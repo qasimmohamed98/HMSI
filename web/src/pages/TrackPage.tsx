@@ -117,7 +117,7 @@ export default function TrackPage() {
                   <p className="font-bold">{ward.name_ar}</p>
                   {ward.name_en && <p className="text-ink/60 small">{ward.name_en}</p>}
                 </div>
-              }}
+              )}
               {department && (
                 <div>
                   <p className="text-sm text-ink/60">{t('tracks.department')}</p>
@@ -144,7 +144,7 @@ export default function TrackPage() {
                 {vitals.map((v, i) => (
                   <div key={i} className="p-2 rounded bg-surface-muted dark:bg-white/10">
                     <p className="text-ink/60 small">{v.recorded_at ? new Date(v.recorded_at).toLocaleString() : '-'}</p>
-                    <p className="font-bold">{t('tracks.temperature')}: {v.temperature ?? '-''} °C</p>
+                    <p className="font-bold">{t('tracks.temperature')}: {v.temperature !== undefined ? v.temperature : '-'} °C</p>
                     <p className="font-bold">{t('tracks.pulse')}: {v.pulse ?? '-'}</p>
                     <p className="font-bold">{t('tracks.spo2')}: {v.spo2 ?? '-'}%</p>
                   </div>
