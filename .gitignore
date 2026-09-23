@@ -4,14 +4,14 @@ node_modules/
 # Build outputs
 dist/
 web/dist/
-api/dist/
+server/dist/
 packages/shared/dist/
 *.tsbuildinfo
 
 # Local database (never commit DB files)
-api/local.db
-api/local.db-wal
-api/local.db-shm
+server/local.db
+server/local.db-wal
+server/local.db-shm
 *.db
 *.db-wal
 *.db-shm

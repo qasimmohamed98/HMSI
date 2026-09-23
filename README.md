@@ -55,7 +55,7 @@ $env:SEED_TOKEN='test-token-123'; npx tsx scripts/smoke.ts   # فحص e2e
 
 > ملاحظة: SQLite المضمّن في `@libsql/client` لا يدعم `ADD COLUMN IF NOT EXISTS`
 > — لِذلك تُضاف الأعمدة عبر ALTER يُسجَّل مرة واحدة في `schema_migrations`.
-> عند مشاكل DB محلياً: احذف `api/local.db{, -wal, -shm}` وأعد migrate/seed.
+> عند مشاكل DB محلياً: احذف `server/local.db{, -wal, -shm}` وأعد migrate/seed.
 
 ---
 
@@ -109,7 +109,7 @@ npm run tauri:icon      # إعادة توليد الأيقونات من tauri/sr
 ## الاختبار
 
 ```bash
-npx tsx api/scripts/smoke.ts    # سلسلة e2e: auth/RBAC/CSRF/discharge/staff-seed
+npx tsx server/scripts/smoke.ts    # سلسلة e2e: auth/RBAC/CSRF/discharge/staff-seed
 npm run typecheck               # tsc لكل الـ workspaces
 npm run build:vercel            # بناء النشر الفعلي
 ```

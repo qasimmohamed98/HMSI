@@ -5,7 +5,7 @@
   "description": "Hospital Management System - Multi-platform (Web / Windows / Android)",
   "workspaces": [
     "web",
-    "api",
+    "server",
     "packages/shared"
   ],
   "scripts": {
