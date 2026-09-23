@@ -16,9 +16,14 @@ export async function runMigrations(): Promise<string[]> {
   const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
 
   const ran: string[] = [];
+  const remote = Boolean(process.env.TURSO_URL);
   for (const f of files) {
     if (applied.has(f)) continue;
-    const sql = readFileSync(join(dir, f), 'utf8');
+    let sql = readFileSync(join(dir, f), 'utf8');
+    if (remote) {
+      // Turso لا يدعم PRAGMA journal_mode
+      sql = sql.replace(/^\s*PRAGMA\s+journal_mode[^;]*;.*$/gim, '');
+    }
     await db.executeMultiple(sql);
     await db.execute({ sql: `INSERT INTO schema_migrations (id) VALUES (?)`, args: [f] });
     ran.push(f);
