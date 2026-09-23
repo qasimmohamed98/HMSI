@@ -24,6 +24,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@netlify/functions": "^6.0.0",
     "@tauri-apps/cli": "^2.11.5",
     "concurrently": "^10.0.5"
   }

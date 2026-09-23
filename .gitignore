@@ -35,8 +35,8 @@ Thumbs.db
 tauri/src-tauri/target/
 src-tauri/target/
 
-# Vercel
-.vercel/
+# Netlify
+.netlify/
 
 # Scratch files
 REEDME.md.txt
