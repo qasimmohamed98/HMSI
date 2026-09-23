@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Cairo", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: #effaf6;
+  --color-brand-100: #d7f2e8;
+  --color-brand-200: #b2e5d5;
+  --color-brand-300: #82d1bd;
+  --color-brand-400: #4fb6a0;
+  --color-brand-500: #2b9b86;
+  --color-brand-600: #1e7f6e;
+  --color-brand-700: #1c665a;
+  --color-brand-800: #1a5249;
+  --color-brand-900: #17443d;
+  --color-brand-950: #0a2823;
+
+  --color-surface: #f6f8f7;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #eef2f0;
+  --color-ink: #0f2420;
+
+  --color-danger-50: #fff1f2;
+  --color-danger-100: #ffe0e2;
+  --color-danger-200: #ffc5c9;
+  --color-danger-300: #fb9ca4;
+  --color-danger-400: #f16a76;
+  --color-danger-500: #e04452;
+  --color-danger-600: #c52937;
+  --color-danger-700: #a4212f;
+  --color-danger-800: #881f2b;
+  --color-danger-900: #711f29;
+  --color-danger-950: #3f0b13;
+
+  --color-warning-50: #fff8eb;
+  --color-warning-100: #feedc7;
+  --color-warning-200: #fddc8a;
+  --color-warning-300: #fbc54d;
+  --color-warning-400: #faab24;
+  --color-warning-500: #f08d0b;
+  --color-warning-600: #d46c06;
+  --color-warning-700: #b04b09;
+  --color-warning-800: #8f3a0e;
+  --color-warning-900: #76310f;
+  --color-warning-950: #441805;
+
+  --color-success-50: #f0fdf5;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-300: #86efac;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #16803a;
+  --color-success-800: #166534;
+  --color-success-900: #14532d;
+  --color-success-950: #052e16;
+
+  --color-info-50: #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-200: #bfdbfe;
+  --color-info-300: #93c5fd;
+  --color-info-400: #60a5fa;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info-700: #1d4ed8;
+  --color-info-800: #1e40af;
+  --color-info-900: #1e3a8a;
+  --color-info-950: #172554;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.375rem;
+  --radius-full: 9999px;
+
+  --shadow-card: 0 1px 2px rgb(15 36 32 / 0.04), 0 4px 16px rgb(15 36 32 / 0.06);
+  --shadow-float: 0 8px 30px rgb(15 36 32 / 0.14);
+  --shadow-pop: 0 12px 48px rgb(15 36 32 / 0.18);
+
+  --animate-skeleton: skeleton 1.4s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.35s ease both;
+  --animate-fade-in: fade-in 0.25s ease both;
+  --animate-slide-end: slide-end 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes skeleton {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-end {
+    from { transform: translateX(var(--slide-from, -100%)); }
+    to { transform: translateX(0); }
+  }
+}
+
+.dark {
+  --color-surface: #0d1716;
+  --color-surface-raised: #14211f;
+  --color-surface-muted: #1b2a27;
+  --color-ink: #e6efec;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+  }
+  [dir="rtl"] body {
+    font-feature-settings: "ss01";
+  }
+  ::selection {
+    background-color: var(--color-brand-200);
+    color: var(--color-brand-950);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-ink) 22%, transparent) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--color-ink) 22%, transparent);
+    border-radius: 9999px;
+  }
+  body::-webkit-scrollbar {
+    width: 10px;
+  }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+web/dist/
+api/dist/
+packages/shared/dist/
+*.tsbuildinfo
+
+# Local database (never commit DB files)
+api/local.db
+api/local.db-wal
+api/local.db-shm
+*.db
+*.db-wal
+*.db-shm
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+dev.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Tauri / Rust
+tauri/src-tauri/target/
+src-tauri/target/
+
+# Vercel
+.vercel/
+
+# Scratch files
+REEDME.md.txt

@@ -1,0 +1,30 @@
+{
+  "name": "hmsi",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hospital Management System - Multi-platform (Web / Windows / Android)",
+  "workspaces": [
+    "web",
+    "api",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -c auto -n api,web \"npm run dev -w @hmsi/api\" \"npm run dev -w @hmsi/web\"",
+    "dev:web": "npm run dev -w web",
+    "dev:api": "npm run dev -w api",
+    "build": "npm run build -w packages/shared && npm run build -w web",
+    "build:vercel": "npm run build && npm run build -w @hmsi/api",
+    "tauri:dev": "tauri dev --project-dir tauri/src-tauri",
+    "tauri:build": "tauri build --project-dir tauri/src-tauri",
+    "tauri:icon": "tauri icon tauri/src-tauri/icons/icon.png",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "audit": "npm audit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.5",
+    "concurrently": "^10.0.5"
+  }
+}

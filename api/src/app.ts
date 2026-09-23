@@ -1,0 +1,36 @@
+import { Hono } from 'hono';
+import { securityHeaders, csrfProtection } from './middleware/security.js';
+import { setUser } from './middleware/auth.js';
+import { authRoutes } from './routes/auth.js';
+import { dashboardRoutes } from './routes/dashboard.js';
+import { patientRoutes } from './routes/patients.js';
+import { recordRoutes } from './routes/records.js';
+import { attachmentRoutes } from './routes/attachments.js';
+import { vitalsRoutes } from './routes/vitals.js';
+import { admissionRoutes } from './routes/admissions.js';
+import { wardRoutes } from './routes/wards.js';
+import { userRoutes } from './routes/users.js';
+import { doctorRoutes } from './routes/doctors.js';
+import { reportRoutes } from './routes/reports.js';
+import { staffRoutes } from './routes/staff.js';
+
+export const api = new Hono();
+
+api.use('*', securityHeaders());
+api.use('*', setUser);
+api.use('*', csrfProtection());
+
+api.route('/api/auth', authRoutes);
+api.route('/api/dashboard', dashboardRoutes);
+api.route('/api/patients', patientRoutes);
+api.route('/api/patients', recordRoutes);
+api.route('/api/patients', attachmentRoutes);
+api.route('/api/vitals', vitalsRoutes);
+api.route('/api/wards', wardRoutes);
+api.route('/api/users', userRoutes);
+api.route('/api/doctors', doctorRoutes);
+api.route('/api/admissions', admissionRoutes);
+api.route('/api/reports', reportRoutes);
+api.route('/api/__staff', staffRoutes);
+
+api.notFound((c) => c.json({ message: 'المسار غير موجود' }, 404));
