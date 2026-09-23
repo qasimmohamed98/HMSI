@@ -9,6 +9,7 @@ const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const PatientsPage = lazy(() => import('@/pages/PatientsPage'));
 const PatientChartPage = lazy(() => import('@/pages/PatientChartPage'));
 const WardsPage = lazy(() => import('@/pages/WardsPage'));
+const DepartmentsPage = lazy(() => import('@/pages/DepartmentsPage'));
 const LaboratoryPage = lazy(() => import('@/pages/LaboratoryPage'));
 const RadiologyPage = lazy(() => import('@/pages/RadiologyPage'));
 const PharmacyPage = lazy(() => import('@/pages/PharmacyPage'));
@@ -16,6 +17,7 @@ const UsersPage = lazy(() => import('@/pages/UsersPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
+const TrackPage = lazy(() => import('@/pages/TrackPage'));
 
 function PageLoader() {
   return (
@@ -56,6 +58,10 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/track/:code',
+    element: withSuspense(<TrackPage />),
+  },
+  {
     path: '/',
     element: (
       <Protected>
@@ -67,6 +73,7 @@ export const router = createBrowserRouter([
       { path: 'patients', element: withSuspense(<PatientsPage />) },
       { path: 'patients/:id', element: withSuspense(<PatientChartPage />) },
       { path: 'wards', element: withSuspense(<WardsPage />) },
+      { path: 'departments', element: withSuspense(<DepartmentsPage />) },
       { path: 'laboratory', element: withSuspense(<LaboratoryPage />) },
       { path: 'radiology', element: withSuspense(<RadiologyPage />) },
       { path: 'pharmacy', element: withSuspense(<PharmacyPage />) },

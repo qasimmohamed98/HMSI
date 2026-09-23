@@ -13,10 +13,14 @@ export const ROLES = [
 export type Role = (typeof ROLES)[number];
 
 export const PERMISSIONS = [
+  'hospitals.manage',
   'users.manage',
   'patients.create',
   'patients.update',
+  'patients.archive',
   'patients.view',
+  'departments.manage',
+  'wards.manage',
   'chart.view',
   'vitals.write',
   'notes.write.doctor',
@@ -40,10 +44,13 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'users.manage',
     'patients.create',
     'patients.update',
+    'patients.archive',
     'patients.view',
     'chart.view',
     'admissions.manage',
     'discharge.approve',
+    'departments.manage',
+    'wards.manage',
     'settings.manage',
     'audit.view',
     'reports.view',
@@ -71,7 +78,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   pharmacist: ['patients.view', 'chart.view', 'medications.manage'],
   lab: ['patients.view', 'chart.view', 'lab.add_result'],
   radiology: ['patients.view', 'chart.view', 'radiology.add_report'],
-  reception: ['patients.create', 'patients.update', 'patients.view', 'admissions.manage'],
+  reception: ['patients.create', 'patients.update', 'patients.archive', 'patients.view', 'admissions.manage'],
   viewer: ['patients.view', 'chart.view'],
 };
 
@@ -325,6 +332,7 @@ export interface Bed {
   room: string;
   bed_no: string;
   status: 'free' | 'occupied';
+  code: string;
 }
 
 export interface Ward {
@@ -351,4 +359,82 @@ export interface ChartData {
   procedures: Procedure[];
   attachments: Attachment[];
   timeline: TimelineEvent[];
+}
+
+export interface Hospital {
+  id: string;
+  name_ar: string;
+  name_en: string;
+  code: string;
+  created_at: string;
+}
+
+export interface Department {
+  id: string;
+  hospital_id: string;
+  name_ar: string;
+  name_en: string;
+  ward_count?: number;
+}
+
+export interface UnassignedPatient {
+  admission_id: string;
+  patient_id: string;
+  patient_name_ar: string;
+  admitted_at: string;
+}
+
+export interface PublicTrackBed {
+  id: string;
+  code: string;
+  room: string;
+  bed_no: string;
+  ward_id: string;
+}
+
+export interface PublicTrackData {
+  bed: PublicTrackBed;
+  hospital: { id: string; name_ar: string; name_en: string };
+  ward: { id: string; name_ar: string; name_en: string } | null;
+  department: { id: string; name_ar: string; name_en: string } | null;
+  occupied: boolean;
+  patient: {
+    id: string;
+    file_number: string;
+    full_name_ar: string;
+    full_name_en: string;
+    gender: Gender;
+    birth_date: string;
+    blood_type: BloodType;
+    allergies: string[];
+    critical_alerts: string[];
+  } | null;
+  admission: {
+    id: string;
+    status: AdmissionStatus;
+    admitted_at: string;
+    discharged_at: string | null;
+    reason: string | null;
+    attending_doctor: string | null;
+  } | null;
+  vitals: Vitals[];
+  notes: MedicalNote[];
+  diagnoses: Diagnosis[];
+  medications: Medication[];
+  labs: LabResult[];
+  radiology: RadiologyReport[];
+  consultations: Consultation[];
+  procedures: Procedure[];
+}
+
+export interface HospitalAdminInfo {
+  id: string;
+  username: string;
+  full_name_ar: string;
+  is_active: boolean;
+}
+
+export interface HospitalListItem extends Hospital {
+  users_count: number;
+  admins: HospitalAdminInfo[];
 }

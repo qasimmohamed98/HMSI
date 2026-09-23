@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, ClipboardList, Trash2 } from 'lucide-react';
+import { Plus, ClipboardList, Trash2, Pencil } from 'lucide-react';
 import { Button, Dialog, Input, Select, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
-import { API, type DiagnosisInput, type ChartData } from '@/lib/api';
+import { API, type DiagnosisUpdateInput, type ChartData } from '@/lib/api';
+import type { Diagnosis } from '@hmsi/shared';
 import { useToast } from '@/components/ui';
 
 export function DiagnosisSection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
@@ -12,12 +13,22 @@ export function DiagnosisSection({ chart, canWrite }: { chart: ChartData; canWri
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Diagnosis | null>(null);
 
   const mut = useMutation({
     mutationFn: API.addDiagnosis,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
       setOpen(false);
+      toast.success(t('common.done'));
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (args: { admissionId: string; id: string; input: DiagnosisUpdateInput }) => API.updateDiagnosis(args.admissionId, args.id, args.input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
+      setEditTarget(null);
       toast.success(t('common.done'));
     },
   });
@@ -65,6 +76,11 @@ export function DiagnosisSection({ chart, canWrite }: { chart: ChartData; canWri
                   {t(`diagnosis.statuses.${d.status}`)}
                 </Badge>
                 {canWrite && chart.admissionId && (
+                  <Button size="icon-sm" variant="ghost" onClick={() => setEditTarget(d)} aria-label={t('common.edit')}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                {canWrite && chart.admissionId && (
                   <Button
                     size="icon-sm"
                     variant="ghost"
@@ -80,21 +96,45 @@ export function DiagnosisSection({ chart, canWrite }: { chart: ChartData; canWri
         </div>
       )}
 
-      <AddDiagnosisDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(input) => mut.mutate(input)} busy={mut.isPending} />
+      <AddDiagnosisDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(input) => mut.mutate({ admissionId: chart.admissionId ?? '', titleAr: input.titleAr ?? '', icd10: input.icd10 ?? null, status: input.status ?? 'suspected' })} busy={mut.isPending} />
+      {editTarget && chart.admissionId && (
+        <AddDiagnosisDialog
+          open
+          onClose={() => setEditTarget(null)}
+          admissionId={chart.admissionId}
+          initial={editTarget}
+          onSubmit={(input) => updateMut.mutate({ admissionId: chart.admissionId!, id: editTarget.id, input })}
+          busy={updateMut.isPending}
+        />
+      )}
     </SectionCard>
   );
 }
 
-function AddDiagnosisDialog({ open, onClose, admissionId, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; onSubmit: (i: DiagnosisInput) => void; busy: boolean }) {
+function AddDiagnosisDialog({
+  open,
+  onClose,
+  admissionId,
+  initial,
+  onSubmit,
+  busy,
+}: {
+  open: boolean;
+  onClose: () => void;
+  admissionId: string | null;
+  initial?: Pick<Diagnosis, 'title_ar' | 'icd10' | 'status'>;
+  onSubmit: (i: DiagnosisUpdateInput) => void;
+  busy: boolean;
+}) {
   const { t } = useTranslation();
-  const [titleAr, setTitleAr] = useState('');
-  const [icd10, setIcd10] = useState('');
-  const [status, setStatus] = useState('suspected');
+  const [titleAr, setTitleAr] = useState(initial?.title_ar ?? '');
+  const [icd10, setIcd10] = useState(initial?.icd10 ?? '');
+  const [status, setStatus] = useState(initial?.status ?? 'suspected');
 
   if (!admissionId) return null;
   const submit = () => {
     if (titleAr.trim().length < 2) return;
-    onSubmit({ admissionId, titleAr, icd10: icd10 || null, status: status as DiagnosisInput['status'] });
+    onSubmit({ titleAr, icd10: icd10 || null, status: status as DiagnosisUpdateInput['status'] });
     setTitleAr('');
     setIcd10('');
     setStatus('suspected');
@@ -104,7 +144,7 @@ function AddDiagnosisDialog({ open, onClose, admissionId, onSubmit, busy }: { op
     <Dialog
       open={open}
       onClose={onClose}
-      title={t('diagnosis.add')}
+      title={initial ? t('common.edit') : t('diagnosis.add')}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -123,7 +163,7 @@ function AddDiagnosisDialog({ open, onClose, admissionId, onSubmit, busy }: { op
           <Select
             label={t('diagnosis.status')}
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => setStatus(e.target.value as Diagnosis['status'])}
             options={(Object.keys(t('diagnosis.statuses', { returnObjects: true }) as object) as string[]).map((k) => ({ value: k, label: t(`diagnosis.statuses.${k}`) }))}
           />
         </div>

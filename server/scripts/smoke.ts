@@ -140,7 +140,7 @@ async function main() {
   const del = (path: string) => api.request(`${base}${path}`, { method: 'DELETE', headers: { cookie: sessionCookie, 'x-csrf-token': csrfToken } });
   const get = (path: string) => api.request(`${base}${path}`, { headers: { cookie: sessionCookie } });
 
-  const newUser = await post('/users', { username: 'smoke_user', password: 'password123', full_name_ar: 'مستخدم تجريبي', role: 'nurse' });
+  const newUser = await post('/users', { username: `smoke_user_${Date.now()}`, password: 'password123', full_name_ar: 'مستخدم تجريبي', role: 'nurse' });
   const newUserBody = (await newUser.json()) as { id: string };
   console.log('create-user', newUser.status, newUserBody.id);
   const updUser = await patch(`/users/${newUserBody.id}`, { full_name_ar: 'مستخدم معدّل', is_active: false });
@@ -208,6 +208,43 @@ async function main() {
   const rep = await get('/reports/overview?from=2026-09-01&to=2026-09-23');
   const repBody = (await rep.json()) as { totalAdmissions: number; totalDischarges: number };
   console.log('reports-overview', rep.status, 'admissions=', repBody.totalAdmissions, 'discharges=', repBody.totalDischarges);
+
+  // —— نهايات التخصيص (org / hospitals / المريض / vitals / استشارة) ——
+  console.log('org-departments-list', (await get('/org/departments')).status);
+  const deptNew = await post('/org/departments', { name_ar: 'قسم تجريبي', name_en: 'Test Dept' });
+  const deptBody = (await deptNew.json()) as { id: string };
+  console.log('org-department-create', deptNew.status, deptBody.id);
+  const deptPatch = await patch(`/org/departments/${deptBody.id}`, { name_ar: 'قسم تجريبي معدّل' });
+  const deptPatchBody = (await deptPatch.json()) as { name_ar: string };
+  console.log('org-department-patch', deptPatch.status, deptPatchBody.name_ar);
+  console.log('org-department-delete', (await del(`/org/departments/${deptBody.id}`)).status);
+
+  const hosp = await get('/hospitals/me');
+  const hospBody = (await hosp.json()) as { name_ar: string; name_en: string };
+  const hospPatch = await patch('/hospitals/me', { name_ar: hospBody.name_ar, name_en: hospBody.name_en });
+  console.log('hospitals-profile', hosp.status, 'patch=', hospPatch.status);
+
+  const vt = await post('/vitals', { admission_id: 'adm1', temperature: 37.1, pulse: 82, respiratory_rate: 16, bp_systolic: 118, bp_diastolic: 78, spo2: 97 });
+  const vtBody = (await vt.json()) as { id: string };
+  const vtPatch = await patch(`/vitals/${vtBody.id}`, { temperature: 37.4 });
+  const vtPatchBody = (await vtPatch.json()) as { temperature: number | null };
+  console.log('vitals-patch', vtPatch.status, 'temp=', vtPatchBody.temperature);
+  console.log('vitals-delete', (await del(`/vitals/${vtBody.id}`)).status);
+
+  const p1Patch = await patch('/patients/p1', { phone: null });
+  const p1PatchBody = (await p1Patch.json()) as { full_name_ar: string };
+  console.log('patient-patch', p1Patch.status, p1PatchBody.full_name_ar);
+
+  const unassigned = await get('/org/unassigned');
+  const unassignedBody = (await unassigned.json()) as unknown[];
+  console.log('org-unassigned', unassigned.status, 'count=', Array.isArray(unassignedBody) ? unassignedBody.length : JSON.stringify(unassignedBody).slice(0, 60));
+
+  const cons2 = await post('/patients/adm2/consultations', { admission_id: 'adm2', specialty: 'طب الأعصاب', reason: 'صداع متكرر' });
+  const cons2Body = (await cons2.json()) as { id: string };
+  const consReqPatch = await patch(`/patients/adm2/consultations/${cons2Body.id}`, { reason: 'صداع متكرر مع دوار' });
+  const consReqPatchBody = (await consReqPatch.json()) as { reason?: string };
+  console.log('consultation-request-patch', consReqPatch.status, consReqPatchBody.reason);
+  console.log('delete-consultation-2', (await del(`/patients/adm2/consultations/${cons2Body.id}`)).status);
 
   // —— نقطة seed المحمية (SEED_TOKEN) ——
   const seedWrong = await api.request(`${base}/__staff/seed`, {

@@ -21,7 +21,7 @@ admissionRoutes.post('/', requireAuth(), requirePermission('admissions.manage'),
   const input = parsed.data as (typeof AdmitPatientSchema)['_output'];
   const session = getSession(c)!;
   try {
-    const result = await admitPatient(input);
+    const result = await admitPatient(input, session.user.hospital_id);
     await addTimeline(
       {
         admissionId: result.admission_id,
@@ -49,11 +49,11 @@ admissionRoutes.post('/:id/transfer', requireAuth(), requirePermission('admissio
   const admissionId = c.req.param('id')!;
   const session = getSession(c)!;
 
-  const scope = await getAdmissionScope(admissionId);
+  const scope = await getAdmissionScope(admissionId, session.user.hospital_id);
   if (!scope) return c.json({ message: 'غير موجود' }, 404);
 
   try {
-    await transferAdmission(admissionId, bed_id);
+    await transferAdmission(admissionId, bed_id, session.user.hospital_id);
     await addTimeline(
       {
         admissionId,
@@ -81,7 +81,7 @@ admissionRoutes.post('/:id/discharge', requireAuth(), requirePermission('dischar
   const admissionId = c.req.param('id')!;
   const session = getSession(c)!;
 
-  const scope = await getAdmissionScope(admissionId);
+  const scope = await getAdmissionScope(admissionId, session.user.hospital_id);
   if (!scope) return c.json({ message: 'غير موجود' }, 404);
   if (scope.admission.status === 'discharged') return c.json({ message: 'الخروج مسجّل مسبقاً' }, 409);
 

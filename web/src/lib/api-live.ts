@@ -83,8 +83,75 @@ export const liveApi: Api = {
         critical_alerts: input.criticalAlerts,
       }),
     }),
+  updatePatient: (id, input) =>
+    request(`/patients/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        full_name_ar: input.fullNameAr,
+        full_name_en: input.fullNameEn,
+        gender: input.gender,
+        birth_date: input.birthDate,
+        phone: input.phone,
+        national_id: input.nationalId,
+        blood_type: input.bloodType,
+        allergies: input.allergies,
+        critical_alerts: input.criticalAlerts,
+      }),
+    }),
+  deletePatient: (id) => request(`/patients/${id}`, { method: 'DELETE' }),
+  admitPatient: (input) =>
+    request('/admissions', {
+      method: 'POST',
+      body: JSON.stringify({
+        patient_id: input.patientId,
+        bed_id: input.bedId,
+        department_id: input.departmentId,
+        attending_doctor_id: input.attendingDoctorId ?? null,
+        reason: input.reason,
+      }),
+    }),
+  transferPatient: (input) =>
+    request(`/admissions/${input.admissionId}/transfer`, { method: 'POST', body: JSON.stringify({ bed_id: input.bedId }) }),
+  wards: () => request('/wards'),
+  listDepartments: () => request('/org/departments'),
+  createDepartment: (input) =>
+    request('/org/departments', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null }) }),
+  updateDepartment: (id, input) =>
+    request(`/org/departments/${id}`, { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null }) }),
+  deleteDepartment: (id) => request(`/org/departments/${id}`, { method: 'DELETE' }),
+  createWard: (input) =>
+    request('/org/wards', { method: 'POST', body: JSON.stringify({ department_id: input.departmentId, name_ar: input.nameAr, name_en: input.nameEn ?? null, ward_type: input.wardType }) }),
+  updateWard: (id, input) =>
+    request(`/org/wards/${id}`, { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, ward_type: input.wardType }) }),
+  deleteWard: (id) => request(`/org/wards/${id}`, { method: 'DELETE' }),
+  createBed: (input) => request('/org/beds', { method: 'POST', body: JSON.stringify({ ward_id: input.wardId, room: input.room, bed_no: input.bedNo }) }),
+  updateBed: (id, input) => request(`/org/beds/${id}`, { method: 'PATCH', body: JSON.stringify({ room: input.room, bed_no: input.bedNo }) }),
+  deleteBed: (id) => request(`/org/beds/${id}`, { method: 'DELETE' }),
+  listUnassigned: () => request('/org/unassigned'),
+  assignBed: (bedId, admissionId) => request(`/org/beds/${bedId}/assign`, { method: 'POST', body: JSON.stringify({ admission_id: admissionId }) }),
+  freeBed: (bedId) => request(`/org/beds/${bedId}/free`, { method: 'POST' }),
+  bedOccupant: async (bedId) => (await request<{ occupant: { admission_id: string; patient_id: string; patient_name_ar: string } | null }>(`/org/beds/${bedId}/occupant`)).occupant,
+  hospitalProfile: () => request('/hospitals/me'),
+  updateHospital: (input) =>
+    request('/hospitals/me', { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn }) }),
+  listUsers: () => request('/users'),
   getChart: (patientId) => request(`/patients/${patientId}/chart`),
   addVitals: (input) => request('/vitals', { method: 'POST', body: JSON.stringify(mapNewVitals(input)) }),
+  updateVitals: (vitalsId, input) =>
+    request(`/vitals/${vitalsId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        temperature: input.temperature,
+        pulse: input.pulse,
+        respiratory_rate: input.respiratoryRate,
+        bp_systolic: input.bpSystolic,
+        bp_diastolic: input.bpDiastolic,
+        spo2: input.spo2,
+        weight: input.weight,
+        glucose: input.glucose,
+      }),
+    }),
+  deleteVitals: (vitalsId) => request(`/vitals/${vitalsId}`, { method: 'DELETE' }),
   addNote: (input) =>
     request(`/patients/${input.admissionId}/notes`, {
       method: 'POST',
@@ -98,6 +165,16 @@ export const liveApi: Api = {
         icd10: input.icd10 ?? null,
         title_ar: input.titleAr,
         title_en: input.titleEn ?? null,
+        status: input.status,
+      }),
+    }),
+  updateDiagnosis: (admissionId, diagnosisId, input) =>
+    request(`/patients/${admissionId}/diagnoses/${diagnosisId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        icd10: input.icd10,
+        title_ar: input.titleAr,
+        title_en: input.titleEn,
         status: input.status,
       }),
     }),
@@ -150,21 +227,6 @@ export const liveApi: Api = {
     }),
   discharge: (input) =>
     request(`/admissions/${input.admissionId}/discharge`, { method: 'POST', body: JSON.stringify({ discharge_type: input.type, summary: input.summary }) }),
-  admitPatient: (input) =>
-    request('/admissions', {
-      method: 'POST',
-      body: JSON.stringify({
-        patient_id: input.patientId,
-        bed_id: input.bedId,
-        department_id: input.departmentId,
-        attending_doctor_id: input.attendingDoctorId ?? null,
-        reason: input.reason,
-      }),
-    }),
-  transferPatient: (input) =>
-    request(`/admissions/${input.admissionId}/transfer`, { method: 'POST', body: JSON.stringify({ bed_id: input.bedId }) }),
-  wards: () => request('/wards'),
-  listUsers: () => request('/users'),
   createUser: (input) =>
     request('/users', {
       method: 'POST',
@@ -200,6 +262,14 @@ export const liveApi: Api = {
     const qs = new URLSearchParams({ from, to });
     return request(`/reports/overview?${qs}`);
   },
+  listHospitals: () => request('/api/hospitals'),
+  createHospital: (input) =>
+    request('/api/hospitals', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn, code: input.code }) }),
+  addHospitalAdmin: (input) =>
+    request('/api/hospitals/:id/admins', { method: 'POST', body: JSON.stringify({ username: input.username, password: input.password, full_name_ar: input.fullNameAr, full_name_en: input.fullNameEn, email: input.email }) },
+    ),
+  publicTrack: (code) => request(`/api/public/beds/${code}/chart`),
+
   updateLabResult: (admissionId, labId, input) =>
     request(`/patients/${admissionId}/labs/${labId}`, {
       method: 'PATCH',
@@ -207,15 +277,32 @@ export const liveApi: Api = {
     }),
   updateRadiology: (admissionId, radiologyId, input) =>
     request(`/patients/${admissionId}/radiology/${radiologyId}`, { method: 'PATCH', body: JSON.stringify({ report: input.report }) }),
-  updateMedicationStatus: (admissionId, medicationId, input) =>
+  updateMedication: (admissionId, medicationId, input) =>
     request(`/patients/${admissionId}/medications/${medicationId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: input.status, end_at: input.endAt ?? null }),
+      body: JSON.stringify({
+        status: input.status,
+        end_at: input.endAt ?? null,
+        name_ar: input.nameAr,
+        name_en: input.nameEn ?? null,
+        dose: input.dose,
+        route: input.route,
+        frequency: input.frequency,
+        start_at: input.startAt,
+      }),
     }),
   updateNote: (admissionId, noteId, input) =>
     request(`/patients/${admissionId}/notes/${noteId}`, { method: 'PATCH', body: JSON.stringify({ content: input.content }) }),
-  respondConsultation: (admissionId, consultationId, input) =>
-    request(`/patients/${admissionId}/consultations/${consultationId}`, { method: 'PATCH', body: JSON.stringify({ response: input.response }) }),
+  updateConsultation: (admissionId, consultationId, input) =>
+    request(`/patients/${admissionId}/consultations/${consultationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ specialty: input.specialty, reason: input.reason, response: input.response }),
+    }),
+  updateProcedure: (admissionId, procedureId, input) =>
+    request(`/patients/${admissionId}/procedures/${procedureId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, notes: input.notes ?? null }),
+    }),
   deleteNote: (admissionId, noteId) => request(`/patients/${admissionId}/notes/${noteId}`, { method: 'DELETE' }),
   deleteDiagnosis: (admissionId, diagnosisId) => request(`/patients/${admissionId}/diagnoses/${diagnosisId}`, { method: 'DELETE' }),
   deleteMedication: (admissionId, medicationId) => request(`/patients/${admissionId}/medications/${medicationId}`, { method: 'DELETE' }),

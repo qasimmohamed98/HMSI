@@ -1,16 +1,17 @@
 import type { Ward, Bed } from '@hmsi/shared';
 import { db } from '../../db/index.js';
 
-export async function getWards(): Promise<Ward[]> {
+export async function getWards(hospitalId: string): Promise<Ward[]> {
   const wards = await db.execute({
     sql: `SELECT w.*, d.name_ar AS department_name_ar, d.name_en AS department_name_en
           FROM wards w LEFT JOIN departments d ON d.id = w.department_id
+          WHERE d.hospital_id = ?
           ORDER BY w.name_ar ASC`,
-    args: [],
+    args: [hospitalId],
   });
   const beds = await db.execute({
-    sql: `SELECT b.* FROM beds b`,
-    args: [],
+    sql: `SELECT b.* FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = ?`,
+    args: [hospitalId],
   });
 
   const byWard = new Map<string, Bed[]>();
@@ -22,6 +23,7 @@ export async function getWards(): Promise<Ward[]> {
       room: String(r.room),
       bed_no: String(r.bed_no),
       status: String(r.status) === 'occupied' ? 'occupied' : 'free',
+      code: String(r.code),
     };
     const list = byWard.get(bed.ward_id) ?? [];
     list.push(bed);

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pill, Timer, Trash2 } from 'lucide-react';
+import { Plus, Pill, Timer, Trash2, Pencil } from 'lucide-react';
 import { Button, Dialog, Input, Badge, Select } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
-import { API, type MedicationInput, type MedicationStatusInput, type ChartData } from '@/lib/api';
+import { API, type MedicationStatusInput, type ChartData } from '@/lib/api';
+import type { Medication } from '@hmsi/shared';
 import { fmtDate, todayISO } from '@/lib/format';
 import { useToast } from '@/components/ui';
 
@@ -13,6 +14,7 @@ export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canW
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Medication | null>(null);
 
   const mut = useMutation({
     mutationFn: API.addMedication,
@@ -24,9 +26,10 @@ export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canW
   });
 
   const updateMut = useMutation({
-    mutationFn: (args: { admissionId: string; medicationId: string; input: MedicationStatusInput }) => API.updateMedicationStatus(args.admissionId, args.medicationId, args.input),
+    mutationFn: (args: { admissionId: string; medicationId: string; input: MedicationStatusInput }) => API.updateMedication(args.admissionId, args.medicationId, args.input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
+      setEditTarget(null);
       toast.success(t('common.done'));
     },
   });
@@ -105,6 +108,11 @@ export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canW
                   <Badge variant={badge(m.status)}>{t(`medications.statuses.${m.status}`)}</Badge>
                 )}
                 {canWrite && chart.admissionId && (
+                  <Button size="icon-sm" variant="ghost" onClick={() => setEditTarget(m)} aria-label={t('common.edit')}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                {canWrite && chart.admissionId && (
                   <Button
                     size="icon-sm"
                     variant="ghost"
@@ -120,25 +128,49 @@ export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canW
         </div>
       )}
 
-      <AddMedicationDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
+      <AddMedicationDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate({ admissionId: chart.admissionId ?? '', nameAr: i.nameAr ?? '', dose: i.dose ?? '', route: i.route ?? '', frequency: i.frequency ?? '', startAt: i.startAt ?? todayISO() })} busy={mut.isPending} />
+      {editTarget && chart.admissionId && (
+        <AddMedicationDialog
+          open
+          onClose={() => setEditTarget(null)}
+          admissionId={chart.admissionId}
+          initial={editTarget}
+          onSubmit={(i) => updateMut.mutate({ admissionId: chart.admissionId!, medicationId: editTarget.id, input: i })}
+          busy={updateMut.isPending}
+        />
+      )}
     </SectionCard>
   );
 }
 
 type MedicationStatus = 'active' | 'discontinued' | 'completed';
 
-function AddMedicationDialog({ open, onClose, admissionId, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; onSubmit: (i: MedicationInput) => void; busy: boolean }) {
+function AddMedicationDialog({
+  open,
+  onClose,
+  admissionId,
+  initial,
+  onSubmit,
+  busy,
+}: {
+  open: boolean;
+  onClose: () => void;
+  admissionId: string | null;
+  initial?: Pick<Medication, 'name_ar' | 'dose' | 'route' | 'frequency' | 'start_at'>;
+  onSubmit: (i: MedicationStatusInput) => void;
+  busy: boolean;
+}) {
   const { t } = useTranslation();
-  const [nameAr, setNameAr] = useState('');
-  const [dose, setDose] = useState('');
-  const [route, setRoute] = useState('');
-  const [frequency, setFrequency] = useState('');
-  const [start, setStart] = useState(todayISO());
+  const [nameAr, setNameAr] = useState(initial?.name_ar ?? '');
+  const [dose, setDose] = useState(initial?.dose ?? '');
+  const [route, setRoute] = useState(initial?.route ?? '');
+  const [frequency, setFrequency] = useState(initial?.frequency ?? '');
+  const [start, setStart] = useState(initial?.start_at ?? todayISO());
 
   if (!admissionId) return null;
   const submit = () => {
     if (nameAr.trim().length < 2 || !dose.trim()) return;
-    onSubmit({ admissionId, nameAr, dose, route, frequency, startAt: start });
+    onSubmit({ nameAr, dose, route, frequency, startAt: start });
     setNameAr('');
     setDose('');
     setRoute('');
@@ -150,7 +182,7 @@ function AddMedicationDialog({ open, onClose, admissionId, onSubmit, busy }: { o
     <Dialog
       open={open}
       onClose={onClose}
-      title={t('medications.add')}
+      title={initial ? t('common.edit') : t('medications.add')}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

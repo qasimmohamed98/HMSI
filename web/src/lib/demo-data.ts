@@ -14,6 +14,7 @@ import type {
   Ward,
   Bed,
   AdmissionSummary,
+  Department,
 } from '@hmsi/shared';
 
 export interface AdmissionRecord {
@@ -33,7 +34,15 @@ export interface AdmissionRecord {
 export interface DemoStore {
   users: (User & { password: string })[];
   patients: Record<string, { patient: Patient; record: AdmissionRecord | null }>;
+  departments: Department[];
   wards: Ward[];
+  hospital: {
+    id: string;
+    name_ar: string;
+    name_en: string;
+    code: string;
+    created_at: string;
+  };
   activity: TimelineEvent[];
   currentUser: User | null;
   sideEffects: number;
@@ -486,7 +495,9 @@ export function createDemoStore(): DemoStore {
   return {
     users,
     patients,
+    departments: DEMO_DEPARTMENTS.map((d) => ({ ...d, hospital_id: 'h-1' })),
     wards,
+    hospital: { id: 'h-1', name_ar: 'مستشفى المدينة الجامعي', name_en: 'City University Hospital', code: 'H-1', created_at: daysAgo(400) },
     activity,
     currentUser: null,
     sideEffects: 0,

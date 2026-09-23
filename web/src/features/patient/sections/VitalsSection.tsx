@@ -1,26 +1,51 @@
 import { useTranslation } from 'react-i18next';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
-import { Plus } from 'lucide-react';
-import { Button, Dialog, Input } from '@/components/ui';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Button, Dialog, Input, ConfirmDialog } from '@/components/ui';
 import { SectionCard } from './SectionCard';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { API, type NewVitalsInput, type ChartData } from '@/lib/api';
+import { API, type NewVitalsInput, type VitalsUpdateInput, type ChartData } from '@/lib/api';
 import { fmtDateTime } from '@/lib/format';
 import { useToast } from '@/components/ui';
+import type { Vitals } from '@hmsi/shared';
 
 export function VitalsSection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Vitals | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Vitals | null>(null);
 
-  const mut = useMutation({
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
+    void qc.invalidateQueries({ queryKey: ['dashboard'] });
+  };
+
+  const addMut = useMutation({
     mutationFn: API.addVitals,
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
-      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidate();
       setOpen(false);
+      toast.success(t('common.done'));
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (args: { id: string; input: VitalsUpdateInput }) => API.updateVitals(args.id, args.input),
+    onSuccess: () => {
+      invalidate();
+      setEditTarget(null);
+      toast.success(t('common.done'));
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => API.deleteVitals(id),
+    onSuccess: () => {
+      invalidate();
+      setDeleteTarget(null);
       toast.success(t('common.done'));
     },
   });
@@ -72,10 +97,20 @@ export function VitalsSection({ chart, canWrite }: { chart: ChartData; canWrite:
           <p className="py-10 text-center text-sm font-medium text-ink/40">{t('vitals.empty')}</p>
         ) : (
           <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full min-w-[520px] text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-ink/10 text-start text-[0.7rem] font-bold uppercase text-ink/45">
-                  {[t('vitals.recordedAt'), t('vitals.temperature'), t('vitals.pulse'), t('vitals.respiratoryRate'), t('vitals.bp'), t('vitals.spo2'), t('vitals.weight'), t('vitals.glucose')].map((h) => (
+                  {[
+                    t('vitals.recordedAt'),
+                    t('vitals.temperature'),
+                    t('vitals.pulse'),
+                    t('vitals.respiratoryRate'),
+                    t('vitals.bp'),
+                    t('vitals.spo2'),
+                    t('vitals.weight'),
+                    t('vitals.glucose'),
+                    canWrite ? t('common.actions') : '',
+                  ].map((h) => (
                     <th key={h} className="px-3 py-2 text-start">
                       {h}
                     </th>
@@ -93,6 +128,18 @@ export function VitalsSection({ chart, canWrite }: { chart: ChartData; canWrite:
                     <td className="px-3 py-2.5 tabular"><Cell value={v.spo2} suffix="%" warn={v.spo2 != null && v.spo2 < 94} /></td>
                     <td className="px-3 py-2.5 tabular"><Cell value={v.weight} suffix="" /></td>
                     <td className="px-3 py-2.5 tabular"><Cell value={v.glucose} suffix="" warn={v.glucose != null && v.glucose > 180} /></td>
+                    {canWrite && (
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1">
+                          <Button size="icon-sm" variant="ghost" onClick={() => setEditTarget(v)} aria-label={t('common.edit')}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon-sm" variant="ghost" className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30" onClick={() => setDeleteTarget(v)} aria-label={t('common.delete')}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -101,32 +148,68 @@ export function VitalsSection({ chart, canWrite }: { chart: ChartData; canWrite:
         )}
       </SectionCard>
 
-      <AddVitalsDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(v) => mut.mutate(v)} busy={mut.isPending} />
+      {chart.admissionId && (
+        <VitalsDialog open={open} onClose={() => setOpen(false)} onSubmit={(v) => addMut.mutate({ admissionId: chart.admissionId!, ...v })} busy={addMut.isPending} />
+      )}
+      {editTarget && (
+        <VitalsDialog
+          open
+          onClose={() => setEditTarget(null)}
+          initial={editTarget}
+          onSubmit={(v) => updateMut.mutate({ id: editTarget.id, input: v })}
+          busy={updateMut.isPending}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          open
+          onClose={() => setDeleteTarget(null)}
+          title={t('common.delete')}
+          message={t('vitals.deleteConfirm', { when: fmtDateTime(deleteTarget.recorded_at) })}
+          busy={deleteMut.isPending}
+          onConfirm={() => deleteMut.mutate(deleteTarget.id)}
+        />
+      )}
     </div>
   );
 }
 
-function Cell({ value, suffix, warn }: { value: string | number | null; suffix?: string; warn?: boolean }) {
-  if (value == null || value === '' || value === 'null/null') return <span className="text-ink/30">—</span>;
-  return (
-    <span className={`font-bold tabular ${warn ? 'text-danger-600' : 'text-ink'}`}>
-      {String(value)}
-      {suffix && <span className="ms-0.5 text-[0.7rem] font-medium text-ink/40">{suffix}</span>}
-    </span>
-  );
-}
+type VitalsValues = Omit<NewVitalsInput, 'admissionId'>;
 
-function AddVitalsDialog({ open, onClose, admissionId, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; onSubmit: (v: NewVitalsInput) => void; busy: boolean }) {
+function VitalsDialog({
+  open,
+  onClose,
+  initial,
+  onSubmit,
+  busy,
+}: {
+  open: boolean;
+  onClose: () => void;
+  initial?: Vitals | null;
+  onSubmit: (v: VitalsValues) => void;
+  busy: boolean;
+}) {
   const { t } = useTranslation();
-  const [values, setValues] = useState<Record<string, string>>({});
-  if (!admissionId) return null;
+  const [values, setValues] = useState<Record<string, string>>(
+    initial
+      ? {
+          temperature: initial.temperature != null ? String(initial.temperature) : '',
+          pulse: initial.pulse != null ? String(initial.pulse) : '',
+          rr: initial.respiratory_rate != null ? String(initial.respiratory_rate) : '',
+          bpS: initial.bp_systolic != null ? String(initial.bp_systolic) : '',
+          bpD: initial.bp_diastolic != null ? String(initial.bp_diastolic) : '',
+          spo2: initial.spo2 != null ? String(initial.spo2) : '',
+          weight: initial.weight != null ? String(initial.weight) : '',
+          glucose: initial.glucose != null ? String(initial.glucose) : '',
+        }
+      : {},
+  );
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setValues((v) => ({ ...v, [k]: e.target.value }));
-  const num = (k: string) => (values[k] === '' ? null : Number(values[k]));
+  const num = (k: string) => (values[k] === '' || values[k] == null ? null : Number(values[k]));
 
   const submit = () => {
     onSubmit({
-      admissionId,
       temperature: num('temperature'),
       pulse: num('pulse'),
       respiratoryRate: num('rr'),
@@ -153,7 +236,7 @@ function AddVitalsDialog({ open, onClose, admissionId, onSubmit, busy }: { open:
     <Dialog
       open={open}
       onClose={onClose}
-      title={t('vitals.add')}
+      title={initial ? t('common.edit') : t('vitals.add')}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -171,5 +254,15 @@ function AddVitalsDialog({ open, onClose, admissionId, onSubmit, busy }: { open:
         ))}
       </div>
     </Dialog>
+  );
+}
+
+function Cell({ value, suffix, warn }: { value: string | number | null; suffix?: string; warn?: boolean }) {
+  if (value == null || value === '' || value === 'null/null') return <span className="text-ink/30">—</span>;
+  return (
+    <span className={`font-bold tabular ${warn ? 'text-danger-600' : 'text-ink'}`}>
+      {String(value)}
+      {suffix && <span className="ms-0.5 text-[0.7rem] font-medium text-ink/40">{suffix}</span>}
+    </span>
   );
 }

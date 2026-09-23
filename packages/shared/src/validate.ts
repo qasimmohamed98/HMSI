@@ -5,6 +5,7 @@ import {
   NOTE_KINDS,
   DIAGNOSIS_STATUSES,
   MEDICATION_STATUSES,
+  WARD_TYPES,
 } from './types.js';
 
 const id = z.string().min(1).max(64);
@@ -61,6 +62,8 @@ export const CreateVitalsSchema = z.object({
   weight: z.coerce.number().min(1).max(400).nullable().optional(),
   glucose: z.coerce.number().min(10).max(800).nullable().optional(),
 });
+
+export const UpdateVitalsSchema = CreateVitalsSchema.omit({ admission_id: true }).partial();
 
 export const CreateNoteSchema = z.object({
   admission_id: id,
@@ -137,9 +140,15 @@ export const UpdateRadiologySchema = z.object({
 });
 
 export const UpdateMedicationSchema = z.object({
-  status: z.enum(MEDICATION_STATUSES),
+  status: z.enum(MEDICATION_STATUSES).optional(),
   end_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-});
+  name_ar: z.string().min(2).max(120).optional(),
+  name_en: z.string().max(120).optional().nullable(),
+  dose: z.string().max(60).optional(),
+  route: z.string().max(60).optional(),
+  frequency: z.string().max(60).optional(),
+  start_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).refine((v) => Object.values(v).some((x) => x !== undefined && x !== null), { message: 'لا توجد بيانات للتحديث' });
 
 export const UpdateNoteSchema = z.object({
   content: z.string().min(2).max(4000),
@@ -153,8 +162,87 @@ export const UpdateUserSchema = z.object({
   is_active: z.coerce.boolean().optional(),
 });
 
+export const CreateDepartmentSchema = z.object({
+  name_ar: z.string().min(2).max(120),
+  name_en: z.string().min(2).max(120).nullable().optional(),
+});
+
+export const UpdateDepartmentSchema = CreateDepartmentSchema.partial();
+
+export const CreateWardSchema = z.object({
+  department_id: id,
+  name_ar: z.string().min(2).max(120),
+  name_en: z.string().min(2).max(120).nullable().optional(),
+  ward_type: z.enum(WARD_TYPES),
+});
+
+export const UpdateWardSchema = CreateWardSchema.partial();
+
+export const CreateBedSchema = z.object({
+  ward_id: id,
+  room: z.string().min(1).max(40),
+  bed_no: z.string().min(1).max(40),
+});
+
+export const UpdateBedSchema = z.object({
+  room: z.string().min(1).max(40).optional(),
+  bed_no: z.string().min(1).max(40).optional(),
+});
+
+export const UpdateHospitalSchema = z.object({
+  name_ar: z.string().min(2).max(160),
+  name_en: z.string().min(2).max(160),
+});
+
+export const CreateHospitalSchema = z.object({
+  name_ar: z.string().min(2).max(160),
+  name_en: z.string().min(2).max(160),
+  code: z.string().min(2).max(20).optional(),
+});
+
+export const CreateHospitalAdminSchema = z.object({
+  username: z.string().min(3).max(64).regex(/^[a-zA-Z0-9_.-]+$/),
+  password: z.string().min(8).max(128),
+  full_name_ar: z.string().min(2).max(100),
+  full_name_en: z.string().min(2).max(100).optional(),
+  email: z.string().email().optional().nullable(),
+});
+
+export const UpdatePatientSchema = z.object({
+  full_name_ar: z.string().min(2).max(120).optional(),
+  full_name_en: z.string().max(120).optional().nullable(),
+  gender: z.enum(GENDERS).optional(),
+  birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  phone: z.string().max(500).nullable().optional(),
+  national_id: z.string().max(500).nullable().optional(),
+  blood_type: z.enum(BLOOD_TYPES).optional(),
+  allergies: z.array(z.string().max(100)).optional(),
+  critical_alerts: z.array(z.string().max(120)).optional(),
+});
+
+export const UpdateDiagnosisSchema = z.object({
+  icd10: z.string().max(20).optional().nullable(),
+  title_ar: z.string().min(2).max(200).optional(),
+  title_en: z.string().max(200).optional().nullable(),
+  status: z.enum(DIAGNOSIS_STATUSES).optional(),
+});
+
+export const UpdateProcedureSchema = z.object({
+  name_ar: z.string().min(2).max(120).optional(),
+  name_en: z.string().max(120).optional().nullable(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
+export const UpdateConsultationSchema = z.object({
+  specialty: z.string().min(2).max(80).optional(),
+  reason: z.string().min(2).max(1000).optional(),
+  response: z.string().min(2).max(2000).optional(),
+});
+
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type CreatePatientInput = z.infer<typeof CreatePatientSchema>;
+export type CreateHospitalInput = z.infer<typeof CreateHospitalSchema>;
+export type CreateHospitalAdminInput = z.infer<typeof CreateHospitalAdminSchema>;
 export type AdmitPatientInput = z.infer<typeof AdmitPatientSchema>;
 export type CreateVitalsInput = z.infer<typeof CreateVitalsSchema>;
 export type CreateNoteInput = z.infer<typeof CreateNoteSchema>;

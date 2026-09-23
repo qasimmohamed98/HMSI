@@ -11,7 +11,9 @@ import {
   UpdateRadiologySchema,
   UpdateMedicationSchema,
   UpdateNoteSchema,
-  RespondConsultationSchema,
+  UpdateDiagnosisSchema,
+  UpdateProcedureSchema,
+  UpdateConsultationSchema,
 } from '@hmsi/shared/validate';
 import type { Context } from 'hono';
 import { getSession, requireAuth, requirePermission } from '../middleware/auth.js';
@@ -259,13 +261,96 @@ recordRoutes.patch('/:admissionId/medications/:id', requireAuth(), requirePermis
   const { row, authorized } = await ownsRecord('medications', id, admissionId, session.user.id, session.user.role === 'super_admin');
   void row;
   if (!authorized) return c.json({ message: 'السجل غير موجود' }, 404);
-  await db.execute({
-    sql: `UPDATE medications SET status = ?, end_at = COALESCE(?, end_at) WHERE id = ?`,
-    args: [input.status, input.end_at ?? null, id],
-  });
-  await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'medication', titleAr: 'تحديث حالة دواء', titleEn: 'Medication status updated' }, new Date().toISOString());
-  await writeAudit({ actorId: session.user.id, action: 'medication_updated', resourceType: 'medication', resourceId: id, meta: { status: input.status }, ip: c.req.header('x-forwarded-for') });
+
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  const cols: Record<string, keyof typeof input> = {
+    name_ar: 'name_ar',
+    name_en: 'name_en',
+    dose: 'dose',
+    route: 'route',
+    frequency: 'frequency',
+    start_at: 'start_at',
+    status: 'status',
+    end_at: 'end_at',
+  };
+  for (const [col, key] of Object.entries(cols)) {
+    const v = input[key];
+    if (v !== undefined) {
+      sets.push(`${col} = ?`);
+      args.push(v === null ? null : String(v));
+    }
+  }
+  if (sets.length === 0) return c.json({ message: 'لا توجد بيانات للتحديث' }, 400);
+  args.push(id);
+  await db.execute({ sql: `UPDATE medications SET ${sets.join(', ')} WHERE id = ?`, args });
+  await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'medication', titleAr: 'تحديث دواء', titleEn: 'Medication updated' }, new Date().toISOString());
+  await writeAudit({ actorId: session.user.id, action: 'medication_updated', resourceType: 'medication', resourceId: id, ip: c.req.header('x-forwarded-for') });
   const updated = await db.execute({ sql: `SELECT * FROM medications WHERE id = ? LIMIT 1`, args: [id] });
+  return c.json(updated.rows[0], 200);
+});
+
+recordRoutes.patch('/:admissionId/diagnoses/:id', requireAuth(), requirePermission('notes.write.doctor'), async (c) => {
+  const parsed = await parseBody(c, UpdateDiagnosisSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof UpdateDiagnosisSchema)['_output'];
+  const admissionId = c.req.param('admissionId')!;
+  const id = c.req.param('id')!;
+  const session = getSession(c)!;
+  const failed = await guard(c, admissionId);
+  if (failed) return failed;
+  const { row, authorized } = await ownsRecord('diagnoses', id, admissionId, session.user.id, session.user.role === 'super_admin');
+  if (!row) return c.json({ message: 'السجل غير موجود' }, 404);
+  if (!authorized) return c.json({ message: 'غير مصرح لك بتعديل هذا التشخيص' }, 403);
+
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  const cols: Record<string, keyof typeof input> = { icd10: 'icd10', title_ar: 'title_ar', title_en: 'title_en', status: 'status' };
+  for (const [col, key] of Object.entries(cols)) {
+    const v = input[key];
+    if (v !== undefined) {
+      sets.push(`${col} = ?`);
+      args.push(v === null ? null : String(v));
+    }
+  }
+  if (sets.length === 0) return c.json({ message: 'لا توجد بيانات للتحديث' }, 400);
+  args.push(id);
+  await db.execute({ sql: `UPDATE diagnoses SET ${sets.join(', ')} WHERE id = ?`, args });
+  await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'diagnosis', titleAr: 'تعديل تشخيص', titleEn: 'Diagnosis updated' }, new Date().toISOString());
+  await writeAudit({ actorId: session.user.id, action: 'diagnosis_updated', resourceType: 'diagnosis', resourceId: id, ip: c.req.header('x-forwarded-for') });
+  const updated = await db.execute({ sql: `SELECT * FROM diagnoses WHERE id = ? LIMIT 1`, args: [id] });
+  return c.json(updated.rows[0], 200);
+});
+
+recordRoutes.patch('/:admissionId/procedures/:id', requireAuth(), requirePermission('notes.write.doctor'), async (c) => {
+  const parsed = await parseBody(c, UpdateProcedureSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof UpdateProcedureSchema)['_output'];
+  const admissionId = c.req.param('admissionId')!;
+  const id = c.req.param('id')!;
+  const session = getSession(c)!;
+  const failed = await guard(c, admissionId);
+  if (failed) return failed;
+  const { row, authorized } = await ownsRecord('procedures', id, admissionId, session.user.id, session.user.role === 'super_admin');
+  if (!row) return c.json({ message: 'السجل غير موجود' }, 404);
+  if (!authorized) return c.json({ message: 'غير مصرح لك بتعديل هذا الإجراء' }, 403);
+
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  const cols: Record<string, keyof typeof input> = { name_ar: 'name_ar', name_en: 'name_en', notes: 'notes' };
+  for (const [col, key] of Object.entries(cols)) {
+    const v = input[key];
+    if (v !== undefined) {
+      sets.push(`${col} = ?`);
+      args.push(v === null ? null : String(v));
+    }
+  }
+  if (sets.length === 0) return c.json({ message: 'لا توجد بيانات للتحديث' }, 400);
+  args.push(id);
+  await db.execute({ sql: `UPDATE procedures SET ${sets.join(', ')} WHERE id = ?`, args });
+  await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'procedure', titleAr: 'تعديل إجراء', titleEn: 'Procedure updated' }, new Date().toISOString());
+  await writeAudit({ actorId: session.user.id, action: 'procedure_updated', resourceType: 'procedure', resourceId: id, ip: c.req.header('x-forwarded-for') });
+  const updated = await db.execute({ sql: `SELECT * FROM procedures WHERE id = ? LIMIT 1`, args: [id] });
   return c.json(updated.rows[0], 200);
 });
 
@@ -295,23 +380,42 @@ recordRoutes.patch('/:admissionId/notes/:id', requireAuth(), async (c) => {
 });
 
 recordRoutes.patch('/:admissionId/consultations/:id', requireAuth(), requirePermission('notes.write.doctor'), async (c) => {
-  const parsed = await parseBody(c, RespondConsultationSchema);
+  const parsed = await parseBody(c, UpdateConsultationSchema);
   if (!parsed.ok) return parsed.json;
-  const input = parsed.data as (typeof RespondConsultationSchema)['_output'];
+  const input = parsed.data as (typeof UpdateConsultationSchema)['_output'];
   const admissionId = c.req.param('admissionId')!;
   const id = c.req.param('id')!;
   const session = getSession(c)!;
   const failed = await guard(c, admissionId);
   if (failed) return failed;
   const { row, authorized } = await ownsRecord('consultations', id, admissionId, session.user.id, session.user.role === 'super_admin');
-  void row;
+  if (!row) return c.json({ message: 'السجل غير موجود' }, 404);
   if (!authorized) return c.json({ message: 'السجل غير موجود' }, 404);
+
+  const alreadyResponded = Boolean(row.response);
+  if (input.response !== undefined) {
+    if (alreadyResponded) return c.json({ message: 'تم الرد على الاستشارة مسبقاً' }, 409);
+    if (String(input.response).trim().length < 2) return c.json({ message: 'الرد قصير جداً' }, 400);
+    await db.execute({
+      sql: `UPDATE consultations SET response = ?, responded_by = ?, responded_at = datetime('now') WHERE id = ?`,
+      args: [input.response, session.user.full_name_ar, id],
+    });
+    await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'consultation', titleAr: 'رد الاستشارة', titleEn: 'Consultation answered' }, new Date().toISOString());
+    await writeAudit({ actorId: session.user.id, action: 'consultation_responded', resourceType: 'consultation', resourceId: id, ip: c.req.header('x-forwarded-for') });
+    const updated = await db.execute({ sql: `SELECT * FROM consultations WHERE id = ? LIMIT 1`, args: [id] });
+    return c.json(updated.rows[0], 200);
+  }
+
+  if (alreadyResponded) return c.json({ message: 'لا يمكن تعديل استشارة تم الرد عليها' }, 409);
+  if (input.specialty === undefined && input.reason === undefined) {
+    return c.json({ message: 'لا توجد بيانات للتحديث' }, 400);
+  }
   await db.execute({
-    sql: `UPDATE consultations SET response = ?, responded_by = ?, responded_at = datetime('now') WHERE id = ?`,
-    args: [input.response, session.user.full_name_ar, id],
+    sql: `UPDATE consultations SET specialty = COALESCE(?, specialty), reason = COALESCE(?, reason) WHERE id = ?`,
+    args: [input.specialty ?? null, input.reason ?? null, id],
   });
-  await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'consultation', titleAr: 'رد الاستشارة', titleEn: 'Consultation answered' }, new Date().toISOString());
-  await writeAudit({ actorId: session.user.id, action: 'consultation_responded', resourceType: 'consultation', resourceId: id, ip: c.req.header('x-forwarded-for') });
+  await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'consultation', titleAr: 'تعديل طلب استشارة', titleEn: 'Consultation request updated' }, new Date().toISOString());
+  await writeAudit({ actorId: session.user.id, action: 'consultation_updated', resourceType: 'consultation', resourceId: id, ip: c.req.header('x-forwarded-for') });
   const updated = await db.execute({ sql: `SELECT * FROM consultations WHERE id = ? LIMIT 1`, args: [id] });
   return c.json(updated.rows[0], 200);
 });

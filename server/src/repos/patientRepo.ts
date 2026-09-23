@@ -1,6 +1,5 @@
 import type { Patient, AdmissionSummary } from '@hmsi/shared';
 import { db, uuid } from '../../db/index.js';
-import { DEFAULT_HOSPITAL_ID } from '../config.js';
 
 export interface PatientListOptions {
   search?: string;
@@ -48,9 +47,9 @@ export function mapPatient(r: Record<string, unknown>, admission: AdmissionSumma
 
 const PATIENT_SELECT = `SELECT p.* FROM patients p`;
 
-export async function listPatients(opts: PatientListOptions = {}): Promise<Patient[]> {
-  const where: string[] = [`p.hospital_id = ?`];
-  const args: (string | number)[] = [DEFAULT_HOSPITAL_ID];
+export async function listPatients(hospitalId: string, opts: PatientListOptions = {}): Promise<Patient[]> {
+  const where: string[] = [`p.hospital_id = ?`, `p.archived_at IS NULL`];
+  const args: (string | number)[] = [hospitalId];
   if (opts.search) {
     where.push(`(p.full_name_ar LIKE ? OR p.full_name_en LIKE ? OR p.file_number LIKE ?)`);
     args.push(`%${opts.search}%`, `%${opts.search}%`, `%${opts.search}%`);
@@ -95,10 +94,10 @@ export async function listPatients(opts: PatientListOptions = {}): Promise<Patie
   });
 }
 
-export async function getPatientById(id: string): Promise<Patient | null> {
+export async function getPatientById(id: string, hospitalId: string): Promise<Patient | null> {
   const rows = await db.execute({
-    sql: `${PATIENT_SELECT} WHERE p.id = ? AND p.hospital_id = ? LIMIT 1`,
-    args: [id, DEFAULT_HOSPITAL_ID],
+    sql: `${PATIENT_SELECT} WHERE p.id = ? AND p.hospital_id = ? AND p.archived_at IS NULL LIMIT 1`,
+    args: [id, hospitalId],
   });
   if (rows.rows.length === 0) return null;
   const r = rows.rows[0] as Record<string, unknown>;
@@ -131,7 +130,7 @@ export async function createPatient(input: {
   blood_type: string;
   allergies: string[];
   critical_alerts: string[];
-}, createdBy: string): Promise<Patient> {
+}, createdBy: string, hospitalId: string): Promise<Patient> {
   const id = uuid('pat');
   const fileNumber = `FM-${String(24500 + Math.floor(Math.random() * 9000)).slice(0, 5)}`;
   const result = await db.execute({
@@ -139,7 +138,7 @@ export async function createPatient(input: {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
     args: [
       id,
-      DEFAULT_HOSPITAL_ID,
+      hospitalId,
       fileNumber,
       input.full_name_ar,
       input.full_name_en ?? null,
@@ -154,5 +153,79 @@ export async function createPatient(input: {
     ],
   });
   void result;
-  return (await getPatientById(id))!;
+  return (await getPatientById(id, hospitalId))!;
+}
+
+export async function updatePatient(id: string, hospitalId: string, input: {
+  full_name_ar?: string;
+  full_name_en?: string | null;
+  gender?: 'male' | 'female';
+  birth_date?: string;
+  phone?: string | null;
+  national_id?: string | null;
+  blood_type?: string;
+  allergies?: string[];
+  critical_alerts?: string[];
+}): Promise<Patient | null> {
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  const cols: Record<string, keyof typeof input> = {
+    full_name_ar: 'full_name_ar',
+    full_name_en: 'full_name_en',
+    gender: 'gender',
+    birth_date: 'birth_date',
+    phone: 'phone',
+    national_id: 'national_id',
+    blood_type: 'blood_type',
+  };
+  for (const [col, key] of Object.entries(cols)) {
+    const v = input[key];
+    if (v !== undefined) {
+      sets.push(`${col} = ?`);
+      args.push(v === null ? null : String(v));
+    }
+  }
+  if (input.allergies !== undefined) {
+    sets.push('allergies_json = ?');
+    args.push(JSON.stringify(input.allergies));
+  }
+  if (input.critical_alerts !== undefined) {
+    sets.push('critical_alerts_json = ?');
+    args.push(JSON.stringify(input.critical_alerts));
+  }
+  if (sets.length === 0) return null;
+  args.push(id, hospitalId);
+  await db.execute({
+    sql: `UPDATE patients SET ${sets.join(', ')} WHERE id = ? AND hospital_id = ? AND archived_at IS NULL`,
+    args,
+  });
+  return getPatientById(id, hospitalId);
+}
+
+export async function archivePatient(id: string, hospitalId: string): Promise<boolean> {
+  const rows = await db.execute({
+    sql: `SELECT id FROM patients WHERE id = ? AND hospital_id = ? AND archived_at IS NULL LIMIT 1`,
+    args: [id, hospitalId],
+  });
+  if (rows.rows.length === 0) return false;
+
+  const active = await db.execute({
+    sql: `SELECT id, bed_id FROM admissions WHERE patient_id = ? AND status = 'active'`,
+    args: [id],
+  });
+  for (const row of active.rows) {
+    const r = row as Record<string, unknown>;
+    await db.execute({
+      sql: `UPDATE admissions SET status = 'discharged', discharged_at = datetime('now'), bed_id = NULL WHERE id = ?`,
+      args: [String(r.id)],
+    });
+    if (r.bed_id) {
+      await db.execute({ sql: `UPDATE beds SET status = 'free' WHERE id = ?`, args: [String(r.bed_id)] });
+    }
+  }
+  await db.execute({
+    sql: `UPDATE patients SET archived_at = datetime('now'), status = 'discharged' WHERE id = ?`,
+    args: [id],
+  });
+  return true;
 }

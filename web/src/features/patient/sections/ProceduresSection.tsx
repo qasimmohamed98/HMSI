@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Scissors, Trash2 } from 'lucide-react';
+import { Plus, Scissors, Trash2, Pencil } from 'lucide-react';
 import { Button, Dialog, Input, Textarea } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
-import { API, type ProcedureInput, type ChartData } from '@/lib/api';
+import { API, type ProcedureUpdateInput, type ChartData } from '@/lib/api';
+import type { Procedure } from '@hmsi/shared';
 import { fmtDateTime } from '@/lib/format';
 import { useToast } from '@/components/ui';
 
@@ -13,12 +14,22 @@ export function ProceduresSection({ chart, canWrite }: { chart: ChartData; canWr
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Procedure | null>(null);
 
   const mut = useMutation({
     mutationFn: API.addProcedure,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
       setOpen(false);
+      toast.success(t('common.done'));
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (args: { admissionId: string; id: string; input: ProcedureUpdateInput }) => API.updateProcedure(args.admissionId, args.id, args.input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
+      setEditTarget(null);
       toast.success(t('common.done'));
     },
   });
@@ -59,34 +70,63 @@ export function ProceduresSection({ chart, canWrite }: { chart: ChartData; canWr
                 {p.notes && <p className="mt-1.5 text-sm text-ink/70">{p.notes}</p>}
               </div>
               {canWrite && chart.admissionId && (
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="mt-1 shrink-0 text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                  onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: p.id })}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="mt-1 flex shrink-0 items-center gap-1">
+                  <Button size="icon-sm" variant="ghost" onClick={() => setEditTarget(p)} aria-label={t('common.edit')}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
+                    onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: p.id })}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
             </div>
           ))}
         </div>
       )}
 
-      <AddProcedureDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
+      <AddProcedureDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate({ admissionId: chart.admissionId ?? '', nameAr: i.nameAr ?? '', notes: i.notes ?? null })} busy={mut.isPending} />
+      {editTarget && chart.admissionId && (
+        <AddProcedureDialog
+          open
+          onClose={() => setEditTarget(null)}
+          admissionId={chart.admissionId}
+          initial={editTarget}
+          onSubmit={(i) => updateMut.mutate({ admissionId: chart.admissionId!, id: editTarget.id, input: i })}
+          busy={updateMut.isPending}
+        />
+      )}
     </SectionCard>
   );
 }
 
-function AddProcedureDialog({ open, onClose, admissionId, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; onSubmit: (i: ProcedureInput) => void; busy: boolean }) {
+function AddProcedureDialog({
+  open,
+  onClose,
+  admissionId,
+  initial,
+  onSubmit,
+  busy,
+}: {
+  open: boolean;
+  onClose: () => void;
+  admissionId: string | null;
+  initial?: Pick<Procedure, 'name_ar' | 'notes'>;
+  onSubmit: (i: ProcedureUpdateInput) => void;
+  busy: boolean;
+}) {
   const { t } = useTranslation();
-  const [nameAr, setNameAr] = useState('');
-  const [notes, setNotes] = useState('');
+  const [nameAr, setNameAr] = useState(initial?.name_ar ?? '');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
 
   if (!admissionId) return null;
   const submit = () => {
     if (nameAr.trim().length < 2) return;
-    onSubmit({ admissionId, nameAr, notes: notes || null });
+    onSubmit({ nameAr, notes: notes || null });
     setNameAr('');
     setNotes('');
   };
@@ -95,7 +135,7 @@ function AddProcedureDialog({ open, onClose, admissionId, onSubmit, busy }: { op
     <Dialog
       open={open}
       onClose={onClose}
-      title={t('procedures.add')}
+      title={initial ? t('common.edit') : t('procedures.add')}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

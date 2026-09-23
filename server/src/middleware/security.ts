@@ -44,7 +44,7 @@ export async function isBruteForced(username: string, ip: string | null): Promis
           FROM login_attempts
           WHERE success = 0 AND attempted_at > datetime('now', ?)
             AND (username = ? OR (? IS NOT NULL AND ip = ?))`,
-    args: [`-${WINDOW_MINUTES} minutes`, username, ip, ip, ip],
+    args: [`-${WINDOW_MINUTES} minutes`, username, ip, ip],
   });
   const n = Number((rows.rows[0] as Record<string, unknown>).n ?? 0);
   return n >= MAX_FAILED;

@@ -30,6 +30,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/', key: 'dashboard', icon: LayoutDashboard },
       { to: '/patients', key: 'patients', icon: Users },
       { to: '/wards', key: 'wards', icon: Building2 },
+      { to: '/departments', key: 'departments', icon: Building2, permission: 'departments.manage' },
     ],
   },
   {

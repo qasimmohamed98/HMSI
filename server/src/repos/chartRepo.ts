@@ -14,12 +14,11 @@ import type {
   AdmissionSummary,
 } from '@hmsi/shared';
 import { db } from '../../db/index.js';
-import { DEFAULT_HOSPITAL_ID } from '../config.js';
 import { getPatientById, mapAdmission } from './patientRepo.js';
 
 export type { ChartData };
 
-export async function getAdmissionScope(admissionId: string): Promise<{ admission: AdmissionSummary; patientId: string } | null> {
+export async function getAdmissionScope(admissionId: string, hospitalId: string): Promise<{ admission: AdmissionSummary; patientId: string } | null> {
   const rows = await db.execute({
     sql: `SELECT a.patient_id, a.id AS admission_id, a.department_id, a.ward_id, a.room,
                  a.bed_no, a.status, a.admitted_at,
@@ -33,15 +32,15 @@ export async function getAdmissionScope(admissionId: string): Promise<{ admissio
           LEFT JOIN wards w ON w.id = a.ward_id
           WHERE a.id = ? AND p.hospital_id = ?
           LIMIT 1`,
-    args: [admissionId, DEFAULT_HOSPITAL_ID],
+    args: [admissionId, hospitalId],
   });
   if (rows.rows.length === 0) return null;
   const r = rows.rows[0] as Record<string, unknown>;
   return { admission: mapAdmission(r)!, patientId: String(r.patient_id) };
 }
 
-export async function getChart(patientId: string): Promise<ChartData | null> {
-  const patient = await getPatientById(patientId);
+export async function getChart(patientId: string, hospitalId: string): Promise<ChartData | null> {
+  const patient = await getPatientById(patientId, hospitalId);
   if (!patient) return null;
 
   return getChartForPatient(patient);

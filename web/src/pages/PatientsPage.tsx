@@ -3,20 +3,23 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Patient } from '@hmsi/shared';
-import { Search, UserPlus, BedDouble, Stethoscope } from 'lucide-react';
-import { Card, Button, Badge, Skeleton, EmptyState, Avatar, TableRoot, THead, TBody, Th, Td, TRow, StatusBadge } from '@/components/ui';
+import { Search, UserPlus, BedDouble, Stethoscope, Pencil, Archive } from 'lucide-react';
+import { Card, Button, Badge, Skeleton, EmptyState, Avatar, TableRoot, THead, TBody, Th, Td, TRow, StatusBadge, ConfirmDialog } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Input } from '@/components/ui/Input';
-import { API } from '@/lib/api';
+import { API, type PatientUpdateInput } from '@/lib/api';
 import { calcAge, fmtDate } from '@/lib/format';
 import { useMediaQuery } from '@/lib/use-media';
 import { NewPatientDialog } from '@/features/patients/NewPatientDialog';
+import { EditPatientDialog } from '@/features/patients/EditPatientDialog';
 import { AdmitDialog } from '@/features/patients/AdmitDialog';
+import { useToast } from '@/components/ui'
 
 export default function PatientsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const toast = useToast();
   const isMobile = useMediaQuery('(max-width: 639px)');
   const isTablet = useMediaQuery('(max-width: 1023px)');
 
@@ -25,6 +28,8 @@ export default function PatientsPage() {
   const [admittedOnly, setAdmittedOnly] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [admitTarget, setAdmitTarget] = useState<Patient | null>(null);
+  const [editTarget, setEditTarget] = useState<Patient | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Patient | null>(null);
 
   useEffect(() => {
     const h = setTimeout(() => setDebounced(search.trim()), 250);
@@ -56,6 +61,24 @@ export default function PatientsPage() {
     onSuccess: () => {
       invalidatePatients();
       setAdmitTarget(null);
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (args: { id: string; input: PatientUpdateInput }) => API.updatePatient(args.id, args.input),
+    onSuccess: () => {
+      invalidatePatients();
+      setEditTarget(null);
+      toast.success(t('common.done'));
+    },
+  });
+
+  const archiveMut = useMutation({
+    mutationFn: (id: string) => API.deletePatient(id),
+    onSuccess: () => {
+      invalidatePatients();
+      setArchiveTarget(null);
+      toast.success(t('common.done'));
     },
   });
 
@@ -113,7 +136,14 @@ export default function PatientsPage() {
       ) : isMobile || isTablet ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {data.map((p) => (
-            <PatientMobileCard key={p.id} patient={p} onClick={() => navigate(`/patients/${p.id}`)} onAdmit={!p.activeAdmission ? () => setAdmitTarget(p) : undefined} />
+            <PatientMobileCard
+              key={p.id}
+              patient={p}
+              onClick={() => navigate(`/patients/${p.id}`)}
+              onAdmit={!p.activeAdmission ? () => setAdmitTarget(p) : undefined}
+              onEdit={() => setEditTarget(p)}
+              onArchive={() => setArchiveTarget(p)}
+            />
           ))}
         </div>
       ) : (
@@ -130,7 +160,7 @@ export default function PatientsPage() {
                 <Th>{t('patients.bed')}</Th>
                 <Th>{t('patients.admittedAt')}</Th>
                 <Th>{t('patients.status')}</Th>
-                <Th>{t('admit.action')}</Th>
+                <Th>{t('common.actions')}</Th>
               </tr>
             </THead>
             <TBody>
@@ -160,19 +190,33 @@ export default function PatientsPage() {
                   </Td>
                   <Td>{p.activeAdmission ? <StatusBadge status="active" /> : <StatusBadge status={p.status} />}</Td>
                   <Td>
-                    {!p.activeAdmission && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon={<Stethoscope className="h-3.5 w-3.5" />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAdmitTarget(p);
-                        }}
-                      >
-                        {t('admit.action')}
+                    <div className="flex items-center gap-1.5">
+                      <Button size="icon-sm" variant="ghost" aria-label={t('common.edit')} onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}>
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                    )}
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={t('common.archive')}
+                        className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
+                        onClick={(e) => { e.stopPropagation(); setArchiveTarget(p); }}
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                      </Button>
+                      {!p.activeAdmission && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          icon={<Stethoscope className="h-3.5 w-3.5" />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAdmitTarget(p);
+                          }}
+                        >
+                          {t('admit.action')}
+                        </Button>
+                      )}
+                    </div>
                   </Td>
                 </TRow>
               ))}
@@ -182,6 +226,20 @@ export default function PatientsPage() {
       )}
 
       <NewPatientDialog open={showNew} onClose={() => setShowNew(false)} onSubmit={(input) => createMut.mutate(input)} busy={createMut.isPending} />
+      {editTarget && (
+        <EditPatientDialog open onClose={() => setEditTarget(null)} patient={editTarget} onSubmit={(input) => updateMut.mutate({ id: editTarget.id, input })} busy={updateMut.isPending} />
+      )}
+      {archiveTarget && (
+        <ConfirmDialog
+          open
+          onClose={() => setArchiveTarget(null)}
+          title={t('patients.archivePatient')}
+          message={t('patients.archiveConfirm', { name: archiveTarget.full_name_ar })}
+          confirmLabel={t('common.archive')}
+          busy={archiveMut.isPending}
+          onConfirm={() => archiveMut.mutate(archiveTarget.id)}
+        />
+      )}
       {admitTarget && (
         <AdmitDialog open onClose={() => setAdmitTarget(null)} patient={admitTarget} onSubmit={(input) => admitMut.mutate(input)} busy={admitMut.isPending} />
       )}
@@ -189,7 +247,7 @@ export default function PatientsPage() {
   );
 }
 
-function PatientMobileCard({ patient: p, onClick, onAdmit }: { patient: Patient; onClick: () => void; onAdmit?: () => void }) {
+function PatientMobileCard({ patient: p, onClick, onAdmit, onEdit, onArchive }: { patient: Patient; onClick: () => void; onAdmit?: () => void; onEdit?: () => void; onArchive?: () => void }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-ink/8 bg-surface-raised p-4 shadow-card transition-all hover:border-brand-300 hover:shadow-float dark:border-white/10 dark:hover:border-brand-700">
@@ -212,11 +270,23 @@ function PatientMobileCard({ patient: p, onClick, onAdmit }: { patient: Patient;
           )}
         </div>
       </button>
-      {onAdmit && (
-        <Button size="sm" variant="outline" icon={<Stethoscope className="h-3.5 w-3.5" />} onClick={onAdmit}>
-          {t('admit.action')}
-        </Button>
-      )}
+      <div className="flex items-center gap-1.5">
+        {onAdmit && (
+          <Button size="sm" variant="outline" icon={<Stethoscope className="h-3.5 w-3.5" />} onClick={onAdmit}>
+            {t('admit.action')}
+          </Button>
+        )}
+        {onEdit && (
+          <Button size="sm" variant="ghost" icon={<Pencil className="h-3.5 w-3.5" />} onClick={onEdit}>
+            {t('common.edit')}
+          </Button>
+        )}
+        {onArchive && (
+          <Button size="sm" variant="ghost" className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30" icon={<Archive className="h-3.5 w-3.5" />} onClick={onArchive}>
+            {t('common.archive')}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

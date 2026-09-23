@@ -9,17 +9,17 @@ export const attachmentRoutes = new Hono();
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
-async function guard(c: Context, admissionId: string): Promise<Response | null> {
-  const scope = await getAdmissionScope(admissionId);
+async function guard(c: Context, admissionId: string, hospitalId: string): Promise<Response | null> {
+  const scope = await getAdmissionScope(admissionId, hospitalId);
   if (!scope) return c.json({ message: 'غير موجود' }, 404);
   return null;
 }
 
 attachmentRoutes.post('/:admissionId/attachments', requireAuth(), requirePermission('files.manage'), async (c) => {
   const admissionId = c.req.param('admissionId')!;
-  const failed = await guard(c, admissionId);
-  if (failed) return failed;
   const session = getSession(c)!;
+  const failed = await guard(c, admissionId, session.user.hospital_id);
+  if (failed) return failed;
 
   const form = await c.req.formData();
   const file = form.get('file');
@@ -42,7 +42,8 @@ attachmentRoutes.post('/:admissionId/attachments', requireAuth(), requirePermiss
 attachmentRoutes.get('/:admissionId/attachments/:id', requireAuth(), requirePermission('chart.view'), async (c) => {
   const admissionId = c.req.param('admissionId')!;
   const id = c.req.param('id')!;
-  const failed = await guard(c, admissionId);
+  const session = getSession(c)!;
+  const failed = await guard(c, admissionId, session.user.hospital_id);
   if (failed) return failed;
   const attachment = await getAttachment(id);
   if (!attachment || attachment.admission_id !== admissionId) return c.json({ message: 'الملف غير موجود' }, 404);
@@ -58,7 +59,7 @@ attachmentRoutes.delete('/:admissionId/attachments/:id', requireAuth(), requireP
   const admissionId = c.req.param('admissionId')!;
   const id = c.req.param('id')!;
   const session = getSession(c)!;
-  const failed = await guard(c, admissionId);
+  const failed = await guard(c, admissionId, session.user.hospital_id);
   if (failed) return failed;
   const attachment = await getAttachment(id);
   if (!attachment || attachment.admission_id !== admissionId) return c.json({ message: 'الملف غير موجود' }, 404);

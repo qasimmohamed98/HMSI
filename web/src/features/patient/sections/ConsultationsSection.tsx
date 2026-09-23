@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, MessagesSquare, Reply, Trash2 } from 'lucide-react';
+import { Plus, MessagesSquare, Reply, Trash2, Pencil } from 'lucide-react';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
-import { API, type ConsultationInput, type ConsultationResponseInput, type ChartData } from '@/lib/api';
+import { API, type ConsultationUpdateInput, type ConsultationResponseInput, type ChartData } from '@/lib/api';
 import { fmtDateTime } from '@/lib/format';
 import { useToast } from '@/components/ui';
 
@@ -14,6 +14,7 @@ export function ConsultationsSection({ chart, canWrite }: { chart: ChartData; ca
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<(typeof chart.consultations)[number] | null>(null);
+  const [editTarget, setEditTarget] = useState<(typeof chart.consultations)[number] | null>(null);
 
   const mut = useMutation({
     mutationFn: API.addConsultation,
@@ -25,7 +26,7 @@ export function ConsultationsSection({ chart, canWrite }: { chart: ChartData; ca
   });
 
   const replyMut = useMutation({
-    mutationFn: (args: { admissionId: string; consultationId: string; input: ConsultationResponseInput }) => API.respondConsultation(args.admissionId, args.consultationId, args.input),
+    mutationFn: (args: { admissionId: string; consultationId: string; input: ConsultationUpdateInput }) => API.updateConsultation(args.admissionId, args.consultationId, args.input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
       setReplyTo(null);
@@ -37,6 +38,15 @@ export function ConsultationsSection({ chart, canWrite }: { chart: ChartData; ca
     mutationFn: (args: { admissionId: string; id: string }) => API.deleteConsultation(args.admissionId, args.id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
+      toast.success(t('common.done'));
+    },
+  });
+
+  const editMut = useMutation({
+    mutationFn: (args: { admissionId: string; id: string; input: ConsultationUpdateInput }) => API.updateConsultation(args.admissionId, args.id, args.input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
+      setEditTarget(null);
       toast.success(t('common.done'));
     },
   });
@@ -73,6 +83,11 @@ export function ConsultationsSection({ chart, canWrite }: { chart: ChartData; ca
                 <div className="flex items-center gap-2">
                   {c.response ? <Badge variant="success" dot>{t('common.done')}</Badge> : <Badge variant="warning">{t('laboratory.statuses.ordered')}</Badge>}
                   {canWrite && chart.admissionId && (
+                    <Button size="icon-sm" variant="ghost" onClick={() => setEditTarget(c)} aria-label={t('common.edit')}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {canWrite && chart.admissionId && (
                     <>
                       {!c.response && (
                         <Button size="sm" variant="outline" icon={<Reply className="h-3.5 w-3.5" />} onClick={() => setReplyTo(c)}>
@@ -106,7 +121,17 @@ export function ConsultationsSection({ chart, canWrite }: { chart: ChartData; ca
         </div>
       )}
 
-      <AddConsultationDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
+      <AddConsultationDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate({ admissionId: chart.admissionId ?? '', specialty: i.specialty ?? '', reason: i.reason ?? '' })} busy={mut.isPending} />
+      {editTarget && chart.admissionId && (
+        <AddConsultationDialog
+          open
+          onClose={() => setEditTarget(null)}
+          admissionId={chart.admissionId}
+          initial={editTarget}
+          onSubmit={(i) => editMut.mutate({ admissionId: chart.admissionId!, id: editTarget.id, input: i })}
+          busy={editMut.isPending}
+        />
+      )}
       {replyTo && chart.admissionId && (
         <ReplyConsultationDialog
           open
@@ -159,15 +184,29 @@ function ReplyConsultationDialog({
   );
 }
 
-function AddConsultationDialog({ open, onClose, admissionId, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; onSubmit: (i: ConsultationInput) => void; busy: boolean }) {
+function AddConsultationDialog({
+  open,
+  onClose,
+  admissionId,
+  initial,
+  onSubmit,
+  busy,
+}: {
+  open: boolean;
+  onClose: () => void;
+  admissionId: string | null;
+  initial?: { specialty: string; reason: string };
+  onSubmit: (i: ConsultationUpdateInput) => void;
+  busy: boolean;
+}) {
   const { t } = useTranslation();
-  const [specialty, setSpecialty] = useState('');
-  const [reason, setReason] = useState('');
+  const [specialty, setSpecialty] = useState(initial?.specialty ?? '');
+  const [reason, setReason] = useState(initial?.reason ?? '');
 
   if (!admissionId) return null;
   const submit = () => {
     if (specialty.trim().length < 2 || reason.trim().length < 2) return;
-    onSubmit({ admissionId, specialty, reason });
+    onSubmit({ specialty, reason });
     setSpecialty('');
     setReason('');
   };
@@ -176,7 +215,7 @@ function AddConsultationDialog({ open, onClose, admissionId, onSubmit, busy }: {
     <Dialog
       open={open}
       onClose={onClose}
-      title={t('consultations.add')}
+      title={initial ? t('common.edit') : t('consultations.add')}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

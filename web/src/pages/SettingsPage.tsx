@@ -1,16 +1,38 @@
 import { useTranslation } from 'react-i18next';
-import { Languages, Moon, Sun, ShieldCheck, Hospital } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Dialog, Input, Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useTheme } from '@/lib/theme';
 import { setLanguage, currentLang } from '@/i18n';
 import { useAuth } from '@/lib/auth';
+import { API, type HospitalProfileInput } from '@/lib/api';
+import { ROLE_PERMISSIONS } from '@hmsi/shared';
+import { useToast } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { resolved, setPref } = useTheme();
   const { user } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [editOpen, setEditOpen] = useState(false);
+  const canEdit = user ? ROLE_PERMISSIONS[user.role].includes('settings.manage' as never) : false;
+
+  const { data: hospital } = useQuery({ queryKey: ['hospital'], queryFn: API.hospitalProfile });
+
+  const updateMut = useMutation({
+    mutationFn: (input: HospitalProfileInput) => API.updateHospital(input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['hospital'] });
+      void qc.invalidateQueries({ queryKey: ['wards'] });
+      setEditOpen(false);
+      toast.success(t('common.done'));
+    },
+    onError: (e) => toast.error((e as Error).message || t('errors.generic')),
+  });
 
   const themeOptions = [
     { value: 'light', label: t('theme.light'), icon: Sun },
@@ -71,19 +93,89 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-muted/70 p-4 dark:bg-white/5">
-            <div>
-              <p className="font-bold text-ink">{user?.hospital_name_ar}</p>
-              <p className="text-sm text-ink/50">{user?.hospital_name_en}</p>
+          {!hospital ? (
+            <Skeleton className="h-16 w-full rounded-xl" />
+          ) : (
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-muted/70 p-4 dark:bg-white/5">
+              <div className="min-w-0">
+                <p className="truncate font-bold text-ink">{hospital.name_ar}</p>
+                <p className="truncate text-sm text-ink/50">{hospital.name_en}</p>
+                <p className="mt-0.5 text-xs tabular text-ink/35" dir="ltr">{hospital.code}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge variant="brand">
+                  <ShieldCheck className="me-1 h-3.5 w-3.5" />
+                  {t('status.active')}
+                </Badge>
+                {canEdit && (
+                  <Button size="icon-sm" variant="ghost" aria-label={t('common.edit')} onClick={() => setEditOpen(true)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
-            <Badge variant="brand">
-              <ShieldCheck className="me-1 h-3.5 w-3.5" />
-              {t('status.active')}
-            </Badge>
-          </div>
+          )}
         </CardContent>
       </Card>
+
+      {hospital && editOpen && (
+        <HospitalDialog
+          open
+          onClose={() => setEditOpen(false)}
+          initial={hospital}
+          onSubmit={(input) => updateMut.mutate(input)}
+          busy={updateMut.isPending}
+        />
+      )}
     </div>
+  );
+}
+
+function HospitalDialog({
+  open,
+  onClose,
+  initial,
+  onSubmit,
+  busy,
+}: {
+  open: boolean;
+  onClose: () => void;
+  initial: { name_ar: string; name_en: string };
+  onSubmit: (i: HospitalProfileInput) => void;
+  busy: boolean;
+}) {
+  const { t } = useTranslation();
+  const [nameAr, setNameAr] = useState(initial.name_ar);
+  const [nameEn, setNameEn] = useState(initial.name_en);
+  const [error, setError] = useState('');
+
+  const submit = () => {
+    if (nameAr.trim().length < 2 || nameEn.trim().length < 2) {
+      setError(t('errors.required'));
+      return;
+    }
+    onSubmit({ nameAr, nameEn });
+    onClose();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={t('settings.hospitalEdit')}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={submit} loading={busy}>{t('common.save')}</Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {error && <p className="text-sm font-semibold text-danger-600">{error}</p>}
+        <Input label={t('settings.hospitalNameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder="مستشفى المدينة الجامعية" />
+        <Input label={t('settings.hospitalNameEn')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="City University Hospital" dir="ltr" />
+      </div>
+    </Dialog>
   );
 }
 

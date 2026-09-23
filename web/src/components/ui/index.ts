@@ -8,6 +8,7 @@ export { Badge } from './Badge';
 export type { BadgeVariant } from './Badge';
 export { TableRoot, THead, TBody, Th, Td, TRow } from './Table';
 export { Dialog } from './Dialog';
+export { ConfirmDialog } from './ConfirmDialog';
 export { Tabs } from './Tabs';
 export type { TabItem } from './Tabs';
 export { Alert } from './Alert';
