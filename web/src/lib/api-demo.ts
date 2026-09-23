@@ -531,11 +531,11 @@ export const demoApi: Api = {
     store.wards = store.wards.filter((w) => w.id !== id);
   },
 
-  async createBed(input: BedInput): Promise<{ id: string; ward_id: string; room: string; bed_no: string; status: 'free' | 'occupied' }> {
+  async createBed(input: BedInput): Promise<{ id: string; ward_id: string; room: string; bed_no: string; status: 'free' | 'occupied'; code: string }> {
     await delay(200);
     const ward = store.wards.find((w) => w.id === input.wardId);
     if (!ward) throw new Error('not_found');
-    const bed = { id: uid(), ward_id: input.wardId, room: input.room, bed_no: input.bedNo, status: 'free' as const };
+    const bed = { id: uid(), ward_id: input.wardId, room: input.room, bed_no: input.bedNo, status: 'free' as const, code: 'b' + Math.random().toString(36).slice(2, 14) };
     ward.beds.push(bed);
     return bed;
   },
@@ -652,7 +652,7 @@ export const demoApi: Api = {
 
   async listHospitals(): Promise<Hospital[]> {
     await delay(150);
-    return [{ id: store.hospital.id, name_ar: store.hospital.name_ar, name_en: store.hospital.name_en, code: store.hospital.code }];
+    return [{ id: store.hospital.id, name_ar: store.hospital.name_ar, name_en: store.hospital.name_en, code: store.hospital.code, created_at: store.hospital.created_at }];
   },
 
   async createHospital(input: { nameAr: string; nameEn?: string; code?: string }): Promise<Hospital> {
@@ -664,8 +664,8 @@ export const demoApi: Api = {
     await delay(200);
     const existing = store.users.some((u) => u.username === input.username);
     if (existing) throw new Error('اسم المستخدم مستخدم من قبل');
-    const newAdmin = {
-      id: 'adm-' + Math.random().toString(36).slice(2, 9),
+const newAdmin: User & { password: string } = {
+      id: uid(),
       hospital_id: store.hospital.id,
       hospital_name_ar: store.hospital.name_ar,
       hospital_name_en: store.hospital.name_en,
@@ -718,18 +718,21 @@ export const demoApi: Api = {
     const admissionEntry = Object.values(store.patients).find((e) => e.record?.admission.ward_id === bed.ward_id && e.record?.admission.bed_no === bed.bed_no && e.record?.admission.status === 'active');
     if (admissionEntry?.record) {
       const rec = admissionEntry.record;
-      // Patient
-      patient = {
-        id: rec.patient.id,
-        file_number: rec.patient.file_number,
-        full_name_ar: rec.patient.full_name_ar,
-        full_name_en: rec.patient.full_name_en,
-        gender: rec.patient.gender,
-        birth_date: rec.patient.birth_date,
-        blood_type: rec.patient.blood_type,
-        allergies: rec.patient.allergies_json ? JSON.parse(rec.patient.allergies_json) : [],
-        critical_alerts: rec.patient.critical_alerts_json ? JSON.parse(rec.patient.critical_alerts_json) : [],
-      };
+      // Patient - get from the store patient entry
+      const patientEntry = Object.values(store.patients).find((e) => e.record?.admission.id === rec.admission.id);
+      patient = patientEntry?.patient
+        ? {
+            id: patientEntry.patient.id,
+            file_number: patientEntry.patient.file_number,
+            full_name_ar: patientEntry.patient.full_name_ar,
+            full_name_en: patientEntry.patient.full_name_en,
+            gender: patientEntry.patient.gender,
+            birth_date: patientEntry.patient.birth_date,
+            blood_type: patientEntry.patient.blood_type,
+            allergies: patientEntry.patient.allergies_json ? JSON.parse(patientEntry.patient.allergies_json) : [],
+            critical_alerts: patientEntry.patient.critical_alerts_json ? JSON.parse(patientEntry.patient.critical_alerts_json) : [],
+          }
+        : null;
       // Admission
       admission = {
         id: rec.admission.id,

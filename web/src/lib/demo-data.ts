@@ -209,7 +209,7 @@ export function createDemoStore(): DemoStore {
   function makeBeds(wardId: string, count: number, prefix: string) {
     const beds: Bed[] = [];
     for (let i = 1; i <= count; i++) {
-      beds.push({ id: id('bed'), ward_id: wardId, room: `${prefix}-${Math.ceil(i / 2)}`, bed_no: `B${i}`, status: 'free' });
+      beds.push({ id: id('bed'), ward_id: wardId, room: `${prefix}-${Math.ceil(i / 2)}`, bed_no: `B${i}`, status: 'free', code: 'b' + Math.random().toString(36).slice(2, 14) });
     }
     return beds;
   }
