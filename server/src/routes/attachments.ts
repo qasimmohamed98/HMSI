@@ -17,6 +17,35 @@ export const MAX_ATTACHMENT_SIZE = 4 * 1024 * 1024;
 
 const ALLOWED_MIME = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/plain|application\/(msword|vnd\.openxmlformats-officedocument\.[\w.]+|vnd\.ms-excel))$/;
 
+const startsWith = (b: Uint8Array, sig: number[], offset = 0) => sig.every((x, i) => b[offset + i] === x);
+
+/**
+ * نوع الملف يُعلنه المتصفح ويمكن تزويره؛ لذلك نتحقق من «التوقيع» الفعلي في أول البايتات
+ * ونرفض أي ملف لا يطابق نوعه المعلن (مثلاً HTML/SVG/EXE بامتداد أو نوع صورة).
+ */
+export function contentMatchesMime(bytes: Uint8Array, mime: string): boolean {
+  if (mime === 'image/png') return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (mime === 'image/jpeg') return startsWith(bytes, [0xff, 0xd8, 0xff]);
+  if (mime === 'image/gif') return startsWith(bytes, [0x47, 0x49, 0x46, 0x38]);
+  if (mime === 'image/webp') return startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8);
+  if (mime === 'application/pdf') return startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]);
+  // docx/xlsx = حاوية ZIP؛ doc/xls = حاوية OLE
+  if (mime.startsWith('application/vnd.openxmlformats-officedocument.')) return startsWith(bytes, [0x50, 0x4b, 0x03, 0x04]);
+  if (mime === 'application/msword' || mime === 'application/vnd.ms-excel') return startsWith(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+  if (mime === 'text/plain') {
+    // نص UTF-8 صالح بدون بايتات تحكم ثنائية وبدون وسوم HTML/سكربت
+    if (bytes.some((b) => b === 0)) return false;
+    let text: string;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      return false;
+    }
+    return !/<\s*(script|html|svg|iframe)\b/i.test(text);
+  }
+  return false;
+}
+
 async function guard(c: Context): Promise<string> {
   const admissionId = c.req.param('admissionId') ?? '';
   const scope = await getAdmissionScope(admissionId, getSession(c)!.user.hospital_id);
@@ -46,6 +75,7 @@ attachmentRoutes.post('/:admissionId/attachments', requireAuth(), requirePermiss
   if (!ALLOWED_MIME.test(mime)) return c.json({ message: 'نوع الملف غير مسموح (صور، PDF، نص، Word، Excel)' }, 415);
 
   const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!contentMatchesMime(bytes, mime)) return c.json({ message: 'محتوى الملف لا يطابق نوعه — تم رفضه' }, 415);
   const attachment = await insertAttachment({
     admission_id: admissionId,
     uploaded_by: session.user.full_name_ar,
@@ -71,6 +101,9 @@ attachmentRoutes.get('/:admissionId/attachments/:id', requireAuth(), requirePerm
     'Content-Type': ALLOWED_MIME.test(attachment.mime) ? attachment.mime : 'application/octet-stream',
     'Content-Disposition': contentDisposition(attachment.file_name),
     'Content-Length': String(body.length),
+    // حتى لو فُتح الملف مباشرة: لا سكربتات ولا تضمين
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+    'Cache-Control': 'private, no-store',
   });
 });
 

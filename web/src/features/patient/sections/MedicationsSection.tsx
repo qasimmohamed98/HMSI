@@ -7,9 +7,10 @@ import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type MedicationStatusInput, type ChartData } from '@/lib/api';
 import type { Medication } from '@hmsi/shared';
 import { fmtDate, todayISO } from '@/lib/format';
+import { MarStrip } from './MarStrip';
 import { useToast, useConfirm } from '@/components/ui';
 
-export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
+export function MedicationsSection({ chart, canWrite, canAdminister = false }: { chart: ChartData; canWrite: boolean; canAdminister?: boolean }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const qc = useQueryClient();
@@ -74,61 +75,64 @@ export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canW
       ) : (
         <div className="space-y-2.5">
           {chart.medications.map((m) => (
-            <div key={m.id} className="flex items-center justify-between gap-3 rounded-xl border border-ink/8 p-4 dark:border-white/10">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200">
-                  <Pill className="h-5 w-5" />
-                </span>
-                <div>
-                  <p className="font-bold text-ink">{m.name_ar}</p>
-                  <p className="text-xs text-ink/50">
-                    {m.dose} · {m.route} · {m.frequency}
-                  </p>
-                  <p className="mt-0.5 flex items-center gap-1 text-xs text-ink/45">
-                    <Timer className="h-3 w-3" />
-                    {fmtDate(m.start_at, { day: 'numeric', month: 'short' })}
-                    {m.end_at ? ` – ${fmtDate(m.end_at, { day: 'numeric', month: 'short' })}` : ''}
-                    <span className="text-ink/30">·</span>
-                    {t('medications.prescribedBy')}: {m.prescribed_by}
-                  </p>
-                  {m.status === 'active' && (
-                    <p className={`mt-0.5 text-xs font-semibold ${m.dispensed_at ? 'text-info-600' : 'text-warning-700'}`}>
-                      {m.dispensed_at ? `${t('ui.dispensed')} · ${m.dispensed_by}` : t('ui.notDispensed')}
+            <div key={m.id} className="rounded-xl border border-ink/8 p-4 dark:border-white/10">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200">
+                    <Pill className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="font-bold text-ink">{m.name_ar}</p>
+                    <p className="text-xs text-ink/50">
+                      {m.dose} · {m.route} · {m.frequency}
                     </p>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-ink/45">
+                      <Timer className="h-3 w-3" />
+                      {fmtDate(m.start_at, { day: 'numeric', month: 'short' })}
+                      {m.end_at ? ` – ${fmtDate(m.end_at, { day: 'numeric', month: 'short' })}` : ''}
+                      <span className="text-ink/30">·</span>
+                      {t('medications.prescribedBy')}: {m.prescribed_by}
+                    </p>
+                    {m.status === 'active' && (
+                      <p className={`mt-0.5 text-xs font-semibold ${m.dispensed_at ? 'text-info-600' : 'text-warning-700'}`}>
+                        {m.dispensed_at ? `${t('ui.dispensed')} · ${m.dispensed_by}` : t('ui.notDispensed')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {canWrite && chart.admissionId ? (
+                    <div className="w-40">
+                      <Select
+                        value={m.status}
+                        onChange={(e) => setStatus(m, e.target.value as MedicationStatus)}
+                        options={(['active', 'discontinued', 'completed'] as MedicationStatus[]).map((s) => ({
+                          value: s,
+                          label: t(`medications.statuses.${s}`),
+                        }))}
+                      />
+                    </div>
+                  ) : (
+                    <Badge variant={badge(m.status)}>{t(`medications.statuses.${m.status}`)}</Badge>
+                  )}
+                  {canWrite && chart.admissionId && (
+                    <Button size="icon-sm" variant="ghost" onClick={() => setEditTarget(m)} aria-label={t('common.edit')}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {canWrite && chart.admissionId && (
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
+                      onClick={async () => { if (await confirm(t('ui.confirmDeleteRecord'))) deleteMut.mutate({ admissionId: chart.admissionId!, id: m.id }); }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {canWrite && chart.admissionId ? (
-                  <div className="w-40">
-                    <Select
-                      value={m.status}
-                      onChange={(e) => setStatus(m, e.target.value as MedicationStatus)}
-                      options={(['active', 'discontinued', 'completed'] as MedicationStatus[]).map((s) => ({
-                        value: s,
-                        label: t(`medications.statuses.${s}`),
-                      }))}
-                    />
-                  </div>
-                ) : (
-                  <Badge variant={badge(m.status)}>{t(`medications.statuses.${m.status}`)}</Badge>
-                )}
-                {canWrite && chart.admissionId && (
-                  <Button size="icon-sm" variant="ghost" onClick={() => setEditTarget(m)} aria-label={t('common.edit')}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-                {canWrite && chart.admissionId && (
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                    onClick={async () => { if (await confirm(t('ui.confirmDeleteRecord'))) deleteMut.mutate({ admissionId: chart.admissionId!, id: m.id }); }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+              <MarStrip chart={chart} medication={m} canAdminister={canAdminister} />
             </div>
           ))}
         </div>

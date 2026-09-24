@@ -11,6 +11,9 @@
     # الواجهة تتصل بالـ API الحقيقي (وليس بيانات العرض التوضيحي)
     VITE_API_MODE = "live"
 
+# توجيه /api/* إلى الدالة يتم داخل الدالة نفسها: `export const config = { path: ['/api/*'] }`
+# في netlify/functions/hmsi.ts (Netlify Functions v2). لا تضف قاعدة [[redirects]] إلى
+# /.netlify/functions/... — الدالة ذات المسار المخصص لا تُخدم على مسارها الافتراضي.
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
@@ -25,6 +28,20 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains"
+    # لا تضمين للموقع داخل مواقع أخرى، ولا plugins، ولا تغيير لـ <base>
+    Content-Security-Policy = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+
+# ملفات البناء تحمل بصمة في اسمها — تُخزَّن سنة
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# الـ Service Worker يجب أن يُفحص في كل زيارة ليصل التحديث فوراً
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
 
 # SPA fallback (بعد الملفات الثابتة ودالة الـ API)
 [[redirects]]

@@ -15,7 +15,7 @@ export function BottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-surface-raised/95 backdrop-blur-md dark:border-white/10 dark:bg-surface-raised/95 sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 print:hidden border-t border-ink/10 bg-surface-raised/95 backdrop-blur-md dark:border-white/10 dark:bg-surface-raised/95 sm:hidden">
       <div className="mx-auto flex h-16 max-w-lg items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {ITEMS.map((item) => {
           const active =

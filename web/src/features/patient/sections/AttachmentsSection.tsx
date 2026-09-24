@@ -8,6 +8,20 @@ import { fmtBytes, fmtDateTime } from '@/lib/format';
 import { API, type ChartData } from '@/lib/api';
 import { useToast } from '@/components/ui';
 
+const MAX_SIZE = 4 * 1024 * 1024;
+const ALLOWED_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'text/plain',
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+
 export function AttachmentsSection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -32,12 +46,17 @@ export function AttachmentsSection({ chart, canWrite }: { chart: ChartData; canW
 
   const onPick = (file: File | undefined) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
+    if (inputRef.current) inputRef.current.value = '';
+    // نفس قيود الخادم (الذي يتحقق أيضاً من توقيع الملف الفعلي)
+    if (file.size > MAX_SIZE) {
       toast.error(t('attachments.tooBig'));
       return;
     }
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error(t('attachments.badType'));
+      return;
+    }
     upload.mutate(file);
-    if (inputRef.current) inputRef.current.value = '';
   };
 
   return (
@@ -49,6 +68,7 @@ export function AttachmentsSection({ chart, canWrite }: { chart: ChartData; canW
             <input
               ref={inputRef}
               type="file"
+              accept={ALLOWED_TYPES.join(',')}
               className="hidden"
               onChange={(e) => onPick(e.target.files?.[0])}
             />

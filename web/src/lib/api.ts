@@ -24,6 +24,12 @@ import type {
   PublicTrackInfo,
   PublicTrackFamily,
   AuditEntry,
+  Consciousness,
+  FluidDirection,
+  FluidKind,
+  FluidEntry,
+  AdministrationStatus,
+  MedicationAdministration,
 } from '@hmsi/shared';
 import { demoApi } from './api-demo';
 import { liveApi } from './api-live';
@@ -45,6 +51,29 @@ export interface NewVitalsInput {
   spo2: number | null;
   weight: number | null;
   glucose: number | null;
+  painScore?: number | null;
+  consciousness?: Consciousness | null;
+  /** معرّف يولّده المتصفح — يمنع التكرار عند إعادة الإرسال من طابور العمل دون اتصال */
+  clientId?: string;
+  /** وقت القياس الفعلي (للإدخالات المؤجلة) */
+  recordedAt?: string;
+}
+
+export interface FluidInput {
+  admissionId: string;
+  direction: FluidDirection;
+  kind: FluidKind;
+  volumeMl: number;
+  note?: string | null;
+  clientId?: string;
+  recordedAt?: string;
+}
+
+export interface AdministrationInput {
+  status: AdministrationStatus;
+  note?: string | null;
+  clientId?: string;
+  administeredAt?: string;
 }
 
 export interface NoteInput {
@@ -181,6 +210,8 @@ export interface VitalsUpdateInput {
   spo2?: number | null;
   weight?: number | null;
   glucose?: number | null;
+  painScore?: number | null;
+  consciousness?: Consciousness | null;
 }
 
 export interface PatientUpdateInput {
@@ -276,6 +307,12 @@ export interface Api {
   updateMedication(admissionId: string, medicationId: string, input: MedicationStatusInput): Promise<Medication>;
   deleteMedication(admissionId: string, medicationId: string): Promise<void>;
   dispenseMedication(admissionId: string, medicationId: string): Promise<Medication>;
+  administerMedication(admissionId: string, medicationId: string, input: AdministrationInput): Promise<MedicationAdministration>;
+  deleteAdministration(admissionId: string, administrationId: string): Promise<void>;
+  addFluid(input: FluidInput): Promise<FluidEntry>;
+  deleteFluid(admissionId: string, fluidId: string): Promise<void>;
+  /** رابط ملصق ZPL للطابعات الحرارية (null في وضع العرض) */
+  labelZplUrl(admissionId: string, kind: 'wristband' | { labId: string }): string | null;
   listAudit(params?: { before?: string; action?: string }): Promise<AuditEntry[]>;
   addLabResult(input: LabInput): Promise<LabResult>;
   updateLabResult(admissionId: string, labId: string, input: LabResultInput): Promise<LabResult>;

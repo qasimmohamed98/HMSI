@@ -1,4 +1,5 @@
-import type { DashboardStats, TimelineEvent } from '@hmsi/shared';
+import type { Consciousness, DashboardStats, MewsAlert, TimelineEvent } from '@hmsi/shared';
+import { calcMews } from '@hmsi/shared';
 import { db } from '../../db/index.js';
 
 export async function getDashboard(hospitalId: string): Promise<DashboardStats> {
@@ -63,7 +64,45 @@ export async function getDashboard(hospitalId: string): Promise<DashboardStats> 
     args: [hospitalId],
   });
 
+  // آخر علامات حيوية لكل تنويم نشط (خلال 24 ساعة) → درجة الإنذار المبكر
+  const latestVitals = await db.execute({
+    sql: `SELECT p.id AS patient_id, p.full_name_ar, p.full_name_en, w.name_ar AS ward_name_ar, w.name_en AS ward_name_en, a.bed_no,
+                 v.recorded_at, v.bp_systolic, v.pulse, v.respiratory_rate, v.temperature, v.consciousness
+          FROM admissions a
+          JOIN patients p ON p.id = a.patient_id
+          LEFT JOIN wards w ON w.id = a.ward_id
+          JOIN vitals v ON v.id = (SELECT id FROM vitals WHERE admission_id = a.id ORDER BY recorded_at DESC LIMIT 1)
+          WHERE p.hospital_id = ? AND a.status = 'active' AND v.recorded_at >= ?`,
+    args: [hospitalId, new Date(Date.now() - 24 * 3600_000).toISOString()],
+  });
+  const mewsAlerts: MewsAlert[] = [];
+  for (const row of latestVitals.rows) {
+    const r = row as Record<string, unknown>;
+    const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    const m = calcMews({
+      bp_systolic: num(r.bp_systolic),
+      pulse: num(r.pulse),
+      respiratory_rate: num(r.respiratory_rate),
+      temperature: num(r.temperature),
+      consciousness: (r.consciousness as Consciousness | null) ?? null,
+    });
+    if (!m || m.level === 'low') continue;
+    mewsAlerts.push({
+      patient_id: String(r.patient_id),
+      patient_name_ar: String(r.full_name_ar),
+      patient_name_en: String(r.full_name_en ?? ''),
+      ward_name_ar: String(r.ward_name_ar ?? ''),
+      ward_name_en: String(r.ward_name_en ?? ''),
+      bed_no: String(r.bed_no ?? ''),
+      score: m.score,
+      level: m.level,
+      recorded_at: String(r.recorded_at),
+    });
+  }
+  mewsAlerts.sort((x, y) => y.score - x.score);
+
   return {
+    mewsAlerts,
     totalPatients: Number((totalPatients.rows[0] as Record<string, unknown>).n ?? 0),
     activeAdmissions: Number((activeAdmissions.rows[0] as Record<string, unknown>).n ?? 0),
     dischargedToday: Number((dischargedToday.rows[0] as Record<string, unknown>).n ?? 0),

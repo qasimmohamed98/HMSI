@@ -22,7 +22,7 @@ export function AppShell() {
       {isDesktop && (
         <aside
           className={cn(
-            'sticky top-0 flex h-dvh shrink-0 flex-col border-e border-ink/8 bg-surface-raised transition-[width] duration-200 dark:border-white/10 dark:bg-surface-raised',
+            'sticky top-0 flex h-dvh shrink-0 flex-col print:hidden border-e border-ink/8 bg-surface-raised transition-[width] duration-200 dark:border-white/10 dark:bg-surface-raised',
             collapsed ? 'w-[76px]' : 'w-[264px]',
           )}
         >
@@ -58,7 +58,7 @@ export function AppShell() {
 
       {/* Drawer for tablet/mobile */}
       {!isDesktop && drawerOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden print:hidden">
           <button
             type="button"
             aria-label="إغلاق القائمة"
@@ -82,7 +82,7 @@ export function AppShell() {
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onMenu={() => setDrawerOpen(true)} />
-        <main className={cn('flex-1', 'pb-20 lg:pb-6')}>
+        <main className={cn('flex-1', 'pb-20 lg:pb-6 print:p-0')}>
           <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-6 sm:py-6">{<Outlet />}</div>
         </main>
       </div>

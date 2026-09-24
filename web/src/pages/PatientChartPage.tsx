@@ -5,8 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { hasPermission, type ChartSection, type Permission } from '@hmsi/shared';
 import { useAuth } from '@/lib/auth';
 import { API } from '@/lib/api';
-import { Card, CardContent, Skeleton, EmptyState, Alert, Select } from '@/components/ui';
-import { fmtDate } from '@/lib/format';
+import { Card, CardContent, Skeleton, EmptyState, Alert, Select, Button } from '@/components/ui';
+import { Printer, Tag } from 'lucide-react';
+import { printWristband } from '@/lib/labels';
+import { fmtDate, fmtDateTime, localName } from '@/lib/format';
 import { PatientHeader } from '@/features/patient/PatientHeader';
 import { OverviewSection } from '@/features/patient/sections/OverviewSection';
 import { VitalsSection } from '@/features/patient/sections/VitalsSection';
@@ -96,6 +98,7 @@ export default function PatientChartPage() {
     nursing: can('notes.write.nursing'),
     diagnosis: active && can('notes.write.doctor'),
     medication: active && can('medications.manage'),
+    administer: active && can('medications.administer'),
     labOrder: can('lab.order'),
     labResult: can('lab.add_result'),
     radOrder: can('radiology.order'),
@@ -119,7 +122,7 @@ export default function PatientChartPage() {
       case 'diagnosis':
         return <DiagnosisSection chart={chart} canWrite={canWrite.diagnosis} />;
       case 'medications':
-        return <MedicationsSection chart={chart} canWrite={canWrite.medication} />;
+        return <MedicationsSection chart={chart} canWrite={canWrite.medication} canAdminister={canWrite.administer} />;
       case 'laboratory':
         return <LaboratorySection chart={chart} canOrder={canWrite.labOrder} canResult={canWrite.labResult} />;
       case 'radiology':
@@ -160,6 +163,22 @@ export default function PatientChartPage() {
         </div>
       )}
       {viewingPast && <Alert variant="info">{t('history.viewingPast')}</Alert>}
+
+      <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
+        {chart.patient.admission && (
+          <Button size="sm" variant="outline" icon={<Tag className="h-4 w-4" />} onClick={() => printWristband(chart.patient, chart.patient.admission!, t)}>
+            {t('labels.wristband')}
+          </Button>
+        )}
+        <Button size="sm" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>
+          {t('ui.printSection')}
+        </Button>
+      </div>
+
+      {/* ترويسة الورق فقط: القسم المطبوع ووقت الطباعة ومن طبعه */}
+      <div className="print-only border-b border-black pb-1 text-sm">
+        <strong>{t(sectionKey(section))}</strong> · {localName(user, 'hospital_name')} · {t('ui.printedAt')}: {fmtDateTime(new Date().toISOString())} · {localName(user, 'full_name')}
+      </div>
 
       {/* Section tabs */}
       <div

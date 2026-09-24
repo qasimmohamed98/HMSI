@@ -61,6 +61,10 @@ function mapNewVitals(v: NewVitalsInput) {
     spo2: v.spo2,
     weight: v.weight,
     glucose: v.glucose,
+    pain_score: v.painScore ?? null,
+    consciousness: v.consciousness ?? null,
+    client_id: v.clientId,
+    recorded_at: v.recordedAt,
   };
 }
 
@@ -163,6 +167,8 @@ export const liveApi: Api = {
         spo2: input.spo2,
         weight: input.weight,
         glucose: input.glucose,
+        pain_score: input.painScore,
+        consciousness: input.consciousness,
       }),
     }),
   deleteVitals: (vitalsId) => request(`/vitals/${vitalsId}`, { method: 'DELETE' }),
@@ -328,6 +334,28 @@ export const liveApi: Api = {
   deleteDiagnosis: (admissionId, diagnosisId) => request(`/patients/${admissionId}/diagnoses/${diagnosisId}`, { method: 'DELETE' }),
   deleteMedication: (admissionId, medicationId) => request(`/patients/${admissionId}/medications/${medicationId}`, { method: 'DELETE' }),
   dispenseMedication: (admissionId, medicationId) => request(`/patients/${admissionId}/medications/${medicationId}/dispense`, { method: 'POST' }),
+  administerMedication: (admissionId, medicationId, input) =>
+    request(`/patients/${admissionId}/medications/${medicationId}/administrations`, {
+      method: 'POST',
+      body: JSON.stringify({ status: input.status, note: input.note ?? null, client_id: input.clientId, administered_at: input.administeredAt }),
+    }),
+  deleteAdministration: (admissionId, administrationId) => request(`/patients/${admissionId}/administrations/${administrationId}`, { method: 'DELETE' }),
+  addFluid: (input) =>
+    request(`/patients/${input.admissionId}/fluids`, {
+      method: 'POST',
+      body: JSON.stringify({
+        admission_id: input.admissionId,
+        direction: input.direction,
+        kind: input.kind,
+        volume_ml: input.volumeMl,
+        note: input.note ?? null,
+        client_id: input.clientId,
+        recorded_at: input.recordedAt,
+      }),
+    }),
+  deleteFluid: (admissionId, fluidId) => request(`/patients/${admissionId}/fluids/${fluidId}`, { method: 'DELETE' }),
+  labelZplUrl: (admissionId, kind) =>
+    kind === 'wristband' ? `${BASE}/patients/${admissionId}/labels/wristband` : `${BASE}/patients/${admissionId}/labs/${kind.labId}/label`,
   listAudit: (params) => {
     const qs = new URLSearchParams();
     if (params?.before) qs.set('before', params.before);

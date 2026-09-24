@@ -15,6 +15,8 @@ import type {
   Bed,
   AdmissionSummary,
   Department,
+  MedicationAdministration,
+  FluidEntry,
 } from '@hmsi/shared';
 
 export interface AdmissionRecord {
@@ -23,6 +25,8 @@ export interface AdmissionRecord {
   notes: MedicalNote[];
   diagnoses: Diagnosis[];
   medications: Medication[];
+  administrations?: MedicationAdministration[];
+  fluids?: FluidEntry[];
   labs: LabResult[];
   radiology: RadiologyReport[];
   consultations: Consultation[];

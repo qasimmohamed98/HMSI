@@ -19,6 +19,7 @@ import { orgRoutes } from './routes/org.js';
 import { hospitalRoutes } from './routes/hospitals.js';
 import { publicTrackRoutes } from './routes/publicTrack.js';
 import { auditRoutes } from './routes/audit.js';
+import { labelRoutes } from './routes/labels.js';
 
 export const api = new Hono();
 
@@ -36,6 +37,7 @@ api.route('/api/dashboard', dashboardRoutes);
 api.route('/api/patients', patientRoutes);
 api.route('/api/patients', recordRoutes);
 api.route('/api/patients', attachmentRoutes);
+api.route('/api/patients', labelRoutes);
 api.route('/api/vitals', vitalsRoutes);
 api.route('/api/wards', wardRoutes);
 api.route('/api/users', userRoutes);

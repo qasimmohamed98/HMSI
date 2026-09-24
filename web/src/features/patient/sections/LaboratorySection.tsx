@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, FlaskConical, PenLine, Trash2 } from 'lucide-react';
+import { Plus, FlaskConical, PenLine, Trash2, Tag } from 'lucide-react';
+import { printSpecimenLabel } from '@/lib/labels';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type LabInput, type ChartData, type LabResultInput } from '@/lib/api';
@@ -82,6 +83,11 @@ export function LaboratorySection({ chart, canOrder, canResult }: { chart: Chart
                   <Badge variant={badge(l.status)}>{t(`laboratory.statuses.${l.status}`)}</Badge>
                   {chart.admissionId && (
                     <>
+                      {(l.status === 'ordered' || l.status === 'in_progress') && (
+                        <Button size="icon-sm" variant="ghost" aria-label={t('labels.specimen')} title={t('labels.specimen')} onClick={() => printSpecimenLabel(chart.patient, chart.admissionId!, l, t)}>
+                          <Tag className="h-4 w-4" />
+                        </Button>
+                      )}
                       {canResult && (l.status === 'ordered' || l.status === 'in_progress') && (
                         <Button size="sm" variant="outline" icon={<PenLine className="h-3.5 w-3.5" />} onClick={() => setEditLab(l)}>
                           {t('actions.enterResult')}

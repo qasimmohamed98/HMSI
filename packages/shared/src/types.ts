@@ -27,6 +27,7 @@ export const PERMISSIONS = [
   'notes.write.nursing',
   'medications.manage',
   'medications.dispense',
+  'medications.administer',
   'lab.order',
   'lab.add_result',
   'radiology.order',
@@ -73,6 +74,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'chart.view',
     'notes.write.doctor',
     'medications.manage',
+    'medications.administer',
     'lab.order',
     'radiology.order',
     'admissions.manage',
@@ -85,6 +87,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'chart.view',
     'notes.write.nursing',
     'vitals.write',
+    'medications.administer',
     'admissions.manage',
     'files.manage',
   ],
@@ -225,7 +228,50 @@ export interface Vitals {
   spo2: number | null;
   weight: number | null;
   glucose: number | null;
+  /** مقياس الألم 0–10 */
+  pain_score?: number | null;
+  /** مستوى الوعي AVPU */
+  consciousness?: Consciousness | null;
   recorded_by: string;
+}
+
+export const CONSCIOUSNESS_LEVELS = ['alert', 'voice', 'pain', 'unresponsive'] as const;
+export type Consciousness = (typeof CONSCIOUSNESS_LEVELS)[number];
+
+export const FLUID_DIRECTIONS = ['in', 'out'] as const;
+export type FluidDirection = (typeof FLUID_DIRECTIONS)[number];
+export const FLUID_KINDS = {
+  in: ['oral', 'iv', 'ng', 'blood', 'other_in'],
+  out: ['urine', 'drain', 'vomit', 'stool', 'ng_out', 'other_out'],
+} as const;
+export type FluidKind = (typeof FLUID_KINDS)[FluidDirection][number];
+
+/** ميزان السوائل (Intake / Output) */
+export interface FluidEntry {
+  id: string;
+  admission_id: string;
+  direction: FluidDirection;
+  kind: FluidKind;
+  volume_ml: number;
+  note: string | null;
+  recorded_by: string;
+  recorded_at: string;
+}
+
+export const ADMINISTRATION_STATUSES = ['given', 'held', 'refused'] as const;
+export type AdministrationStatus = (typeof ADMINISTRATION_STATUSES)[number];
+
+/** سجل إعطاء جرعة دواء (MAR) */
+export interface MedicationAdministration {
+  id: string;
+  medication_id: string;
+  admission_id: string;
+  status: AdministrationStatus;
+  note: string | null;
+  administered_by: string;
+  /** لتحديد من يحق له تصحيح الإدخال */
+  administered_by_id?: string | null;
+  administered_at: string;
 }
 
 export interface MedicalNote {
@@ -367,6 +413,20 @@ export interface DashboardStats {
   occupancy: { ward_name_ar: string; ward_name_en: string; used: number; total: number }[];
   admissionsTrend: { label: string; count: number }[];
   recentActivity: TimelineEvent[];
+  /** مرضى بدرجة إنذار مبكر (MEWS) مرتفعة حسب آخر علامات حيوية */
+  mewsAlerts?: MewsAlert[];
+}
+
+export interface MewsAlert {
+  patient_id: string;
+  patient_name_ar: string;
+  patient_name_en: string;
+  ward_name_ar: string;
+  ward_name_en: string;
+  bed_no: string;
+  score: number;
+  level: 'medium' | 'high';
+  recorded_at: string;
 }
 
 export interface Bed {
@@ -398,6 +458,9 @@ export interface ChartData {
   notes: MedicalNote[];
   diagnoses: Diagnosis[];
   medications: Medication[];
+  /** سجل إعطاء الأدوية (الأحدث أولاً) */
+  administrations: MedicationAdministration[];
+  fluids: FluidEntry[];
   labs: LabResult[];
   radiology: RadiologyReport[];
   consultations: Consultation[];

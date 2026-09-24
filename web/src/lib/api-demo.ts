@@ -24,7 +24,11 @@ import type {
   PublicTrackInfo,
   PublicTrackFamily,
   AuditEntry,
+  MedicationAdministration,
+  FluidEntry,
+  MewsAlert,
 } from '@hmsi/shared';
+import { calcMews } from '@hmsi/shared';
 import type {
   Api,
   ChartData,
@@ -59,6 +63,8 @@ import type {
   ReportOverview,
   CreateHospitalInput,
   HospitalAdminInput,
+  FluidInput,
+  AdministrationInput,
 } from './api';
 import { createDemoStore, jsonParse, DEMO_DEPARTMENTS, type DemoStore, type AdmissionRecord } from './demo-data';
 
@@ -121,6 +127,8 @@ function buildChart(patientId: string): ChartData {
     notes: record ? [...record.notes].sort((a, b) => (a.recorded_at > b.recorded_at ? -1 : 1)) : [],
     diagnoses: record ? [...record.diagnoses] : [],
     medications: record ? [...record.medications] : [],
+    administrations: record ? [...(record.administrations ?? [])].sort((a, b) => (a.administered_at > b.administered_at ? -1 : 1)) : [],
+    fluids: record ? [...(record.fluids ?? [])].sort((a, b) => (a.recorded_at > b.recorded_at ? -1 : 1)) : [],
     labs: record ? [...record.labs] : [],
     radiology: record ? [...record.radiology] : [],
     consultations: record ? [...record.consultations] : [],
@@ -187,6 +195,13 @@ export const demoApi: Api = {
       occupancy,
       admissionsTrend: trend,
       recentActivity: store.activity.slice(0, 8),
+      mewsAlerts: active.flatMap((e): MewsAlert[] => {
+        const v = e.record?.vitals.slice().sort((a, b) => (a.recorded_at > b.recorded_at ? -1 : 1))[0];
+        const m = v ? calcMews(v) : null;
+        if (!v || !m || m.level === 'low' || !e.record) return [];
+        const adm = e.record.admission;
+        return [{ patient_id: e.patient.id, patient_name_ar: e.patient.full_name_ar, patient_name_en: e.patient.full_name_en, ward_name_ar: adm.ward_name_ar, ward_name_en: adm.ward_name_en, bed_no: adm.bed_no, score: m.score, level: m.level, recorded_at: v.recorded_at }];
+      }),
     };
   },
 
@@ -199,7 +214,7 @@ export const demoApi: Api = {
     if (params?.admitted) list = list.filter((p) => p.activeAdmission);
     const q = (params?.search ?? '').trim().toLowerCase();
     if (q) {
-      list = list.filter((p) => p.full_name_ar.toLowerCase().includes(q) || p.full_name_en.toLowerCase().includes(q) || p.file_number.toLowerCase().includes(q));
+      list = list.filter((p) => p.full_name_ar.toLowerCase().includes(q) || p.full_name_en.toLowerCase().includes(q) || p.file_number.toLowerCase().includes(q) || (p.national_id ?? '').includes(q) || (p.phone ?? '').includes(q));
     }
     return list;
   },
@@ -261,10 +276,14 @@ export const demoApi: Api = {
     const entry = store.patients[Object.values(store.patients).find((x) => x.record?.admission.id === input.admissionId)?.patient.id ?? ''];
     const record = entry?.record;
     if (!record) throw new Error('not_found');
+    const existing = input.clientId ? record.vitals.find((v) => v.id === input.clientId) : undefined;
+    if (existing) return existing;
     const vit: Vitals = {
-      id: uid(),
+      id: input.clientId ?? uid(),
       admission_id: input.admissionId,
-      recorded_at: new Date().toISOString(),
+      recorded_at: input.recordedAt ?? new Date().toISOString(),
+      pain_score: input.painScore ?? null,
+      consciousness: input.consciousness ?? null,
       temperature: input.temperature,
       pulse: input.pulse,
       respiratory_rate: input.respiratoryRate,
@@ -291,6 +310,8 @@ export const demoApi: Api = {
     if (input.spo2 !== undefined) found.spo2 = input.spo2 ?? null;
     if (input.weight !== undefined) found.weight = input.weight ?? null;
     if (input.glucose !== undefined) found.glucose = input.glucose ?? null;
+    if (input.painScore !== undefined) found.pain_score = input.painScore ?? null;
+    if (input.consciousness !== undefined) found.consciousness = input.consciousness ?? null;
     return found;
   },
 
@@ -897,6 +918,65 @@ export const demoApi: Api = {
     found.dispensed_by = actorName(u);
     found.dispensed_at = new Date().toISOString();
     return found;
+  },
+
+  async administerMedication(admissionId: string, medicationId: string, input: AdministrationInput): Promise<MedicationAdministration> {
+    const u = requireUser();
+    const record = findRecord(admissionId);
+    record.administrations ??= [];
+    const existing = input.clientId ? record.administrations.find((x) => x.id === input.clientId) : undefined;
+    if (existing) return existing;
+    const med = record.medications.find((m) => m.id === medicationId);
+    if (!med) throw new Error('not_found');
+    if (med.status !== 'active') throw new Error('الدواء موقوف أو مكتمل — لا تُسجَّل له جرعات');
+    const entry: MedicationAdministration = {
+      id: input.clientId ?? uid(),
+      medication_id: medicationId,
+      admission_id: admissionId,
+      status: input.status,
+      note: input.note ?? null,
+      administered_by: actorName(u),
+      administered_by_id: u.id,
+      administered_at: input.administeredAt ?? new Date().toISOString(),
+    };
+    record.administrations.unshift(entry);
+    const titles = { given: ['إعطاء جرعة', 'Dose given'], held: ['تأجيل جرعة', 'Dose held'], refused: ['رفض المريض الجرعة', 'Dose refused'] }[input.status];
+    pushTimeline(record, actorName(u), 'medication', `${titles[0]}: ${med.name_ar}`, `${titles[1]}: ${med.name_en ?? med.name_ar}`, entry.administered_at);
+    return entry;
+  },
+
+  async deleteAdministration(admissionId: string, administrationId: string): Promise<void> {
+    const record = findRecord(admissionId);
+    record.administrations = (record.administrations ?? []).filter((x) => x.id !== administrationId);
+  },
+
+  async addFluid(input: FluidInput): Promise<FluidEntry> {
+    const u = requireUser();
+    const record = findRecord(input.admissionId);
+    record.fluids ??= [];
+    const existing = input.clientId ? record.fluids.find((x) => x.id === input.clientId) : undefined;
+    if (existing) return existing;
+    const entry: FluidEntry = {
+      id: input.clientId ?? uid(),
+      admission_id: input.admissionId,
+      direction: input.direction,
+      kind: input.kind,
+      volume_ml: input.volumeMl,
+      note: input.note ?? null,
+      recorded_by: actorName(u),
+      recorded_at: input.recordedAt ?? new Date().toISOString(),
+    };
+    record.fluids.unshift(entry);
+    return entry;
+  },
+
+  async deleteFluid(admissionId: string, fluidId: string): Promise<void> {
+    const record = findRecord(admissionId);
+    record.fluids = (record.fluids ?? []).filter((x) => x.id !== fluidId);
+  },
+
+  labelZplUrl() {
+    return null;
   },
 
   async listAudit(): Promise<AuditEntry[]> {

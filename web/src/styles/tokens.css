@@ -162,3 +162,119 @@
     display: none;
   }
 }
+/*
+ * الطباعة (A4): إخفاء التنقل والأزرار، أبيض وأسود واضح، بدون ظلال أو خلفيات ملوّنة.
+ * - print:hidden على عناصر الواجهة (الشريط الجانبي، العلوي، السفلي)
+ * - [data-print-hide] أو .no-print لأي عنصر إضافي لا يلزم ورقياً
+ * - .print-only يظهر في الورق فقط (ترويسة المستشفى/المريض)
+ */
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm 10mm;
+  }
+
+  /* الوضع الليلي لا ينتقل إلى الورق */
+  :root,
+  .dark {
+    color-scheme: light;
+    --color-surface: #fff;
+    --color-surface-raised: #fff;
+    --color-surface-muted: #fff;
+    --color-ink: #000;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+    -webkit-print-color-adjust: economy;
+    print-color-adjust: economy;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .no-print,
+  [data-print-hide],
+  button,
+  [role='tablist'],
+  input[type='file'] {
+    display: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* البطاقات: إطار رفيع بدل الخلفيات، ولا تنقسم بين صفحتين */
+  [class*='rounded-2xl'],
+  [class*='rounded-xl'] {
+    background: #fff !important;
+    border: 1px solid #999 !important;
+    break-inside: avoid;
+  }
+
+  [class*='bg-'] {
+    background-color: transparent !important;
+  }
+
+  [class*='text-'] {
+    color: #000 !important;
+  }
+
+  /* القيم غير الطبيعية تبقى مميزة بالخط العريض والتسطير بدل اللون الأحمر */
+  .text-danger-600,
+  .text-danger-700 {
+    font-weight: 800 !important;
+    text-decoration: underline;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th,
+  td {
+    border-bottom: 1px solid #bbb;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  /* الرسوم البيانية مفيدة ورقياً لكن بعرض الصفحة */
+  .recharts-responsive-container {
+    width: 100% !important;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+}

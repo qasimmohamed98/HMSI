@@ -69,9 +69,9 @@ export async function listPatients(hospitalId: string, opts: PatientListOptions 
   const args: (string | number)[] = [hospitalId];
   const search = opts.search?.trim();
   if (search) {
-    where.push(`(p.full_name_ar LIKE ? ESCAPE '\\' OR p.full_name_en LIKE ? ESCAPE '\\' OR p.file_number LIKE ? ESCAPE '\\' OR p.national_id LIKE ? ESCAPE '\\')`);
+    where.push(`(p.full_name_ar LIKE ? ESCAPE '\\' OR p.full_name_en LIKE ? ESCAPE '\\' OR p.file_number LIKE ? ESCAPE '\\' OR p.national_id LIKE ? ESCAPE '\\' OR p.phone LIKE ? ESCAPE '\\')`);
     const pat = likePattern(search);
-    args.push(pat, pat, pat, pat);
+    args.push(pat, pat, pat, pat, pat);
   }
   if (opts.admitted) {
     where.push(`EXISTS (SELECT 1 FROM admissions a WHERE a.patient_id = p.id AND a.status = 'active')`);

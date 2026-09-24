@@ -87,7 +87,7 @@ export function PatientHeader({
               </div>
             )}
             {admission.status === 'active' && admission.family_pin && (
-              <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-brand-300 px-3 py-2 sm:col-span-4 lg:col-span-3 dark:border-brand-800" title={t('familyPin.hint')}>
+              <div className="no-print col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-brand-300 px-3 py-2 sm:col-span-4 lg:col-span-3 dark:border-brand-800" title={t('familyPin.hint')}>
                 <KeyRound className="h-4 w-4 text-brand-600" />
                 <span className="text-xs font-bold text-ink/55">{t('familyPin.title')}:</span>
                 <span className="font-mono text-base font-extrabold tracking-[0.3em] text-ink" dir="ltr">{admission.family_pin}</span>

@@ -240,6 +240,61 @@ console.log('\n— الصيدلية والخروج والتدقيق');
   check('تواريخ التدقيق بصيغة ISO', /T.*Z$/.test(audit.json[0].created_at));
 }
 
+console.log('\n— سجلات التمريض (ألم، وعي، سوائل) والعمل دون اتصال');
+{
+  const cid = `c_${Date.now().toString(36)}-vitals01`;
+  const v1 = await nurse.post('/vitals', { admission_id: 'adm2', pulse: 88, pain_score: 6, consciousness: 'voice', client_id: cid, recorded_at: new Date(Date.now() - 3600_000).toISOString() });
+  check('علامات حيوية مع الألم والوعي (201)', v1.status === 201 && v1.json.pain_score === 6 && v1.json.consciousness === 'voice', v1.json);
+  check('وقت القياس الفعلي محفوظ (دون اتصال)', Date.now() - Date.parse(v1.json.recorded_at) > 50 * 60_000);
+  const v2 = await nurse.post('/vitals', { admission_id: 'adm2', pulse: 88, client_id: cid });
+  check('إعادة الإرسال بنفس المعرّف لا تكرر السجل (200)', v2.status === 200 && v2.json.id === cid);
+  check('وقت أقدم من 48 ساعة مرفوض (422)', (await nurse.post('/vitals', { admission_id: 'adm2', pulse: 80, recorded_at: new Date(Date.now() - 72 * 3600_000).toISOString() })).status === 422);
+  check('مقياس ألم خارج المدى (422)', (await nurse.post('/vitals', { admission_id: 'adm2', pain_score: 14 })).status === 422);
+  const fin = await nurse.post('/patients/adm2/fluids', { admission_id: 'adm2', direction: 'in', kind: 'iv', volume_ml: 500 });
+  check('تسجيل سوائل داخلة (201)', fin.status === 201 && fin.json.volume_ml === 500, fin.json);
+  check('نوع سائل لا يطابق الاتجاه (422)', (await nurse.post('/patients/adm2/fluids', { admission_id: 'adm2', direction: 'in', kind: 'urine', volume_ml: 200 })).status === 422);
+  check('المشاهد لا يسجل سوائل (403)', (await viewer.post('/patients/adm2/fluids', { admission_id: 'adm2', direction: 'out', kind: 'urine', volume_ml: 200 })).status === 403);
+  const chart = await nurse.get('/patients/p2/chart');
+  check('الملف يعرض السوائل', chart.status === 200 && chart.json.fluids.some((f: any) => f.id === fin.json.id), chart.json.fluids);
+  const dash = await manager.get('/dashboard/stats');
+  check('لوحة التحكم تعرض إنذار MEWS', dash.status === 200 && Array.isArray(dash.json.mewsAlerts) && dash.json.mewsAlerts.length > 0, dash.json.mewsAlerts);
+}
+
+console.log('\n— سجل إعطاء الأدوية (MAR)');
+{
+  const m = await doctor.post('/patients/adm2/medications', { admission_id: 'adm2', name_ar: 'سيفترياكسون', dose: '1g', route: 'IV', frequency: 'q12h', start_at: '2026-09-24' });
+  const give = await nurse.post(`/patients/adm2/medications/${m.json.id}/administrations`, { status: 'given' });
+  check('الممرض يسجل إعطاء جرعة (201)', give.status === 201 && give.json.status === 'given', give.json);
+  check('تأجيل الجرعة بدون سبب مرفوض (422)', (await nurse.post(`/patients/adm2/medications/${m.json.id}/administrations`, { status: 'held' })).status === 422);
+  check('تأجيل الجرعة مع السبب (201)', (await nurse.post(`/patients/adm2/medications/${m.json.id}/administrations`, { status: 'held', note: 'المريض صائم للعملية' })).status === 201);
+  const pharm = client(await login('pharmacist'));
+  check('الصيدلي لا يسجل إعطاء (403)', (await pharm.post(`/patients/adm2/medications/${m.json.id}/administrations`, { status: 'given' })).status === 403);
+  check('لا يُحذف دواء أُعطيت منه جرعات (409)', (await doctor.del(`/patients/adm2/medications/${m.json.id}`)).status === 409);
+  check('غير المسجِّل لا يلغي الإدخال (403)', (await doctor.del(`/patients/adm2/administrations/${give.json.id}`)).status === 403);
+  check('المسجِّل يصحح إدخاله خلال ساعة (204)', (await nurse.del(`/patients/adm2/administrations/${give.json.id}`)).status === 204);
+  await doctor.patch(`/patients/adm2/medications/${m.json.id}`, { status: 'discontinued' });
+  check('لا جرعات لدواء موقوف (409)', (await nurse.post(`/patients/adm2/medications/${m.json.id}/administrations`, { status: 'given' })).status === 409);
+  const chart = await nurse.get('/patients/p2/chart');
+  check('الملف يعرض سجل الإعطاء', chart.json.administrations.length >= 1 && chart.json.administrations.every((x: any) => x.admission_id === 'adm2'));
+}
+
+console.log('\n— الملصقات والمرفقات');
+{
+  const wb = await api.request(`${BASE}/patients/adm2/labels/wristband`, { headers: { cookie: (await login('viewer')).cookie } });
+  const zplBody = await wb.text();
+  check('ملصق السوار بصيغة ZPL', wb.status === 200 && zplBody.startsWith('^XA') && zplBody.includes('^BC') && zplBody.trim().endsWith('^XZ'), zplBody.slice(0, 80));
+  check('ملصق مستشفى آخر = 404', (await admin2.get('/patients/adm2/labels/wristband')).status === 404);
+  const s = await login('doctor');
+  const fd = new FormData();
+  fd.append('file', new File(['<html><script>alert(1)</script></html>'], 'x.png', { type: 'image/png' }));
+  const fake = await api.request(`${BASE}/patients/adm2/attachments`, { method: 'POST', headers: { cookie: s.cookie, 'x-csrf-token': s.csrf }, body: fd });
+  check('ملف بنوع مزوّر مرفوض (415)', fake.status === 415);
+  const fd2 = new FormData();
+  fd2.append('file', new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x0a])], 'r.pdf', { type: 'application/pdf' }));
+  check('ملف PDF حقيقي مقبول (201)', (await api.request(`${BASE}/patients/adm2/attachments`, { method: 'POST', headers: { cookie: s.cookie, 'x-csrf-token': s.csrf }, body: fd2 })).status === 201);
+  check('تنزيل المرفق يتطلب جلسة (401)', (await anon.get('/patients/adm2/attachments/x')).status === 401);
+}
+
 console.log('\n— كلمات المرور');
 {
   const nurse2 = client(await login('nurse2'));

@@ -11,6 +11,8 @@ import type {
   Attachment,
   TimelineEvent,
   AdmissionSummary,
+  MedicationAdministration,
+  FluidEntry,
 } from '@hmsi/shared';
 import { db } from '../../db/index.js';
 import { getPatientById, mapAdmission, ADMISSION_COLUMNS } from './patientRepo.js';
@@ -67,6 +69,8 @@ export async function getChart(patientId: string, hospitalId: string, admissionI
       notes: [],
       diagnoses: [],
       medications: [],
+      administrations: [],
+      fluids: [],
       labs: [],
       radiology: [],
       consultations: [],
@@ -79,13 +83,17 @@ export async function getChart(patientId: string, hospitalId: string, admissionI
   const q = async <T,>(sql: string): Promise<T[]> =>
     (await db.execute({ sql, args: [chosen.id] })).rows.map((r) => ({ ...r }) as unknown as T);
 
-  const [vitals, notes, diagnoses, medications, labs, radiology, consultations, procedures, attachments, timeline] = await Promise.all([
+  const [vitals, notes, diagnoses, medications, administrations, fluids, labs, radiology, consultations, procedures, attachments, timeline] = await Promise.all([
     q<Vitals>(`SELECT * FROM vitals WHERE admission_id = ? ORDER BY recorded_at DESC LIMIT 200`),
     q<MedicalNote>(`SELECT n.*, u.full_name_ar AS author, cu.full_name_ar AS corrected_by
                     FROM medical_notes n JOIN users u ON u.id = n.author_id LEFT JOIN users cu ON cu.id = n.corrected_by
                     WHERE n.admission_id = ? ORDER BY n.recorded_at DESC LIMIT 200`),
     q<Diagnosis>(`SELECT * FROM diagnoses WHERE admission_id = ? ORDER BY created_at DESC LIMIT 100`),
     q<Medication>(`SELECT * FROM medications WHERE admission_id = ? ORDER BY created_at DESC LIMIT 200`),
+    q<MedicationAdministration>(`SELECT id, medication_id, admission_id, status, note, administered_by, administered_by_id, administered_at
+                                 FROM medication_administrations WHERE admission_id = ? ORDER BY administered_at DESC LIMIT 500`),
+    q<FluidEntry>(`SELECT id, admission_id, direction, kind, volume_ml, note, recorded_by, recorded_at
+                   FROM fluid_entries WHERE admission_id = ? ORDER BY recorded_at DESC LIMIT 500`),
     q<LabResult>(`SELECT * FROM lab_results WHERE admission_id = ? ORDER BY ordered_at DESC LIMIT 200`),
     q<RadiologyReport>(`SELECT * FROM radiology_reports WHERE admission_id = ? ORDER BY ordered_at DESC LIMIT 100`),
     q<Consultation>(`SELECT * FROM consultations WHERE admission_id = ? ORDER BY requested_at DESC LIMIT 100`),
@@ -102,6 +110,8 @@ export async function getChart(patientId: string, hospitalId: string, admissionI
     notes,
     diagnoses,
     medications,
+    administrations,
+    fluids,
     labs,
     radiology,
     consultations,

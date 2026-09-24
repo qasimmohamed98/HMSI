@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   Users,
@@ -81,6 +82,43 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* إنذار مبكر: مرضى تدهورت علاماتهم الحيوية (آخر قراءة خلال 24 ساعة) */}
+      {data.mewsAlerts && data.mewsAlerts.length > 0 && (
+        <Card className="border-danger-200 dark:border-danger-900/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-danger-600" />
+              {t('mews.dashboardTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {data.mewsAlerts.map((m) => (
+                <li key={m.patient_id}>
+                  <Link
+                    to={`/patients/${m.patient_id}`}
+                    className={`flex items-center gap-3 rounded-xl border p-3 transition-colors hover:bg-surface-muted dark:hover:bg-white/5 ${m.level === 'high' ? 'border-danger-300 dark:border-danger-900/60' : 'border-warning-300 dark:border-warning-900/60'}`}
+                  >
+                    <span
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg font-extrabold tabular ${m.level === 'high' ? 'bg-danger-100 text-danger-700 dark:bg-danger-900/40 dark:text-danger-200' : 'bg-warning-100 text-warning-800 dark:bg-warning-900/40 dark:text-warning-200'}`}
+                    >
+                      {m.score}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-bold text-ink">{localName(m, 'patient_name')}</span>
+                      <span className="block truncate text-xs text-ink/55">
+                        {localName(m, 'ward_name')} · <bdi dir="ltr">{m.bed_no}</bdi> · <span className="tabular">{fmtDateTime(m.recorded_at)}</span>
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs font-bold text-ink/60">{t(`mews.level.${m.level}`)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <div className={isLarge ? 'grid grid-cols-3 gap-5' : 'grid grid-cols-1 gap-5 lg:grid-cols-2'}>
         {/* Trend chart */}

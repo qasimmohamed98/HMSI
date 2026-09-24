@@ -15,6 +15,8 @@ import {
   UpdateDiagnosisSchema,
   UpdateProcedureSchema,
   UpdateConsultationSchema,
+  CreateFluidSchema,
+  AdministerMedicationSchema,
 } from '@hmsi/shared/validate';
 import type { AdmissionSummary, Permission } from '@hmsi/shared';
 import { getSession, requireAuth, requirePermission, sessionHas, type SessionUser } from '../middleware/auth.js';
@@ -24,6 +26,7 @@ import { writeAudit, addTimeline } from '../lib/audit.js';
 import { HttpError } from '../lib/errors.js';
 import { clientIp } from '../config.js';
 import { db, uuid } from '../../db/index.js';
+import { resolveRecordedAt, existingClientRecord } from '../lib/offline.js';
 
 export const recordRoutes = new Hono();
 
@@ -227,6 +230,77 @@ recordRoutes.post('/:admissionId/medications/:id/dispense', requireAuth(), requi
   return c.json(await fetchRow('medications', id), 200);
 });
 
+// ---------------------------------------------------------------- سجل إعطاء الأدوية (MAR)
+
+const ADMIN_TITLES = {
+  given: ['إعطاء جرعة', 'Dose given'],
+  held: ['تأجيل جرعة', 'Dose held'],
+  refused: ['رفض المريض الجرعة', 'Dose refused'],
+} as const;
+
+recordRoutes.post('/:admissionId/medications/:id/administrations', requireAuth(), requirePermission('medications.administer'), async (c) => {
+  const parsed = await parseBody(c, AdministerMedicationSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof AdministerMedicationSchema)['_output'];
+  const s = getSession(c)!;
+  const a = await loadAdmission(c);
+  const id = input.client_id ?? uuid('ma');
+  if (input.client_id && (await existingClientRecord('medication_administrations', id, a.id))) {
+    return c.json(await fetchRow('medication_administrations', id), 200);
+  }
+  requireActive(a);
+  const medId = c.req.param('id');
+  const med = await findRecord('medications', medId, a.id);
+  if (String(med.status) !== 'active') throw new HttpError('الدواء موقوف أو مكتمل — لا تُسجَّل له جرعات', 409);
+  const at = resolveRecordedAt(input.administered_at);
+  await db.execute({
+    sql: `INSERT INTO medication_administrations (id, medication_id, admission_id, status, note, administered_by, administered_by_id, administered_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [id, medId, a.id, input.status, input.note?.trim() || null, s.user.full_name_ar, s.user.id, at, new Date().toISOString()],
+  });
+  const [ar, en] = ADMIN_TITLES[input.status];
+  await addTimeline({ admissionId: a.id, actor: s.user.full_name_ar, actorId: s.user.id, type: 'medication', titleAr: `${ar}: ${String(med.name_ar)}`, titleEn: `${en}: ${String(med.name_en ?? med.name_ar)}` }, at);
+  await writeAudit({ actorId: s.user.id, action: `medication_${input.status}`, resourceType: 'medication_administration', resourceId: id, ip: clientIp(c) });
+  return c.json(await fetchRow('medication_administrations', id), 201);
+});
+
+/** تصحيح إدخال خاطئ: صاحب الإدخال فقط وخلال ساعة من تسجيله */
+recordRoutes.delete('/:admissionId/administrations/:id', requireAuth(), requirePermission('medications.administer'), async (c) => {
+  const s = getSession(c)!;
+  const a = await loadAdmission(c);
+  const id = c.req.param('id');
+  const row = await findRecord('medication_administrations', id, a.id);
+  if (String(row.administered_by_id) !== s.user.id || Date.now() - Date.parse(String(row.created_at)) > 3600_000) {
+    throw new HttpError('يمكن تصحيح الإدخال من قِبل مسجّله خلال ساعة فقط', 403);
+  }
+  await db.execute({ sql: `DELETE FROM medication_administrations WHERE id = ?`, args: [id] });
+  await track(c, s, a.id, 'medication', 'إلغاء تسجيل جرعة', 'Dose entry removed', 'medication_administration_deleted', 'medication_administration', id);
+  return c.body(null, 204);
+});
+
+// ---------------------------------------------------------------- ميزان السوائل (Intake / Output)
+
+recordRoutes.post('/:admissionId/fluids', requireAuth(), requirePermission('vitals.write'), async (c) => {
+  const parsed = await parseBody(c, CreateFluidSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof CreateFluidSchema)['_output'];
+  const s = getSession(c)!;
+  const a = await loadAdmission(c, input.admission_id);
+  const id = input.client_id ?? uuid('fl');
+  if (input.client_id && (await existingClientRecord('fluid_entries', id, a.id))) {
+    return c.json(await fetchRow('fluid_entries', id), 200);
+  }
+  requireActive(a);
+  const at = resolveRecordedAt(input.recorded_at);
+  await db.execute({
+    sql: `INSERT INTO fluid_entries (id, admission_id, direction, kind, volume_ml, note, recorded_by, recorded_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [id, a.id, input.direction, input.kind, input.volume_ml, input.note?.trim() || null, s.user.full_name_ar, at, new Date().toISOString()],
+  });
+  await writeAudit({ actorId: s.user.id, action: 'fluid_recorded', resourceType: 'fluid_entry', resourceId: id, ip: clientIp(c) });
+  return c.json(await fetchRow('fluid_entries', id), 201);
+});
+
 // ---------------------------------------------------------------- المختبر: الطبيب يطلب، الفني يُدخل النتيجة
 
 recordRoutes.post('/:admissionId/labs', requireAuth(), requirePermission('lab.order', 'lab.add_result'), async (c) => {
@@ -404,7 +478,7 @@ interface DeleteSpec {
   titleAr: string;
   titleEn: string;
   /** قيد إضافي — مثلاً: الطبيب يلغي طلب مختبر لم تصدر نتيجته فقط */
-  check?: (c: Context, row: Row) => void;
+  check?: (c: Context, row: Row) => void | Promise<void>;
 }
 
 function deleteRoute(path: string, permissions: Permission[], spec: DeleteSpec) {
@@ -413,7 +487,7 @@ function deleteRoute(path: string, permissions: Permission[], spec: DeleteSpec) 
     const a = await loadAdmission(c);
     const id = c.req.param('id') ?? '';
     const row = await findRecord(spec.table, id, a.id);
-    spec.check?.(c, row);
+    await spec.check?.(c, row);
     await db.execute({ sql: `DELETE FROM ${spec.table} WHERE id = ?`, args: [id] });
     await track(c, s, a.id, spec.timelineType, spec.titleAr, spec.titleEn, `${spec.resourceType}_deleted`, spec.resourceType, id);
     return c.body(null, 204);
@@ -429,6 +503,18 @@ const onlyPendingUnless = (perm: Permission) => (c: Context, row: Row) => {
 deleteRoute('diagnoses', ['notes.write.doctor'], { table: 'diagnoses', resourceType: 'diagnosis', timelineType: 'diagnosis', titleAr: 'حذف تشخيص', titleEn: 'Diagnosis deleted' });
 deleteRoute('procedures', ['notes.write.doctor'], { table: 'procedures', resourceType: 'procedure', timelineType: 'procedure', titleAr: 'حذف إجراء', titleEn: 'Procedure deleted' });
 deleteRoute('consultations', ['notes.write.doctor'], { table: 'consultations', resourceType: 'consultation', timelineType: 'consultation', titleAr: 'حذف استشارة', titleEn: 'Consultation deleted' });
-deleteRoute('medications', ['medications.manage'], { table: 'medications', resourceType: 'medication', timelineType: 'medication', titleAr: 'حذف دواء', titleEn: 'Medication deleted' });
+deleteRoute('medications', ['medications.manage'], {
+  table: 'medications',
+  resourceType: 'medication',
+  timelineType: 'medication',
+  titleAr: 'حذف دواء',
+  titleEn: 'Medication deleted',
+  // دواء أُعطيت منه جرعات جزء من السجل الطبي: يُوقف ولا يُحذف
+  check: async (_c, row) => {
+    const n = await db.execute({ sql: `SELECT 1 FROM medication_administrations WHERE medication_id = ? LIMIT 1`, args: [String(row.id)] });
+    if (n.rows.length > 0) throw new HttpError('سُجّلت جرعات لهذا الدواء — أوقفه بدلاً من حذفه', 409);
+  },
+});
+deleteRoute('fluids', ['vitals.write'], { table: 'fluid_entries', resourceType: 'fluid_entry', timelineType: 'vitals', titleAr: 'حذف إدخال سوائل', titleEn: 'Fluid entry deleted' });
 deleteRoute('labs', ['lab.order', 'lab.add_result'], { table: 'lab_results', resourceType: 'lab_result', timelineType: 'lab', titleAr: 'حذف طلب مختبر', titleEn: 'Lab order deleted', check: onlyPendingUnless('lab.add_result') });
 deleteRoute('radiology', ['radiology.order', 'radiology.add_report'], { table: 'radiology_reports', resourceType: 'radiology_report', timelineType: 'radiology', titleAr: 'حذف طلب أشعة', titleEn: 'Radiology order deleted', check: onlyPendingUnless('radiology.add_report') });

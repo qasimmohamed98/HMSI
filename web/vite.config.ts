@@ -36,6 +36,26 @@ export default defineConfig(({ mode }) => {
           // طلبات الـ API لا تُخدم أبداً من الكاش (بيانات طبية حساسة ومتغيرة)
           navigateFallbackDenylist: [/^\/api\//],
           globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+          /*
+           * Background Sync لإدخالات التمريض فقط (علامات حيوية، سوائل، جرعات): إن فشل الإرسال لانقطاع الشبكة
+           * يحفظه الـ Service Worker ويعيد إرساله عند عودة الاتصال حتى لو أُغلقت الصفحة (متصفحات Chromium).
+           * كل طلب يحمل client_id، فالإرسال المزدوج (من هنا ومن طابور الواجهة offline-queue.ts) لا يكرر السجل.
+           * لا شيء من الـ API يُخزَّن مؤقتاً (NetworkOnly).
+           */
+          runtimeCaching: [
+            {
+              urlPattern: /\/api\/(vitals|patients\/[^/]+\/(fluids|medications\/[^/]+\/administrations))$/,
+              method: 'POST',
+              handler: 'NetworkOnly',
+              options: {
+                backgroundSync: {
+                  name: 'hmsi-nursing-entries',
+                  // بالدقائق — نفس نافذة الخادم (48 ساعة)
+                  options: { maxRetentionTime: 48 * 60 },
+                },
+              },
+            },
+          ],
         },
       }),
     ],

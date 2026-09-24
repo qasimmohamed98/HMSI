@@ -7,11 +7,23 @@ import {
   MEDICATION_STATUSES,
   WARD_TYPES,
   DISCHARGE_TYPES,
+  CONSCIOUSNESS_LEVELS,
+  FLUID_DIRECTIONS,
+  FLUID_KINDS,
+  ADMINISTRATION_STATUSES,
 } from './types.js';
 
 const id = z.string().min(1).max(64);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'صيغة التاريخ يجب أن تكون YYYY-MM-DD');
 const optionalString = z.string().max(500).nullable().optional();
+
+/**
+ * معرّف يولّده المتصفح للإدخالات التي قد تُرسل من طابور العمل دون اتصال:
+ * إعادة الإرسال بنفس المعرّف لا تُنشئ سجلاً مكرراً.
+ */
+export const clientId = z.string().regex(/^c_[a-z0-9-]{8,64}$/, 'معرّف العميل غير صالح').optional();
+/** وقت القياس الفعلي (قد يسبق وقت الإرسال عند العمل دون اتصال) — يتحقق الخادم من النافذة المسموحة */
+const recordedAt = z.string().datetime({ offset: true }).optional();
 
 export const LoginSchema = z.object({
   username: z.string().min(3).max(64),
@@ -63,9 +75,35 @@ export const CreateVitalsSchema = z.object({
   spo2: z.coerce.number().min(30).max(100).nullable().optional(),
   weight: z.coerce.number().min(1).max(400).nullable().optional(),
   glucose: z.coerce.number().min(10).max(800).nullable().optional(),
+  pain_score: z.coerce.number().int().min(0).max(10).nullable().optional(),
+  consciousness: z.enum(CONSCIOUSNESS_LEVELS).nullable().optional(),
+  client_id: clientId,
+  recorded_at: recordedAt,
 });
 
-export const UpdateVitalsSchema = CreateVitalsSchema.omit({ admission_id: true }).partial();
+export const UpdateVitalsSchema = CreateVitalsSchema.omit({ admission_id: true, client_id: true, recorded_at: true }).partial();
+
+export const CreateFluidSchema = z
+  .object({
+    admission_id: id,
+    direction: z.enum(FLUID_DIRECTIONS),
+    kind: z.string().max(20),
+    volume_ml: z.coerce.number().int().min(1).max(10000),
+    note: z.string().max(300).nullable().optional(),
+    client_id: clientId,
+    recorded_at: recordedAt,
+  })
+  .refine((v) => (FLUID_KINDS[v.direction] as readonly string[]).includes(v.kind), { message: 'نوع السائل لا يطابق الاتجاه', path: ['kind'] });
+
+export const AdministerMedicationSchema = z
+  .object({
+    status: z.enum(ADMINISTRATION_STATUSES),
+    note: z.string().max(300).nullable().optional(),
+    client_id: clientId,
+    administered_at: recordedAt,
+  })
+  // تأجيل الجرعة أو رفض المريض يتطلب ذكر السبب
+  .refine((v) => v.status === 'given' || Boolean(v.note?.trim()), { message: 'اذكر السبب', path: ['note'] });
 
 export const CreateNoteSchema = z.object({
   admission_id: id,
