@@ -9,6 +9,8 @@ import {
   ShieldCheck,
   Settings,
   Hospital,
+  Network,
+  ScrollText,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -31,7 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/', key: 'dashboard', icon: LayoutDashboard },
       { to: '/patients', key: 'patients', icon: Users },
       { to: '/wards', key: 'wards', icon: Building2 },
-      { to: '/departments', key: 'departments', icon: Building2, permission: 'departments.manage' },
+      { to: '/departments', key: 'departments', icon: Network, permission: 'departments.manage' },
     ],
   },
   {
@@ -39,7 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/laboratory', key: 'laboratory', icon: FlaskConical, permission: 'lab.add_result' },
       { to: '/radiology', key: 'radiology', icon: ScanLine, permission: 'radiology.add_report' },
-      { to: '/pharmacy', key: 'pharmacy', icon: Pill, permission: 'medications.manage' },
+      { to: '/pharmacy', key: 'pharmacy', icon: Pill, permission: 'medications.dispense' },
     ],
   },
   {
@@ -48,6 +50,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/hospitals', key: 'hospitals', icon: Hospital, permission: 'hospitals.manage' },
       { to: '/reports', key: 'reports', icon: FileBarChart2, permission: 'reports.view' },
       { to: '/users', key: 'users', icon: ShieldCheck, permission: 'users.manage' },
+      { to: '/audit', key: 'audit', icon: ScrollText, permission: 'audit.view' },
       { to: '/settings', key: 'settings', icon: Settings },
     ],
   },

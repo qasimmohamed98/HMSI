@@ -7,6 +7,7 @@ import { useTheme } from '@/lib/theme';
 import { setLanguage, currentLang } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { localName } from '@/lib/format';
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { t } = useTranslation();
@@ -37,14 +38,14 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       <div className="flex flex-1 items-center gap-2">
         <span className="hidden text-sm font-bold text-ink md:block">{t('nav.hospital')}</span>
         <span className="hidden text-ink/25 md:block">·</span>
-        <span className="truncate text-sm text-ink/55">{user?.hospital_name_ar}</span>
+        <span className="truncate text-sm text-ink/55">{localName(user, 'hospital_name')}</span>
         {user?.home_hospital_id && user.home_hospital_id !== user.hospital_id && (
           // المدير العام يعمل داخل مستشفى آخر
           <button
             type="button"
             onClick={() => navigate('/hospitals')}
             className="truncate rounded-full bg-warning-100 px-2.5 py-0.5 text-xs font-bold text-warning-800 hover:bg-warning-200 dark:bg-warning-900/40 dark:text-warning-200"
-            title={t('hospitals.actingBanner', { name: user.hospital_name_ar })}
+            title={t('hospitals.actingBanner', { name: localName(user, 'hospital_name') })}
           >
             {t('hospitals.back')}
           </button>
@@ -71,7 +72,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
           >
             <Avatar name={user.full_name_ar || user.username} className="h-8 w-8 text-xs" />
             <span className="hidden max-w-[10rem] flex-col items-start leading-tight sm:flex">
-              <span className="truncate text-sm font-bold text-ink">{user.full_name_ar || user.full_name_en}</span>
+              <span className="truncate text-sm font-bold text-ink">{localName(user, 'full_name') || user.username}</span>
               <span className="truncate text-[0.68rem] font-semibold text-ink/45">{t(`user.role.${user.role}`)}</span>
             </span>
             <ChevronDown className={cn('h-4 w-4 text-ink/40 transition-transform', menuOpen && 'rotate-180')} />
@@ -80,7 +81,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
           {menuOpen && (
             <div className="absolute end-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-xl border border-ink/10 bg-surface-raised shadow-float animate-fade-up dark:border-white/10 dark:bg-surface-raised">
               <div className="border-b border-ink/8 px-4 py-3 dark:border-white/10">
-                <p className="text-sm font-bold text-ink">{user.full_name_ar || user.full_name_en}</p>
+                <p className="text-sm font-bold text-ink">{localName(user, 'full_name') || user.username}</p>
                 <p className="text-xs text-ink/50">{user.username}</p>
               </div>
               <button

@@ -7,10 +7,11 @@ import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type ProcedureUpdateInput, type ChartData } from '@/lib/api';
 import type { Procedure } from '@hmsi/shared';
 import { fmtDateTime } from '@/lib/format';
-import { useToast } from '@/components/ui';
+import { useToast, useConfirm } from '@/components/ui';
 
 export function ProceduresSection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -78,7 +79,7 @@ export function ProceduresSection({ chart, canWrite }: { chart: ChartData; canWr
                     size="icon-sm"
                     variant="ghost"
                     className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                    onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: p.id })}
+                    onClick={async () => { if (await confirm(t('ui.confirmDeleteRecord'))) deleteMut.mutate({ admissionId: chart.admissionId!, id: p.id }); }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

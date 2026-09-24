@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { History } from 'lucide-react';
 import { SectionCard, EmptyLine } from './SectionCard';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDateTime, localName } from '@/lib/format';
 import type { ChartData } from '@/lib/api';
 
 export function TimelineSection({ chart }: { chart: ChartData }) {
@@ -20,7 +20,7 @@ export function TimelineSection({ chart }: { chart: ChartData }) {
                 </span>
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-ink">{ev.title_ar}</p>
+                    <p className="text-sm font-bold text-ink">{localName(ev, 'title')}</p>
                     <p className="text-xs text-ink/50">
                       {ev.actor} · <span className="tabular">{fmtDateTime(ev.created_at)}</span>
                     </p>

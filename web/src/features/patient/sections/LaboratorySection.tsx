@@ -6,11 +6,12 @@ import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type LabInput, type ChartData, type LabResultInput } from '@/lib/api';
 import { fmtDateTime } from '@/lib/format';
-import { useToast } from '@/components/ui';
+import { useToast, useConfirm } from '@/components/ui';
 
 /** canOrder: طلب فحص (الطبيب) — canResult: إدخال النتائج (فني المختبر) */
 export function LaboratorySection({ chart, canOrder, canResult }: { chart: ChartData; canOrder: boolean; canResult: boolean }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -91,7 +92,7 @@ export function LaboratorySection({ chart, canOrder, canResult }: { chart: Chart
                           size="icon-sm"
                           variant="ghost"
                           className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                          onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: l.id })}
+                          onClick={async () => { if (await confirm(t('ui.confirmDeleteRecord'))) deleteMut.mutate({ admissionId: chart.admissionId!, id: l.id }); }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -107,7 +108,11 @@ export function LaboratorySection({ chart, canOrder, canResult }: { chart: Chart
                       {l.result}
                       {l.unit && <span className="ms-1 text-xs font-semibold text-ink/45">{l.unit}</span>}
                     </p>
-                    {l.reference_range && <span className="text-xs font-medium text-ink/45">مرجع: {l.reference_range}</span>}
+                    {l.reference_range && (
+                      <span className="text-xs font-medium text-ink/45">
+                        {t('laboratory.reference')}: <bdi dir="ltr">{l.reference_range}</bdi>
+                      </span>
+                    )}
                   </div>
                   {l.resulted_by && l.resulted_at && (
                     <p className="mt-1 text-xs text-ink/40">

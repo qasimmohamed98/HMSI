@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { FileText } from 'lucide-react';
 import type { Patient } from '@hmsi/shared';
 import { Card, CardContent, Avatar } from '@/components/ui';
+import { localName } from '@/lib/format';
 
 export function AdmittedPatientCard({ patient, children }: { patient: Patient; children?: ReactNode }) {
   const { t } = useTranslation();
@@ -15,7 +16,7 @@ export function AdmittedPatientCard({ patient, children }: { patient: Patient; c
       <div className="flex items-center gap-3 border-b border-ink/8 bg-surface-muted/50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
         <Avatar name={patient.full_name_ar} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-bold text-ink">{patient.full_name_ar}</p>
+          <p className="truncate font-bold text-ink">{localName(patient, 'full_name')}</p>
           <p className="text-xs text-ink/50">
             {patient.file_number}
             {admission && (

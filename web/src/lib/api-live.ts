@@ -327,6 +327,13 @@ export const liveApi: Api = {
   deleteNote: (admissionId, noteId) => request(`/patients/${admissionId}/notes/${noteId}`, { method: 'DELETE' }),
   deleteDiagnosis: (admissionId, diagnosisId) => request(`/patients/${admissionId}/diagnoses/${diagnosisId}`, { method: 'DELETE' }),
   deleteMedication: (admissionId, medicationId) => request(`/patients/${admissionId}/medications/${medicationId}`, { method: 'DELETE' }),
+  dispenseMedication: (admissionId, medicationId) => request(`/patients/${admissionId}/medications/${medicationId}/dispense`, { method: 'POST' }),
+  listAudit: (params) => {
+    const qs = new URLSearchParams();
+    if (params?.before) qs.set('before', params.before);
+    if (params?.action) qs.set('action', params.action);
+    return request(`/audit${qs.toString() ? `?${qs}` : ''}`);
+  },
   deleteLabResult: (admissionId, labId) => request(`/patients/${admissionId}/labs/${labId}`, { method: 'DELETE' }),
   deleteRadiology: (admissionId, radiologyId) => request(`/patients/${admissionId}/radiology/${radiologyId}`, { method: 'DELETE' }),
   deleteConsultation: (admissionId, consultationId) => request(`/patients/${admissionId}/consultations/${consultationId}`, { method: 'DELETE' }),

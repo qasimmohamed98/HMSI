@@ -13,6 +13,7 @@ export default function RadiologyPage() {
   const { t } = useTranslation();
   const { data, isLoading, error, refetch, refetchAll } = useAdmittedCharts();
   const toast = useToast();
+  const [pendingOnly, setPendingOnly] = useState(true);
   const [dialog, setDialog] = useState<string | null>(null);
   const [reportFor, setReportFor] = useState<{ admissionId: string; id: string; study: string } | null>(null);
 
@@ -35,9 +36,30 @@ export default function RadiologyPage() {
     },
   });
 
+  const isPending = (r: { report: string | null }) => !r.report;
+  const rows = (data ?? [])
+    .map((d) => ({ ...d, items: pendingOnly ? d.chart.radiology.filter(isPending) : d.chart.radiology }))
+    .filter((d) => !pendingOnly || d.items.length > 0);
+  const pendingCount = (data ?? []).reduce((n, d) => n + d.chart.radiology.filter(isPending).length, 0);
+
   return (
     <div>
-      <PageHeader title={t('nav.radiology')} subtitle={t('dept.radSubtitle')} />
+      <PageHeader title={t('nav.radiology')} subtitle={t('dept.radSubtitle')}
+        actions={
+          <div className="flex rounded-lg border border-ink/10 p-0.5 dark:border-white/10">
+            {[true, false].map((v) => (
+              <button
+                key={String(v)}
+                type="button"
+                onClick={() => setPendingOnly(v)}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${pendingOnly === v ? 'bg-brand-600 text-white' : 'text-ink/60 hover:text-ink'}`}
+              >
+                {v ? `${t('ui.pendingOnly')} (${pendingCount})` : t('ui.showAll')}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-4">
@@ -51,22 +73,21 @@ export default function RadiologyPage() {
             <EmptyState title={t('errors.generic')} action={{ label: t('common.retry'), onClick: () => void refetch() }} />
           </CardContent>
         </Card>
-      ) : data.length === 0 ? (
+      ) : rows.length === 0 ? (
         <Card>
           <CardContent>
-            <EmptyState title={t('dept.noAdmitted')} icon={<ScanLine className="h-6 w-6" />} />
+            <EmptyState title={pendingOnly ? t('ui.noPending') : t('dept.noAdmitted')} icon={<ScanLine className="h-6 w-6" />} />
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm font-semibold text-ink/60">{t('dept.count', { count: data.length })}</p>
-          {data.map(({ patient, chart }) => (
+          {rows.map(({ patient, chart, items }) => (
             <AdmittedPatientCard key={patient.id} patient={patient}>
-              {chart.radiology.length === 0 ? (
+              {items.length === 0 ? (
                 <p className="py-2 text-center text-sm font-medium text-ink/45">{t('radiology.empty')}</p>
               ) : (
                 <ul className="space-y-2.5">
-                  {chart.radiology.map((r) => (
+                  {items.map((r) => (
                     <li key={r.id} className="rounded-lg border border-ink/8 px-3.5 py-2.5 dark:border-white/10">
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-bold text-ink">{r.study_type_ar}</p>

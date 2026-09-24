@@ -327,4 +327,12 @@ CREATE INDEX IF NOT EXISTS idx_login_attempts_attempted_at ON login_attempts(att
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 `,
   },
+  {
+    id: "007_dispense.sql",
+    sql: `-- 007 — صرف الأدوية من الصيدلية
+ALTER TABLE medications ADD COLUMN dispensed_by TEXT;
+ALTER TABLE medications ADD COLUMN dispensed_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_audit_actor_id ON audit_logs(actor_id);
+`,
+  },
 ];

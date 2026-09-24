@@ -18,4 +18,4 @@ export { Skeleton, SkeletonCard } from './Skeleton';
 export { EmptyState, ErrorState } from './EmptyState';
 export { Avatar } from './Avatar';
 export { Chip } from './Chip';
-export { StatusBadge } from './StatusBadge';
+export { StatusBadge } from './StatusBadge';export { ConfirmProvider, useConfirm } from './Confirm';

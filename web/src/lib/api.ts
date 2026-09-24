@@ -23,6 +23,7 @@ import type {
   ReportOverview,
   PublicTrackInfo,
   PublicTrackFamily,
+  AuditEntry,
 } from '@hmsi/shared';
 import { demoApi } from './api-demo';
 import { liveApi } from './api-live';
@@ -274,6 +275,8 @@ export interface Api {
   addMedication(input: MedicationInput): Promise<Medication>;
   updateMedication(admissionId: string, medicationId: string, input: MedicationStatusInput): Promise<Medication>;
   deleteMedication(admissionId: string, medicationId: string): Promise<void>;
+  dispenseMedication(admissionId: string, medicationId: string): Promise<Medication>;
+  listAudit(params?: { before?: string; action?: string }): Promise<AuditEntry[]>;
   addLabResult(input: LabInput): Promise<LabResult>;
   updateLabResult(admissionId: string, labId: string, input: LabResultInput): Promise<LabResult>;
   deleteLabResult(admissionId: string, labId: string): Promise<void>;

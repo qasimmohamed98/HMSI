@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { LogOut, DoorOpen } from 'lucide-react';
+import { LogOut, DoorOpen, Printer } from 'lucide-react';
 import { Button, Dialog, Textarea, Select, Alert } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type DischargeInput, type ChartData } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { fmtDateTime } from '@/lib/format';
+import { printDischargeSummary } from './printDischarge';
 
 export function DischargeSection({ chart, canDischarge }: { chart: ChartData; canDischarge: boolean }) {
   const { t } = useTranslation();
@@ -59,9 +60,14 @@ export function DischargeSection({ chart, canDischarge }: { chart: ChartData; ca
               <p className="mt-1 whitespace-pre-wrap text-sm text-ink/85">{chart.patient.admission.discharge_summary}</p>
             </div>
           )}
+          <Button className="mt-3" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => printDischargeSummary(chart, t)}>
+            {t('ui.printSummary')}
+          </Button>
         </div>
       ) : (
-        <EmptyLine>{t('discharge.reason')}</EmptyLine>
+        <EmptyLine>
+          {!chart.admissionId ? t('ui.notAdmitted') : canDischarge ? t('ui.notDischarged') : `${t('ui.notDischarged')} — ${t('ui.dischargeNoPermission')}`}
+        </EmptyLine>
       )}
 
       <DischargeDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
@@ -98,7 +104,7 @@ function DischargeDialog({ open, onClose, admissionId, onSubmit, busy }: { open:
       }
     >
       <div className="space-y-4">
-        <Alert variant="warning">{t('discharge.reason')}</Alert>
+        <Alert variant="warning">{t('ui.dischargeWarning')}</Alert>
         <Select
           label={t('discharge.type')}
           value={type}

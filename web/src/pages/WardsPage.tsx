@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Building2, BedDouble, Plus, Pencil, Trash2, Copy, Users, Stethoscope, Printer } from 'lucide-react';
+import { Building2, BedDouble, Plus, Pencil, Trash2, Copy, Users, Stethoscope, Printer, Network } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent, CardHeader, CardTitle, Skeleton, EmptyState, Badge, Button, Dialog, Input, Select, ConfirmDialog } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { ROLE_PERMISSIONS } from '@hmsi/shared';
 import type { Ward, Bed, Department } from '@hmsi/shared';
 import { cn } from '@/lib/utils';
+import { fmtPercent, localName } from '@/lib/format';
 
 export default function WardsPage() {
   const { t } = useTranslation();
@@ -61,7 +62,7 @@ export default function WardsPage() {
         actions={
           <>
             {canDept && (
-              <Button variant="outline" icon={<Users className="h-4 w-4" />} onClick={() => navigate('/departments')}>
+              <Button variant="outline" icon={<Network className="h-4 w-4" />} onClick={() => navigate('/departments')}>
                 {t('nav.departments')}
               </Button>
             )}
@@ -99,10 +100,10 @@ export default function WardsPage() {
                       <Building2 className="h-5 w-5" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <CardTitle className="truncate">{w.name_ar}</CardTitle>
+                      <CardTitle className="truncate">{localName(w, 'name')}</CardTitle>
                       <p className="truncate text-xs text-ink/50">
-                        {w.name_en}
-                        {w.department_name_ar ? ` · ${w.department_name_ar}` : ''}
+                        {t(`wards.types.${w.type}`)}
+                        {w.department_name_ar ? ` · ${localName(w, 'department_name')}` : ''}
                       </p>
                     </div>
                     {canWard && (
@@ -128,7 +129,7 @@ export default function WardsPage() {
                           <Plus className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                      <span className="text-xs font-bold text-ink/45">%{pct}</span>
+                      <span className="text-xs font-bold text-ink/45">{fmtPercent(pct / 100)}</span>
                     </div>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-surface-muted dark:bg-white/10">

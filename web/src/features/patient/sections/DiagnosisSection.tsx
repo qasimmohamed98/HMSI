@@ -6,10 +6,11 @@ import { Button, Dialog, Input, Select, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type DiagnosisUpdateInput, type ChartData } from '@/lib/api';
 import type { Diagnosis } from '@hmsi/shared';
-import { useToast } from '@/components/ui';
+import { useToast, useConfirm } from '@/components/ui';
 
 export function DiagnosisSection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -85,7 +86,7 @@ export function DiagnosisSection({ chart, canWrite }: { chart: ChartData; canWri
                     size="icon-sm"
                     variant="ghost"
                     className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                    onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: d.id })}
+                    onClick={async () => { if (await confirm(t('ui.confirmDeleteRecord'))) deleteMut.mutate({ admissionId: chart.admissionId!, id: d.id }); }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

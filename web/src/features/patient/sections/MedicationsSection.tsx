@@ -7,10 +7,11 @@ import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type MedicationStatusInput, type ChartData } from '@/lib/api';
 import type { Medication } from '@hmsi/shared';
 import { fmtDate, todayISO } from '@/lib/format';
-import { useToast } from '@/components/ui';
+import { useToast, useConfirm } from '@/components/ui';
 
 export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -86,10 +87,15 @@ export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canW
                   <p className="mt-0.5 flex items-center gap-1 text-xs text-ink/45">
                     <Timer className="h-3 w-3" />
                     {fmtDate(m.start_at, { day: 'numeric', month: 'short' })}
-                    {m.end_at ? ` ← ${fmtDate(m.end_at, { day: 'numeric', month: 'short' })}` : ''}
+                    {m.end_at ? ` – ${fmtDate(m.end_at, { day: 'numeric', month: 'short' })}` : ''}
                     <span className="text-ink/30">·</span>
                     {t('medications.prescribedBy')}: {m.prescribed_by}
                   </p>
+                  {m.status === 'active' && (
+                    <p className={`mt-0.5 text-xs font-semibold ${m.dispensed_at ? 'text-info-600' : 'text-warning-700'}`}>
+                      {m.dispensed_at ? `${t('ui.dispensed')} · ${m.dispensed_by}` : t('ui.notDispensed')}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -117,7 +123,7 @@ export function MedicationsSection({ chart, canWrite }: { chart: ChartData; canW
                     size="icon-sm"
                     variant="ghost"
                     className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                    onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: m.id })}
+                    onClick={async () => { if (await confirm(t('ui.confirmDeleteRecord'))) deleteMut.mutate({ admissionId: chart.admissionId!, id: m.id }); }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

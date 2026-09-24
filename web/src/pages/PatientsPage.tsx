@@ -8,7 +8,10 @@ import { Card, Button, Badge, Skeleton, EmptyState, Avatar, TableRoot, THead, TB
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Input } from '@/components/ui/Input';
 import { API, type PatientUpdateInput } from '@/lib/api';
-import { calcAge, fmtDate } from '@/lib/format';
+import { calcAge, fmtDate, localName } from '@/lib/format';
+import { useAuth } from '@/lib/auth';
+import { hasPermission } from '@hmsi/shared';
+import { currentLang } from '@/i18n';
 import { useMediaQuery } from '@/lib/use-media';
 import { NewPatientDialog } from '@/features/patients/NewPatientDialog';
 import { EditPatientDialog } from '@/features/patients/EditPatientDialog';
@@ -22,6 +25,13 @@ export default function PatientsPage() {
   const toast = useToast();
   const isMobile = useMediaQuery('(max-width: 639px)');
   const isTablet = useMediaQuery('(max-width: 1023px)');
+  const { user } = useAuth();
+  const can = {
+    create: hasPermission(user?.role, 'patients.create'),
+    update: hasPermission(user?.role, 'patients.update'),
+    archive: hasPermission(user?.role, 'patients.archive'),
+    admit: hasPermission(user?.role, 'admissions.manage'),
+  };
 
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -92,9 +102,11 @@ export default function PatientsPage() {
         title={t('patients.title')}
         subtitle={t('patients.subtitle')}
         actions={
-          <Button onClick={() => setShowNew(true)} icon={<UserPlus className="h-4 w-4" />}>
-            {t('patients.newPatient')}
-          </Button>
+          can.create ? (
+            <Button onClick={() => setShowNew(true)} icon={<UserPlus className="h-4 w-4" />}>
+              {t('patients.newPatient')}
+            </Button>
+          ) : undefined
         }
       />
 
@@ -144,9 +156,9 @@ export default function PatientsPage() {
               key={p.id}
               patient={p}
               onClick={() => navigate(`/patients/${p.id}`)}
-              onAdmit={!p.activeAdmission ? () => setAdmitTarget(p) : undefined}
-              onEdit={() => setEditTarget(p)}
-              onArchive={() => setArchiveTarget(p)}
+              onAdmit={can.admit && !p.activeAdmission ? () => setAdmitTarget(p) : undefined}
+              onEdit={can.update ? () => setEditTarget(p) : undefined}
+              onArchive={can.archive ? () => setArchiveTarget(p) : undefined}
             />
           ))}
         </div>
@@ -170,23 +182,23 @@ export default function PatientsPage() {
             <TBody>
               {data.map((p) => (
                 <TRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/patients/${p.id}`)}>
-                  <Td className="tabular font-bold text-brand-700 dark:text-brand-300">{p.file_number}</Td>
+                  <Td className="tabular whitespace-nowrap font-bold text-brand-700 dark:text-brand-300" dir="ltr">{p.file_number}</Td>
                   <Td>
                     <div className="flex items-center gap-3">
                       <Avatar name={p.full_name_ar} className="h-9 w-9 text-xs" />
                       <div>
-                        <p className="font-bold text-ink">{p.full_name_ar}</p>
-                        <p className="text-xs text-ink/45">{p.full_name_en}</p>
+                        <p className="whitespace-nowrap font-bold text-ink">{localName(p, 'full_name')}</p>
+                        <p className="whitespace-nowrap text-xs text-ink/45">{currentLang() === 'ar' ? p.full_name_en : p.full_name_ar}</p>
                       </div>
                     </div>
                   </Td>
                   <Td className="tabular">{calcAge(p.birth_date)}</Td>
                   <Td>
-                    <Badge variant="outline">{p.blood_type}</Badge>
+                    <Badge variant="outline"><bdi dir="ltr">{p.blood_type}</bdi></Badge>
                   </Td>
-                  <Td>{p.activeAdmission?.department_name_ar ?? '—'}</Td>
-                  <Td>{p.activeAdmission?.ward_name_ar ?? '—'}</Td>
-                  <Td className="tabular">
+                  <Td>{p.activeAdmission ? localName(p.activeAdmission, 'department_name') : '—'}</Td>
+                  <Td>{p.activeAdmission ? localName(p.activeAdmission, 'ward_name') : '—'}</Td>
+                  <Td className="tabular whitespace-nowrap" dir="ltr">
                     {p.activeAdmission ? `${p.activeAdmission.room} / ${p.activeAdmission.bed_no}` : '—'}
                   </Td>
                   <Td className="tabular">
@@ -195,19 +207,24 @@ export default function PatientsPage() {
                   <Td>{p.activeAdmission ? <StatusBadge status="active" /> : <StatusBadge status={p.status} />}</Td>
                   <Td>
                     <div className="flex items-center gap-1.5">
-                      <Button size="icon-sm" variant="ghost" aria-label={t('common.edit')} onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={t('common.archive')}
-                        className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                        onClick={(e) => { e.stopPropagation(); setArchiveTarget(p); }}
-                      >
-                        <Archive className="h-3.5 w-3.5" />
-                      </Button>
-                      {!p.activeAdmission && (
+                      {can.update && (
+                        <Button size="icon-sm" variant="ghost" aria-label={t('common.edit')} title={t('common.edit')} onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {can.archive && (
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label={t('common.archive')}
+                          title={t('common.archive')}
+                          className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
+                          onClick={(e) => { e.stopPropagation(); setArchiveTarget(p); }}
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {can.admit && !p.activeAdmission && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -274,19 +291,17 @@ function PatientMobileCard({ patient: p, onClick, onAdmit, onEdit, onArchive }: 
         <Avatar name={p.full_name_ar} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-sm font-bold text-ink">{p.full_name_ar}</p>
+            <p className="truncate text-sm font-bold text-ink">{localName(p, 'full_name')}</p>
             {p.activeAdmission ? <StatusBadge status="active" /> : <StatusBadge status={p.status} />}
           </div>
           <p className="text-xs text-ink/45">
-            {p.file_number} · {t('gender.' + p.gender)} · {calcAge(p.birth_date)} سنة
+            <bdi dir="ltr">{p.file_number}</bdi> · {t('gender.' + p.gender)} · {calcAge(p.birth_date)} {t('common.years')}
           </p>
           {p.activeAdmission ? (
             <p className="mt-1.5 text-xs font-semibold text-ink/65">
-              {p.activeAdmission.department_name_ar} · {p.activeAdmission.ward_name_ar} · {p.activeAdmission.room}/{p.activeAdmission.bed_no}
+              {localName(p.activeAdmission, 'department_name')} · {localName(p.activeAdmission, 'ward_name')} · <bdi dir="ltr">{p.activeAdmission.room}/{p.activeAdmission.bed_no}</bdi>
             </p>
-          ) : (
-            <p className="mt-1.5 text-xs text-ink/40">{t('status.discharged')}</p>
-          )}
+          ) : null}
         </div>
       </button>
       <div className="flex items-center gap-1.5">

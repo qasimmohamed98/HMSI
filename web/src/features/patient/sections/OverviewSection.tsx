@@ -24,7 +24,7 @@ export function OverviewSection({ chart }: { chart: ChartData }) {
   return (
     <div className="space-y-4">
       {/* Latest vitals snapshot */}
-      <SectionCard title={t('vitals.title')} description={chart.admissionId ? t('vitals.title') : undefined}>
+      <SectionCard title={t('vitals.title')}>
         {latest ? (
           <div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">

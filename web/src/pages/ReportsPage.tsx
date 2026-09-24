@@ -2,17 +2,45 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Users, BedDouble, AlertTriangle, FlaskConical, Activity, Printer } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, Skeleton, EmptyState, Badge, Button, Input } from '@/components/ui';
+import { Card, CardContent, CardHeader, CardTitle, Skeleton, EmptyState, Button, Input } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API } from '@/lib/api';
-import { fmtDateTime, todayISO } from '@/lib/format';
+import { fmtDate, fmtDateTime, fmtPercent, todayISO, localName, localISODate } from '@/lib/format';
+import { currentLang } from '@/i18n';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { cn } from '@/lib/utils';
 
 function daysAgo(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${String(d.getDate()).padStart(2, '0')}`;
+  return localISODate(d);
+}
+
+function TrendChart({ data, admissionsLabel, dischargesLabel }: { data: { label: string; admissions: number; discharges: number }[]; admissionsLabel: string; dischargesLabel: string }) {
+  const rtl = currentLang() === 'ar';
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.08} vertical={false} />
+          <XAxis
+            dataKey="label"
+            reversed={rtl}
+            tickFormatter={(v: string) => fmtDate(v, { day: 'numeric', month: 'short' })}
+            tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.55 }}
+            axisLine={false}
+            tickLine={false}
+            minTickGap={12}
+          />
+          <YAxis allowDecimals={false} orientation={rtl ? 'right' : 'left'} width={28} tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.55 }} axisLine={false} tickLine={false} />
+          <Tooltip labelFormatter={(v) => fmtDate(String(v), { weekday: 'long', day: 'numeric', month: 'short' })} cursor={{ fill: 'currentColor', opacity: 0.05 }} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Bar dataKey="admissions" name={admissionsLabel} fill="#1e7f6e" radius={[4, 4, 0, 0]} maxBarSize={18} />
+          <Bar dataKey="discharges" name={dischargesLabel} fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={18} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 export default function ReportsPage() {
@@ -68,7 +96,6 @@ export default function ReportsPage() {
     { label: t('reports.pendingLabs'), value: data.pendingLabs, icon: FlaskConical, tone: 'warning' },
   ] as const;
 
-  const maxTrend = (arr: { count: number }[]) => Math.max(1, ...arr.map((d) => d.count));
 
   return (
     <div>
@@ -107,61 +134,25 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('reports.admissionsTrend')}</CardTitle>
-            <CardDescription>{t('reports.admissionsTrend')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.admissionsTrend.length === 0 ? (
-              <p className="py-6 text-center text-sm font-medium text-ink/45">{t('reports.noData')}</p>
-            ) : (
-              <ul className="space-y-2.5">
-                {data.admissionsTrend.map((d) => (
-                  <li key={d.label} className="flex items-center gap-3">
-                    <span className="w-20 shrink-0 text-xs font-bold text-ink/55 tabular">{d.label}</span>
-                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-muted dark:bg-white/10">
-                      <div className="h-full rounded-full bg-brand-500" style={{ width: `${(d.count / maxTrend(data.admissionsTrend)) * 100}%` }} />
-                    </div>
-                    <span className="w-6 shrink-0 text-end text-xs font-extrabold tabular text-ink">{d.count}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('reports.dischargesTrend')}</CardTitle>
-            <CardDescription>{t('reports.dischargesTrend')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.dischargesTrend.length === 0 ? (
-              <p className="py-6 text-center text-sm font-medium text-ink/45">{t('reports.noData')}</p>
-            ) : (
-              <ul className="space-y-2.5">
-                {data.dischargesTrend.map((d) => (
-                  <li key={d.label} className="flex items-center gap-3">
-                    <span className="w-20 shrink-0 text-xs font-bold text-ink/55 tabular">{d.label}</span>
-                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-muted dark:bg-white/10">
-                      <div className="h-full rounded-full bg-success-500" style={{ width: `${(d.count / maxTrend(data.dischargesTrend)) * 100}%` }} />
-                    </div>
-                    <span className="w-6 shrink-0 text-end text-xs font-extrabold tabular text-ink">{d.count}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle>
+            {t('reports.admissionsTrend')} / {t('reports.dischargesTrend')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TrendChart
+            data={data.admissionsTrend.map((d, i) => ({ label: d.label, admissions: d.count, discharges: data.dischargesTrend[i]?.count ?? 0 }))}
+            admissionsLabel={t('reports.admissions')}
+            dischargesLabel={t('reports.discharges')}
+          />
+        </CardContent>
+      </Card>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>{t('dashboard.occupancyTitle')}</CardTitle>
-            <CardDescription>{t('dashboard.occupancyTitle')}</CardDescription>
           </CardHeader>
           <CardContent>
             {data.occupancy.length === 0 ? (
@@ -171,11 +162,11 @@ export default function ReportsPage() {
                 {data.occupancy.map((w) => {
                   const pct = w.total > 0 ? Math.round((w.used / w.total) * 100) : 0;
                   return (
-                    <li key={w.ward_name_ar}>
+                    <li key={`${w.ward_name_ar}-${w.ward_name_en}`}>
                       <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-                        <p className="font-bold text-ink">{w.ward_name_ar}</p>
+                        <p className="font-bold text-ink">{localName(w, 'ward_name')}</p>
                         <p className="text-xs font-semibold tabular text-ink/55">
-                          {w.used} / {w.total} · %{pct}
+                          {t('occupancy.bedsUsed', { used: w.used, total: w.total })} · {fmtPercent(pct / 100)}
                         </p>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-surface-muted dark:bg-white/10">
@@ -208,7 +199,7 @@ export default function ReportsPage() {
                   <li key={`${ev.id}-${i}`} className="flex items-start gap-3">
                     <span className={cn('mt-1 h-2 w-2 shrink-0 rounded-full', ev.type === 'discharge' ? 'bg-danger-500' : 'bg-brand-500')} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-ink">{ev.title_ar}</p>
+                      <p className="text-sm font-semibold text-ink">{localName(ev, 'title')}</p>
                       <p className="text-xs text-ink/50">{ev.actor} · {fmtDateTime(ev.created_at)}</p>
                     </div>
                   </li>
@@ -219,9 +210,6 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      <div className="mt-4 flex items-center justify-end print:hidden">
-        <Badge variant="outline">{t('status.active')}</Badge>
-      </div>
     </div>
   );
 }

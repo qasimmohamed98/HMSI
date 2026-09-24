@@ -5,7 +5,7 @@ import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react
 import '@/styles/tokens.css';
 import '@/i18n';
 import { ThemeProvider } from '@/lib/theme';
-import { ToastProvider, notifyError } from '@/components/ui';
+import { ToastProvider, ConfirmProvider, notifyError } from '@/components/ui';
 import { AuthProvider } from '@/lib/auth';
 import { router } from '@/app/router';
 
@@ -32,7 +32,9 @@ createRoot(document.getElementById('root')!).render(
       <ToastProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <RouterProvider router={router} />
+            <ConfirmProvider>
+              <RouterProvider router={router} />
+            </ConfirmProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ToastProvider>

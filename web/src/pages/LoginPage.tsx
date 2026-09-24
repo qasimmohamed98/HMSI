@@ -5,14 +5,15 @@ import { Activity, ShieldCheck, HeartPulse, Stethoscope, Lock, User as UserIcon,
 import { Button, Input, Alert } from '@/components/ui';
 import { Logo } from '@/components/layout/Logo';
 import { useAuth } from '@/lib/auth';
+import { API } from '@/lib/api';
 import { setLanguage, currentLang } from '@/i18n';
 import { useTheme } from '@/lib/theme';
 
 const FEATURES = [
-  { icon: Stethoscope, key: 'طبابة إلكترونية شاملة لكل مريض' },
-  { icon: Activity, key: 'متابعة العلامات الحيوية لحظة بلحظة' },
-  { icon: ShieldCheck, key: 'أمان صارم وحماية كاملة للبيانات' },
-  { icon: HeartPulse, key: 'جزء متكامل من تجربة التشخيص والعلاج' },
+  { icon: Stethoscope, key: 'auth.features.chart' },
+  { icon: Activity, key: 'auth.features.vitals' },
+  { icon: ShieldCheck, key: 'auth.features.security' },
+  { icon: HeartPulse, key: 'auth.features.family' },
 ];
 
 export default function LoginPage() {
@@ -53,9 +54,9 @@ export default function LoginPage() {
           <Logo light />
         </div>
         <div className="relative max-w-md">
-          <h1 className="text-4xl font-extrabold leading-snug">منصة طبية موحّدة لإدارة المستشفى</h1>
+          <h1 className="text-4xl font-extrabold leading-snug">{t('auth.heroTitle')}</h1>
           <p className="mt-4 text-lg font-medium text-white/75">
-            تصميم عصري، أمان صارم، وتجربة تعمل على كل الأجهزة — من الجوال إلى سطح المكتب.
+            {t('auth.heroSubtitle')}
           </p>
           <ul className="mt-8 space-y-4">
             {FEATURES.map((f) => (
@@ -63,7 +64,7 @@ export default function LoginPage() {
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
                   <f.icon className="h-5 w-5" />
                 </span>
-                <span className="font-semibold text-white/90">{f.key}</span>
+                <span className="font-semibold text-white/90">{t(f.key)}</span>
               </li>
             ))}
           </ul>
@@ -90,7 +91,7 @@ export default function LoginPage() {
               onClick={toggle}
               className="rounded-lg px-3 py-2 text-sm font-bold text-ink/70 hover:bg-surface-muted dark:text-white/70"
             >
-              {resolved === 'dark' ? 'فاتح' : 'داكن'}
+              {resolved === 'dark' ? t('theme.light') : t('theme.dark')}
             </button>
           </div>
         </div>
@@ -125,9 +126,12 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6 rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-4 text-center dark:border-brand-800 dark:bg-brand-950/30">
-              <p className="text-sm font-semibold text-brand-800 dark:text-brand-200">{t('auth.demoHint')}</p>
-            </div>
+            {/* تلميح الحسابات التجريبية فقط في وضع العرض — لا يظهر أبداً في الإنتاج */}
+            {API.mode === 'demo' && (
+              <div className="mt-6 rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-4 text-center dark:border-brand-800 dark:bg-brand-950/30">
+                <p className="text-sm font-semibold text-brand-800 dark:text-brand-200">{t('auth.demoHint')}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

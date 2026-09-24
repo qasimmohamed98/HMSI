@@ -210,6 +210,23 @@ recordRoutes.patch('/:admissionId/medications/:id', requireAuth(), requirePermis
   return c.json(await fetchRow('medications', id), 200);
 });
 
+/** صرف الدواء من الصيدلية (مرة واحدة لكل وصفة) */
+recordRoutes.post('/:admissionId/medications/:id/dispense', requireAuth(), requirePermission('medications.dispense'), async (c) => {
+  const s = getSession(c)!;
+  const a = await loadAdmission(c);
+  requireActive(a);
+  const id = c.req.param('id');
+  const med = await findRecord('medications', id, a.id);
+  if (String(med.status) !== 'active') throw new HttpError('لا يمكن صرف دواء موقوف أو مكتمل', 409);
+  if (med.dispensed_at) throw new HttpError('تم صرف هذا الدواء مسبقاً', 409);
+  await db.execute({
+    sql: `UPDATE medications SET dispensed_by = ?, dispensed_at = ? WHERE id = ? AND dispensed_at IS NULL`,
+    args: [s.user.full_name_ar, new Date().toISOString(), id],
+  });
+  await track(c, s, a.id, 'medication', `صرف دواء: ${String(med.name_ar)}`, `Dispensed: ${String(med.name_en ?? med.name_ar)}`, 'medication_dispensed', 'medication', id);
+  return c.json(await fetchRow('medications', id), 200);
+});
+
 // ---------------------------------------------------------------- المختبر: الطبيب يطلب، الفني يُدخل النتيجة
 
 recordRoutes.post('/:admissionId/labs', requireAuth(), requirePermission('lab.order', 'lab.add_result'), async (c) => {

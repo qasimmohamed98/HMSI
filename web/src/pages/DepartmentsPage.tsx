@@ -8,6 +8,7 @@ import { API, type DepartmentInput } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
 import type { Department } from '@hmsi/shared';
+import { localName } from '@/lib/format';
 
 export default function DepartmentsPage() {
   const { t } = useTranslation();
@@ -71,7 +72,7 @@ export default function DepartmentsPage() {
                     <Network className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate font-bold text-ink">{d.name_ar}</p>
+                    <p className="truncate font-bold text-ink">{localName(d, 'name')}</p>
                     <p className="truncate text-xs text-ink/50">{d.name_en}</p>
                   </div>
                 </div>

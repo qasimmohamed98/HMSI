@@ -12,10 +12,10 @@ interface BedContext {
   attendingDoctor: string | null;
 }
 
-/** «محمد علي كريم» → «م. ع.» */
+/** «محمد علي كريم» → «م*** ع***» — يكفي الأهل للتأكد دون كشف الاسم لأي شخص يصوّر الرمز */
 function initials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  return parts.map((p) => `${[...p][0]}.`).join(' ');
+  return parts.map((p) => `${[...p][0]}***`).join(' ');
 }
 
 async function loadBedContext(code: string): Promise<BedContext | null> {

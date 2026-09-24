@@ -157,7 +157,7 @@ check('رمز العائلة ظاهر للتمريض', chartNurse.json.patient.a
 console.log('\n— صفحة ذوي المريض (QR)');
 const code = free[0].bed.code;
 const pub = await anon.get(`/public/track/${code}`);
-check('المعلومات العامة بدون تسجيل دخول', pub.status === 200 && pub.json.occupied === true && pub.json.admission.patient_initials === 'م. ا.', pub.json);
+check('المعلومات العامة بدون تسجيل دخول', pub.status === 200 && pub.json.occupied === true && pub.json.admission.patient_initials === 'م*** ا***', pub.json);
 check('لا بيانات طبية أو اسم كامل في الرد العام', !JSON.stringify(pub.json).includes('مريض اختبار') && !('patient' in pub.json));
 check('رمز خاطئ = 403', (await anon.post(`/public/track/${code}/family`, { pin: admit.json.family_pin === '000000' ? '111111' : '000000' })).status === 403);
 const fam = await anon.post(`/public/track/${code}/family`, { pin: admit.json.family_pin });
@@ -222,6 +222,23 @@ check('بعد التبديل: مرضى المستشفى الأول غير مرئ
 check('العودة للمستشفى الأصلي', (await superA.post('/hospitals/h-1/switch')).status === 200 && (await superA.get('/auth/me')).json.hospital_id === 'h-1');
 check('تعطيل مستشفى', (await superA.patch(`/hospitals/${hosp.json.id}`, { is_active: false })).status === 200);
 check('جلسة مستخدم المستشفى المعطّل تتوقف', (await tAdmin.get('/auth/me')).json === null);
+
+console.log('\n— الصيدلية والخروج والتدقيق');
+{
+  const pharm = client(await login('pharmacist'));
+  check('الصيدلي لا يصف دواء (403)', (await pharm.post('/patients/adm2/medications', { admission_id: 'adm2', name_ar: 'دواء', dose: '1', route: 'PO', frequency: 'x', start_at: '2026-09-24' })).status === 403);
+  const m = await doctor.post('/patients/adm2/medications', { admission_id: 'adm2', name_ar: 'أموكسيسيلين', dose: '500mg', route: 'PO', frequency: 'q8h', start_at: '2026-09-24' });
+  const d1 = await pharm.post(`/patients/adm2/medications/${m.json.id}/dispense`);
+  check('الصيدلي يصرف الدواء', d1.status === 200 && Boolean(d1.json.dispensed_at), d1.json);
+  check('لا صرف مكرر (409)', (await pharm.post(`/patients/adm2/medications/${m.json.id}/dispense`)).status === 409);
+  check('الطبيب لا يصرف (403)', (await doctor.post(`/patients/adm2/medications/${m.json.id}/dispense`)).status === 403);
+  check('الطبيب يعتمد الخروج', (await doctor.post('/admissions/adm5/discharge', { discharge_type: 'home', summary: 'تحسن' })).status === 204);
+  const audit = await manager.get('/audit');
+  check('سجل التدقيق لمدير المستشفى', audit.status === 200 && audit.json.length > 0 && audit.json.some((e: any) => e.action === 'medication_dispensed'));
+  check('سجل التدقيق معزول عن المستشفيات الأخرى', ((await admin2.get('/audit')).json as any[]).every((e) => e.actor_id !== 'u_doctor'));
+  check('الطبيب لا يرى سجل التدقيق (403)', (await doctor.get('/audit')).status === 403);
+  check('تواريخ التدقيق بصيغة ISO', /T.*Z$/.test(audit.json[0].created_at));
+}
 
 console.log('\n— كلمات المرور');
 {

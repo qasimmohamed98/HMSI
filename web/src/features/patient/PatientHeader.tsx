@@ -4,7 +4,8 @@ import type { Patient, AdmissionSummary } from '@hmsi/shared';
 import { ArrowRight, CalendarClock, KeyRound, MapPin, RefreshCw, Stethoscope, UserRound } from 'lucide-react';
 import { Badge, Chip, Avatar, Button, useToast } from '@/components/ui';
 import { API } from '@/lib/api';
-import { calcAge, fmtDate } from '@/lib/format';
+import { currentLang } from '@/i18n';
+import { calcAge, fmtDate, localName } from '@/lib/format';
 import { jsonParse } from '@/lib/demo-data';
 
 export function PatientHeader({
@@ -44,17 +45,19 @@ export function PatientHeader({
           <Avatar name={patient.full_name_ar} className="h-14 w-14 text-lg" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-extrabold text-ink sm:text-2xl">{patient.full_name_ar}</h1>
-              <Badge variant="outline" className="tabular font-bold">{patient.file_number}</Badge>
+              <h1 className="truncate text-xl font-extrabold text-ink sm:text-2xl">{localName(patient, 'full_name')}</h1>
+              <Badge variant="outline" className="tabular font-bold"><bdi dir="ltr">{patient.file_number}</bdi></Badge>
             </div>
-            <p className="text-sm font-medium text-ink/50">{patient.full_name_en}</p>
+            <p className="text-sm font-medium text-ink/50">{currentLang() === 'ar' ? patient.full_name_en : patient.full_name_ar}</p>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-ink/60">
               <span className="inline-flex items-center gap-1">
                 <UserRound className="h-3.5 w-3.5 text-brand-600" />
                 {t('gender.' + patient.gender)} · {calcAge(patient.birth_date)} {t('common.years')}
               </span>
               <span className="text-ink/25">·</span>
-              <span className="tabular">فصيلة {patient.blood_type}</span>
+              <span className="tabular">
+                {t('patients.bloodType')} <bdi dir="ltr">{patient.blood_type}</bdi>
+              </span>
               {patient.national_id && (
                 <>
                   <span className="text-ink/25">·</span>
@@ -68,8 +71,8 @@ export function PatientHeader({
         {/* Admission summary */}
         {admission && (
           <div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-2.5 rounded-xl border border-ink/8 bg-surface-raised/70 p-4 sm:grid-cols-4 lg:grid-cols-3 dark:border-white/10 dark:bg-white/5">
-            <Meta icon={<MapPin className="h-4 w-4" />} label={t('patients.department')} value={admission.department_name_ar} />
-            <Meta icon={<MapPin className="h-4 w-4" />} label={t('patients.ward')} value={admission.ward_name_ar} />
+            <Meta icon={<MapPin className="h-4 w-4" />} label={t('patients.department')} value={localName(admission, 'department_name')} />
+            <Meta icon={<MapPin className="h-4 w-4" />} label={t('patients.ward')} value={localName(admission, 'ward_name')} />
             <Meta icon={<MapPin className="h-4 w-4" />} label={t('patients.bed')} value={`${admission.room} / ${admission.bed_no}`} mono />
             <Meta icon={<Stethoscope className="h-4 w-4" />} label={t('chart.attendingDoctor')} value={admission.attending_doctor ?? '—'} />
             <Meta icon={<CalendarClock className="h-4 w-4" />} label={t('chart.admitted')} value={fmtDate(admission.admitted_at, { day: 'numeric', month: 'short', year: 'numeric' })} mono />

@@ -42,7 +42,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <PageHeader title={t('nav.settings')} subtitle={t('dashboard.subtitle')} />
+      <PageHeader title={t('nav.settings')} subtitle={t('ui.settingsSubtitle')} />
 
       {/* Language */}
       <Card>
@@ -69,7 +69,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {resolved === 'dark' ? <Moon className="h-5 w-5 text-brand-600" /> : <Sun className="h-5 w-5 text-brand-600" />}
-            {t('theme.' + resolved)}
+            {t('ui.themeTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -107,7 +107,7 @@ export default function SettingsPage() {
               <div className="flex shrink-0 items-center gap-2">
                 <Badge variant="brand">
                   <ShieldCheck className="me-1 h-3.5 w-3.5" />
-                  {t('status.active')}
+                  {t('ui.active')}
                 </Badge>
                 {canEdit && (
                   <Button size="icon-sm" variant="ghost" aria-label={t('common.edit')} onClick={() => setEditOpen(true)}>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui';
@@ -10,6 +11,7 @@ import { BottomNav } from './BottomNav';
 import { useMediaQuery } from '@/lib/use-media';
 
 export function AppShell() {
+  const { t } = useTranslation();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -36,17 +38,17 @@ export function AppShell() {
               size="sm"
               className="w-full justify-start"
               onClick={() => setCollapsed((c) => !c)}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={collapsed ? t('ui.expand') : t('ui.collapse')}
             >
               {collapsed ? (
                 <>
                   <PanelLeftOpen className="h-4 w-4" />
-                  <span className="sr-only">Expand</span>
+                  <span className="sr-only">{t('ui.expand')}</span>
                 </>
               ) : (
                 <>
                   <PanelLeftClose className="h-4 w-4" />
-                  <span>طيّ القائمة</span>
+                  <span>{t('ui.collapse')}</span>
                 </>
               )}
             </Button>

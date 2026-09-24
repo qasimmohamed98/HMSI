@@ -23,6 +23,7 @@ import type {
   Bed,
   PublicTrackInfo,
   PublicTrackFamily,
+  AuditEntry,
 } from '@hmsi/shared';
 import type {
   Api,
@@ -886,6 +887,31 @@ export const demoApi: Api = {
   async deleteDiagnosis(_admissionId: string, diagnosisId: string): Promise<void> {
     const record = findRecordContaining('diagnoses', diagnosisId);
     record.diagnoses = record.diagnoses.filter((x) => x.id !== diagnosisId);
+  },
+
+  async dispenseMedication(_admissionId: string, medicationId: string): Promise<Medication> {
+    const u = requireUser();
+    const found = Object.values(store.patients).map((e) => e.record?.medications.find((m) => m.id === medicationId)).find(Boolean);
+    if (!found) throw new Error('not_found');
+    if (found.dispensed_at) throw new Error('تم صرف هذا الدواء مسبقاً');
+    found.dispensed_by = actorName(u);
+    found.dispensed_at = new Date().toISOString();
+    return found;
+  },
+
+  async listAudit(): Promise<AuditEntry[]> {
+    await delay(150);
+    return store.activity.slice(0, 50).map((a) => ({
+      id: a.id,
+      actor_id: null,
+      actor_name: a.actor,
+      action: a.type,
+      resource_type: 'admission',
+      resource_id: a.admission_id,
+      meta_json: '{}',
+      ip: null,
+      created_at: a.created_at,
+    }));
   },
 
   async deleteMedication(_admissionId: string, medicationId: string): Promise<void> {

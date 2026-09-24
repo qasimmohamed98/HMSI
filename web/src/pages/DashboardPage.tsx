@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   Users,
   BedDouble,
@@ -12,7 +12,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, SkeletonCard, EmptyState, Avatar } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API } from '@/lib/api';
-import { fmtDate, fmtDateTime } from '@/lib/format';
+import { fmtDate, fmtDateTime, localName } from '@/lib/format';
+import { currentLang } from '@/i18n';
 import { useMediaQuery } from '@/lib/use-media';
 
 export default function DashboardPage() {
@@ -90,13 +91,8 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.admissionsTrend} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="brandFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#1e7f6e" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#1e7f6e" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                {/* أعمدة لأن القيم أعداد يومية صحيحة؛ في العربية يسير الزمن من اليمين إلى اليسار */}
+                <BarChart data={data.admissionsTrend} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.08} vertical={false} />
                   <XAxis
                     dataKey="label"
@@ -105,14 +101,24 @@ export default function DashboardPage() {
                     axisLine={false}
                     tickLine={false}
                     interval="preserveStartEnd"
+                    reversed={currentLang() === 'ar'}
                   />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.55 }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    allowDecimals={false}
+                    orientation={currentLang() === 'ar' ? 'right' : 'left'}
+                    width={28}
+                    tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.55 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip
-                    formatter={(value) => [value, t('patients.title')]}
+                    formatter={(value) => [value, t('reports.admissions')]}
+                    labelFormatter={(v) => fmtDate(String(v), { weekday: 'long', day: 'numeric', month: 'short' })}
+                    cursor={{ fill: 'currentColor', opacity: 0.05 }}
                     contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 8px 30px rgba(0,0,0,0.1)' }}
                   />
-                  <Area type="monotone" dataKey="count" stroke="#1e7f6e" strokeWidth={2.5} fill="url(#brandFill)" />
-                </AreaChart>
+                  <Bar dataKey="count" fill="#1e7f6e" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -127,9 +133,9 @@ export default function DashboardPage() {
             {data.occupancy.map((o) => {
               const pct = Math.round((o.used / o.total) * 100);
               return (
-                <div key={o.ward_name_ar}>
+                <div key={`${o.ward_name_ar}-${o.ward_name_en}`}>
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-ink/85">{o.ward_name_ar}</span>
+                    <span className="font-semibold text-ink/85">{localName(o, 'ward_name')}</span>
                     <span className="tabular text-xs font-bold text-ink/50">{t('occupancy.bedsUsed', { used: o.used, total: o.total })}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-surface-muted dark:bg-white/10">
@@ -159,7 +165,7 @@ export default function DashboardPage() {
                 <li key={a.id} className={isMobile ? 'flex items-start gap-3 rounded-xl border border-ink/8 p-3' : 'flex items-center gap-4 py-3'}>
                   <Avatar name={a.actor} className="h-9 w-9 text-xs" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink">{a.title_ar}</p>
+                    <p className="truncate text-sm font-semibold text-ink">{localName(a, 'title')}</p>
                     <p className="truncate text-xs text-ink/50">{a.actor}</p>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs font-medium text-ink/45">

@@ -6,11 +6,12 @@ import { Button, Textarea, Avatar, Dialog } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type NoteInput, type NoteUpdateInput, type ChartData } from '@/lib/api';
 import { fmtDateTime } from '@/lib/format';
-import { useToast } from '@/components/ui';
+import { useToast, useConfirm } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 
 export function NotesSection({ chart, kind, canWrite }: { chart: ChartData; kind: 'doctor' | 'nursing'; canWrite: boolean }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const toast = useToast();
   const { user } = useAuth();
@@ -52,7 +53,8 @@ export function NotesSection({ chart, kind, canWrite }: { chart: ChartData; kind
   };
 
   const canEditNote = (authorId?: string | null) =>
-    canWrite && chart.admissionId && (!authorId || authorId === user?.id || user?.role === 'super_admin' || API.mode === 'demo');
+    // الخادم يسمح لكاتب الملاحظة فقط بتعديلها أو حذفها
+    canWrite && chart.admissionId && (authorId === user?.id || API.mode === 'demo');
 
   const titleKey = kind === 'doctor' ? 'notes.doctorTitle' : 'notes.nursingTitle';
   const emptyKey = kind === 'doctor' ? 'notes.emptyDoctor' : 'notes.emptyNursing';
@@ -90,6 +92,7 @@ export function NotesSection({ chart, kind, canWrite }: { chart: ChartData; kind
                   <span className="font-bold text-brand-700 dark:text-brand-300">{n.author}</span>
                   <span className="text-ink/25">·</span>
                   <span className="tabular">{fmtDateTime(n.recorded_at)}</span>
+                  {n.corrected_by && <span className="italic text-ink/40">({t('ui.edited')})</span>}
                 </div>
                 <p className="mt-1.5 whitespace-pre-wrap text-[0.95rem] leading-relaxed text-ink/90">{n.content}</p>
               </div>
@@ -102,7 +105,7 @@ export function NotesSection({ chart, kind, canWrite }: { chart: ChartData; kind
                     size="icon-sm"
                     variant="ghost"
                     className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                    onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, noteId: n.id })}
+                    onClick={async () => { if (await confirm(t('ui.confirmDeleteRecord'))) deleteMut.mutate({ admissionId: chart.admissionId!, noteId: n.id }); }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

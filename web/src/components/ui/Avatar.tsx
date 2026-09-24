@@ -10,6 +10,7 @@ export function Avatar({ name, className, ...props }: { name: string } & HTMLAtt
         className,
       )}
       aria-hidden
+      dir="auto"
       {...props}
     >
       {chipKey(name)}

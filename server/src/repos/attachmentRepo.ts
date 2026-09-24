@@ -32,8 +32,8 @@ export async function insertAttachment(input: {
   const id = uuid('at');
   await db.execute({
     sql: `INSERT INTO attachments (id, admission_id, uploaded_by, file_name, mime, size, storage_key, created_at, data)
-          VALUES (?, ?, ?, ?, ?, ?, 'inline', datetime('now'), ?)`,
-    args: [id, input.admission_id, input.uploaded_by, input.file_name, input.mime, input.size, input.data],
+          VALUES (?, ?, ?, ?, ?, ?, 'inline', ?, ?)`,
+    args: [id, input.admission_id, input.uploaded_by, input.file_name, input.mime, input.size, new Date().toISOString(), input.data],
   });
   return {
     id,

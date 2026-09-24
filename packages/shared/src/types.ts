@@ -26,6 +26,7 @@ export const PERMISSIONS = [
   'notes.write.doctor',
   'notes.write.nursing',
   'medications.manage',
+  'medications.dispense',
   'lab.order',
   'lab.add_result',
   'radiology.order',
@@ -75,6 +76,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'lab.order',
     'radiology.order',
     'admissions.manage',
+    'discharge.approve',
     'reports.view',
     'files.manage',
   ],
@@ -86,7 +88,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'admissions.manage',
     'files.manage',
   ],
-  pharmacist: ['patients.view', 'chart.view', 'medications.manage'],
+  // الصيدلي يصرف الأدوية ولا يصفها
+  pharmacist: ['patients.view', 'chart.view', 'medications.dispense'],
   lab: ['patients.view', 'chart.view', 'lab.order', 'lab.add_result'],
   radiology: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report'],
   reception: ['patients.create', 'patients.update', 'patients.archive', 'patients.view', 'admissions.manage'],
@@ -258,6 +261,8 @@ export interface Medication {
   end_at: string | null;
   status: MedicationStatus;
   prescribed_by: string;
+  dispensed_by?: string | null;
+  dispensed_at?: string | null;
 }
 
 export interface LabResult {
@@ -333,6 +338,18 @@ export interface TimelineEvent {
 export interface AuditLog {
   id: string;
   actor_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  meta_json: string;
+  ip: string | null;
+  created_at: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  actor_id: string | null;
+  actor_name: string | null;
   action: string;
   resource_type: string;
   resource_id: string | null;

@@ -18,6 +18,7 @@ import { staffRoutes } from './routes/staff.js';
 import { orgRoutes } from './routes/org.js';
 import { hospitalRoutes } from './routes/hospitals.js';
 import { publicTrackRoutes } from './routes/publicTrack.js';
+import { auditRoutes } from './routes/audit.js';
 
 export const api = new Hono();
 
@@ -45,6 +46,7 @@ api.route('/api/__staff', staffRoutes);
 api.route('/api/org', orgRoutes);
 api.route('/api/hospitals', hospitalRoutes);
 api.route('/api/public', publicTrackRoutes);
+api.route('/api/audit', auditRoutes);
 
 api.notFound((c) => c.json({ message: 'المسار غير موجود' }, 404));
 

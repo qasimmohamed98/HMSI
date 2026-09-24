@@ -8,6 +8,8 @@ import { Badge, Button, Card, CardContent, ConfirmDialog, Dialog, EmptyState, In
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API, type CreateHospitalInput, type HospitalAdminInput } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { currentLang } from '@/i18n';
+import { localName } from '@/lib/format';
 
 /** إدارة المستشفيات — للمدير العام فقط (hospitals.manage) */
 export default function HospitalsPage() {
@@ -99,8 +101,8 @@ export default function HospitalsPage() {
                 <CardContent className="space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-lg font-extrabold text-ink">{h.name_ar}</p>
-                      <p className="truncate text-sm text-ink/50">{h.name_en}</p>
+                      <p className="truncate text-lg font-extrabold text-ink">{localName(h, 'name')}</p>
+                      <p className="truncate text-sm text-ink/50">{currentLang() === 'ar' ? h.name_en : h.name_ar}</p>
                       <p className="mt-0.5 font-mono text-xs text-ink/40" dir="ltr">{h.code}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
