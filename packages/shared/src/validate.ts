@@ -6,9 +6,11 @@ import {
   DIAGNOSIS_STATUSES,
   MEDICATION_STATUSES,
   WARD_TYPES,
+  DISCHARGE_TYPES,
 } from './types.js';
 
 const id = z.string().min(1).max(64);
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'صيغة التاريخ يجب أن تكون YYYY-MM-DD');
 const optionalString = z.string().max(500).nullable().optional();
 
 export const LoginSchema = z.object({
@@ -47,7 +49,7 @@ export const AdmitPatientSchema = z.object({
 
 export const DischargeSchema = z.object({
   admission_id: id,
-  discharge_type: z.enum(['home', 'transfer', 'death', 'ama']),
+  discharge_type: z.enum(DISCHARGE_TYPES),
   summary: z.string().max(2000).optional(),
 });
 
@@ -90,27 +92,29 @@ export const CreateMedicationSchema = z.object({
   end_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
+/** طلب فحص (طبيب) أو إدخال مباشر مع النتيجة (فني المختبر) */
 export const AddLabResultSchema = z.object({
   admission_id: id,
   test_name_ar: z.string().min(2).max(120),
   test_name_en: z.string().max(120).optional().nullable(),
-  category: z.string().max(60).optional(),
-  result: z.string().max(500),
+  category: z.string().max(60).optional().nullable(),
+  result: z.string().max(500).optional().nullable(),
   unit: z.string().max(40).optional().nullable(),
   reference_range: z.string().max(120).optional().nullable(),
 });
 
 export const UpdateLabResultSchema = z.object({
-  result: z.string().max(500),
+  result: z.string().min(1).max(500),
   unit: z.string().max(40).optional().nullable(),
   reference_range: z.string().max(120).optional().nullable(),
+  abnormal: z.boolean().optional(),
 });
 
 export const RadiologyReportSchema = z.object({
   admission_id: id,
   study_type_ar: z.string().min(2).max(120),
   study_type_en: z.string().max(120).optional().nullable(),
-  report: z.string().max(4000),
+  report: z.string().max(4000).optional().nullable(),
 });
 
 export const ConsultationSchema = z.object({
@@ -159,7 +163,7 @@ export const UpdateUserSchema = z.object({
   full_name_en: z.string().min(2).max(100).optional().nullable(),
   email: z.string().email().optional().nullable(),
   role: z.enum(['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'reception', 'viewer']).optional(),
-  is_active: z.coerce.boolean().optional(),
+  is_active: z.boolean().optional(),
 });
 
 export const CreateDepartmentSchema = z.object({
@@ -194,10 +198,19 @@ export const UpdateHospitalSchema = z.object({
   name_en: z.string().min(2).max(160),
 });
 
+const hospitalCode = z.string().min(2).max(20).regex(/^[A-Za-z0-9-]+$/, 'رمز المستشفى: أحرف إنجليزية وأرقام وشرطة فقط');
+
 export const CreateHospitalSchema = z.object({
   name_ar: z.string().min(2).max(160),
   name_en: z.string().min(2).max(160),
-  code: z.string().min(2).max(20).optional(),
+  code: hospitalCode.optional(),
+});
+
+/** تعديل مستشفى من قبل المدير العام */
+export const AdminUpdateHospitalSchema = z.object({
+  name_ar: z.string().min(2).max(160).optional(),
+  name_en: z.string().min(2).max(160).optional(),
+  is_active: z.boolean().optional(),
 });
 
 export const CreateHospitalAdminSchema = z.object({
@@ -237,6 +250,27 @@ export const UpdateConsultationSchema = z.object({
   specialty: z.string().min(2).max(80).optional(),
   reason: z.string().min(2).max(1000).optional(),
   response: z.string().min(2).max(2000).optional(),
+});
+
+const newPassword = z
+  .string()
+  .min(8, 'كلمة المرور 8 أحرف على الأقل')
+  .max(128)
+  .refine((v) => /[A-Za-z؀-ۿ]/.test(v) && /\d/.test(v), { message: 'كلمة المرور يجب أن تحتوي حروفاً وأرقاماً' });
+
+export const ChangePasswordSchema = z
+  .object({ current_password: z.string().min(1).max(128), new_password: newPassword })
+  .refine((v) => v.current_password !== v.new_password, { message: 'كلمة المرور الجديدة مطابقة للحالية' });
+
+export const ResetPasswordSchema = z.object({ password: newPassword });
+
+export const ReportRangeSchema = z
+  .object({ from: isoDate, to: isoDate })
+  .refine((v) => v.from <= v.to, { message: 'تاريخ البداية بعد تاريخ النهاية' })
+  .refine((v) => (Date.parse(v.to) - Date.parse(v.from)) / 86400000 <= 366, { message: 'المدى الأقصى للتقرير سنة واحدة' });
+
+export const FamilyPinSchema = z.object({
+  pin: z.string().regex(/^\d{6}$/, 'الرمز يتكون من 6 أرقام'),
 });
 
 export type LoginInput = z.infer<typeof LoginSchema>;

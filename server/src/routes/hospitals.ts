@@ -1,18 +1,14 @@
 import { Hono } from 'hono';
-import { z } from 'zod';
-import { UpdateHospitalSchema } from '@hmsi/shared/validate';
+import { UpdateHospitalSchema, CreateHospitalSchema, CreateHospitalAdminSchema, AdminUpdateHospitalSchema } from '@hmsi/shared/validate';
 import { getSession, requireAuth, requirePermission } from '../middleware/auth.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit } from '../lib/audit.js';
-import {
-  listHospitals,
-  createHospital,
-  createHospitalAdmin,
-  getHospital,
-  updateHospital,
-} from '../repos/orgRepo.js';
+import { clientIp } from '../config.js';
+import { listHospitals, createHospital, createHospitalAdmin, getHospital, updateHospital, setActiveHospital } from '../repos/hospitalRepo.js';
 
 export const hospitalRoutes = new Hono();
+
+// ------------------------------ المستشفى الحالي (مدير المستشفى)
 
 hospitalRoutes.get('/me', requireAuth(), async (c) => {
   const hospital = await getHospital(getSession(c)!.user.hospital_id);
@@ -27,34 +23,58 @@ hospitalRoutes.patch('/me', requireAuth(), requirePermission('settings.manage'),
   const session = getSession(c)!;
   const hospital = await updateHospital(session.user.hospital_id, input);
   if (!hospital) return c.json({ message: 'المستشفى غير موجود' }, 404);
-  await writeAudit({ actorId: session.user.id, action: 'settings_changed', resourceType: 'hospital', resourceId: hospital.id, meta: input, ip: c.req.header('x-forwarded-for') });
+  await writeAudit({ actorId: session.user.id, action: 'settings_changed', resourceType: 'hospital', resourceId: hospital.id, meta: input, ip: clientIp(c) });
   return c.json(hospital, 200);
 });
 
-// ------------------------------ مدير النظام (super_admin only)
-
-const hospitalIdSchema = z.object({ id: z.string().min(1) });
+// ------------------------------ المدير العام (hospitals.manage)
 
 hospitalRoutes.get('/', requireAuth(), requirePermission('hospitals.manage'), async (c) => {
-  const hospitals = await listHospitals();
-  return c.json(hospitals, 200);
+  return c.json(await listHospitals(), 200);
 });
 
 hospitalRoutes.post('/', requireAuth(), requirePermission('hospitals.manage'), async (c) => {
   const parsed = await parseBody(c, CreateHospitalSchema);
   if (!parsed.ok) return parsed.json;
   const input = parsed.data as (typeof CreateHospitalSchema)['_output'];
-  const hospital = await createHospital(input, getSession(c)!.user.id);
-  await writeAudit({ actorId: getSession(c)!.user.id, action: 'hospital_created', resourceType: 'hospital', resourceId: hospital.id, ip: c.req.header('x-forwarded-for') });
+  const session = getSession(c)!;
+  const hospital = await createHospital(input);
+  await writeAudit({ actorId: session.user.id, action: 'hospital_created', resourceType: 'hospital', resourceId: hospital.id, ip: clientIp(c) });
   return c.json(hospital, 201);
 });
 
+hospitalRoutes.patch('/:id', requireAuth(), requirePermission('hospitals.manage'), async (c) => {
+  const parsed = await parseBody(c, AdminUpdateHospitalSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof AdminUpdateHospitalSchema)['_output'];
+  const session = getSession(c)!;
+  const id = c.req.param('id');
+  if (input.is_active === false && id === session.user.home_hospital_id) {
+    return c.json({ message: 'لا يمكن تعطيل مستشفى المدير العام' }, 400);
+  }
+  if (!(await getHospital(id))) return c.json({ message: 'المستشفى غير موجود' }, 404);
+  const hospital = await updateHospital(id, input);
+  await writeAudit({ actorId: session.user.id, action: 'hospital_updated', resourceType: 'hospital', resourceId: id, meta: input, ip: clientIp(c) });
+  return c.json(hospital, 200);
+});
+
 hospitalRoutes.post('/:id/admins', requireAuth(), requirePermission('hospitals.manage'), async (c) => {
-  const { id } = c.req.param();
   const parsed = await parseBody(c, CreateHospitalAdminSchema);
   if (!parsed.ok) return parsed.json;
   const input = parsed.data as (typeof CreateHospitalAdminSchema)['_output'];
-  const admin = await createHospitalAdmin(id, input, getSession(c)!.user.id);
-  await writeAudit({ actorId: getSession(c)!.user.id, action: 'hospital_admin_created', resourceType: 'hospital_admin', resourceId: admin.id, ip: c.req.header('x-forwarded-for') });
+  const session = getSession(c)!;
+  const admin = await createHospitalAdmin(c.req.param('id'), input);
+  await writeAudit({ actorId: session.user.id, action: 'hospital_admin_created', resourceType: 'user', resourceId: admin.id, meta: { hospital_id: c.req.param('id'), username: admin.username }, ip: clientIp(c) });
   return c.json(admin, 201);
+});
+
+/** الدخول إلى مستشفى والعمل فيه كمدير (للمدير العام). استخدام مستشفاه الأصلي = العودة. */
+hospitalRoutes.post('/:id/switch', requireAuth(), requirePermission('hospitals.manage'), async (c) => {
+  const session = getSession(c)!;
+  const id = c.req.param('id');
+  const hospital = await getHospital(id);
+  if (!hospital) return c.json({ message: 'المستشفى غير موجود' }, 404);
+  await setActiveHospital(session.sessionId, id === session.user.home_hospital_id ? null : id);
+  await writeAudit({ actorId: session.user.id, action: 'hospital_switched', resourceType: 'hospital', resourceId: id, ip: clientIp(c) });
+  return c.json(hospital, 200);
 });

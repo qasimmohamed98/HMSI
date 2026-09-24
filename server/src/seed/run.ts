@@ -1,8 +1,10 @@
 import { hash } from '@node-rs/argon2';
-import { db, uuid } from '../../db/index.js';
+import { db, uuid, generateFamilyPin } from '../../db/index.js';
+import { generateBedCode } from '../repos/orgRepo.js';
 
 const PASSWORD = 'password123';
 const H = 'h-1';
+const H2 = 'h-2';
 
 async function pw(): Promise<string> {
   return hash(PASSWORD, { algorithm: 2 /* Argon2id */, memoryCost: 19456, timeCost: 2, parallelism: 1 });
@@ -45,6 +47,8 @@ export async function runSeed(): Promise<{ users: number; patients: number }> {
   // تعريفات ثابتة --------------------------------------------------
   const users: DBRows = [
     { id: 'u_admin', hospital_id: H, username: 'admin', full_name_ar: 'مدير النظام', full_name_en: 'System Admin', role: 'super_admin', email: 'admin@hms.local', password_hash: passwordHash },
+    { id: 'u_manager', hospital_id: H, username: 'manager', full_name_ar: 'مدير المستشفى', full_name_en: 'Hospital Manager', role: 'admin', email: 'manager@hms.local', password_hash: passwordHash },
+    { id: 'u_admin2', hospital_id: H2, username: 'admin2', full_name_ar: 'مدير مستشفى النور', full_name_en: 'Alnoor Manager', role: 'admin', email: null, password_hash: passwordHash },
     { id: 'u_doctor', hospital_id: H, username: 'doctor', full_name_ar: 'أحمد المنصور', full_name_en: 'Ahmad Almansour', role: 'doctor', email: 'ahmad@hms.local', password_hash: passwordHash },
     { id: 'u_doctor2', hospital_id: H, username: 'doctor2', full_name_ar: 'ليلى حسن', full_name_en: 'Laila Hasan', role: 'doctor', email: 'laila@hms.local', password_hash: passwordHash },
     { id: 'u_doctor3', hospital_id: H, username: 'doctor3', full_name_ar: 'عمر النجار', full_name_en: 'Omar Alnajjar', role: 'doctor', email: 'omar@hms.local', password_hash: passwordHash },
@@ -62,6 +66,7 @@ export async function runSeed(): Promise<{ users: number; patients: number }> {
     { id: 'd-2', hospital_id: H, name_ar: 'الجراحة', name_en: 'Surgery' },
     { id: 'd-3', hospital_id: H, name_ar: 'الطوارئ', name_en: 'Emergency' },
     { id: 'd-4', hospital_id: H, name_ar: 'طب الأطفال', name_en: 'Pediatrics' },
+    { id: 'd-h2-1', hospital_id: H2, name_ar: 'الباطنية', name_en: 'Internal Medicine' },
   ];
 
   const wards: DBRows = [
@@ -69,21 +74,26 @@ export async function runSeed(): Promise<{ users: number; patients: number }> {
     { id: 'w-2', department_id: 'd-1', name_ar: 'ردهة النساء – الباطنية', name_en: 'Internal – Female Ward', ward_type: 'female' },
     { id: 'w-3', department_id: 'd-2', name_ar: 'ردهة الجراحة', name_en: 'Surgery Ward', ward_type: 'mixed' },
     { id: 'w-4', department_id: 'd-4', name_ar: 'ردهة الأطفال', name_en: 'Pediatrics Ward', ward_type: 'mixed' },
+    { id: 'w-h2-1', department_id: 'd-h2-1', name_ar: 'ردهة الباطنية', name_en: 'Internal Ward', ward_type: 'mixed' },
   ];
 
   const beds: DBRows = [];
   {
     let i = 1;
-    for (const w of ['w-1', 'w-2', 'w-3', 'w-4']) {
+    for (const w of ['w-1', 'w-2', 'w-3', 'w-4', 'w-h2-1']) {
       const count = w === 'w-4' ? 2 : 4;
       for (let k = 1; k <= count; k++) {
-        beds.push({ id: `bed-${i}`, ward_id: w, room: `${w.toUpperCase().replace('-', '')}-${Math.ceil(k / 2)}`, bed_no: `B${k}`, status: i <= 11 ? 'occupied' : 'free' });
+        // الحالة تُحسب لاحقاً من التنويمات النشطة
+        beds.push({ id: `bed-${i}`, ward_id: w, room: `${w.toUpperCase().replace(/-/g, '')}-${Math.ceil(k / 2)}`, bed_no: `B${k}`, status: 'free', code: generateBedCode() });
         i++;
       }
     }
   }
 
-  await insert('hospitals', [{ id: H, name_ar: 'مستشفى المدينة التخصصي', name_en: 'Madinah Specialized Hospital', code: 'MSH-001', settings_json: '{"timezone":"Asia/Riyadh"}' }]);
+  await insert('hospitals', [
+    { id: H, name_ar: 'مستشفى المدينة التخصصي', name_en: 'Madinah Specialized Hospital', code: 'MSH-001', settings_json: '{"timezone":"Asia/Riyadh"}' },
+    { id: H2, name_ar: 'مستشفى النور العام', name_en: 'Alnoor General Hospital', code: 'ANH-002', settings_json: '{}' },
+  ]);
   await insert('users', users);
   await insert('departments', departments);
   await insert('wards', wards);
@@ -113,8 +123,17 @@ export async function runSeed(): Promise<{ users: number; patients: number }> {
     { id: 'adm8', patient_id: 'p8', bed_id: 'bed-8', ward_id: 'w-2', room: 'W2-2', bed_no: 'B4', department_id: 'd-1', attending_doctor_id: 'u_doctor', admitted_at: daysAgo(6, 6), status: 'active', reason: 'متابعة فشل كلوي مزمن' },
   ];
 
+  for (const a of admissions) {
+    if (a.status === 'active') a.family_pin = generateFamilyPin();
+    // سرير التنويم المنتهي لا يبقى مرتبطاً به
+    if (a.status !== 'active') a.bed_id = null;
+  }
   await insert('patients', patients);
   await insert('admissions', admissions);
+  await db.execute({
+    sql: `UPDATE beds SET status = 'occupied' WHERE id IN (SELECT bed_id FROM admissions WHERE status = 'active' AND bed_id IS NOT NULL)`,
+    args: [],
+  });
 
   // عناصر السجل الطبقي (إلى جانب timeline) ----------------
   const vitals: DBRows = [];

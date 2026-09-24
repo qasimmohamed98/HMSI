@@ -28,7 +28,8 @@ import {
   freeBed,
   occupiedByPatient,
 } from '../repos/orgRepo.js';
-import { HttpConflict } from '../repos/admissionRepo.js';
+import { HttpConflict } from '../lib/errors.js';
+import { clientIp } from '../config.js';
 
 export const orgRoutes = new Hono();
 
@@ -39,7 +40,7 @@ async function conflict(c: Context, e: unknown): Promise<Response | null> {
   throw e;
 }
 
-const actorIp = (c: Context) => c.req.header('x-forwarded-for');
+const actorIp = (c: Context) => clientIp(c);
 
 // ------------------------------ الأقسام
 
@@ -189,7 +190,7 @@ orgRoutes.get('/beds/:id/occupant', requireAuth(), requirePermission('admissions
   return c.json({ occupant }, 200);
 });
 
-orgRoutes.post('/beds/:id/assign', requireAuth(), requirePermission('wards.manage'), async (c) => {
+orgRoutes.post('/beds/:id/assign', requireAuth(), requirePermission('admissions.manage'), async (c) => {
   const parsed = await parseBody(c, AssignBedSchema);
   if (!parsed.ok) return parsed.json;
   const { admission_id } = parsed.data as { admission_id: string };
@@ -206,7 +207,7 @@ orgRoutes.post('/beds/:id/assign', requireAuth(), requirePermission('wards.manag
   return c.body(null, 204);
 });
 
-orgRoutes.post('/beds/:id/free', requireAuth(), requirePermission('wards.manage'), async (c) => {
+orgRoutes.post('/beds/:id/free', requireAuth(), requirePermission('admissions.manage'), async (c) => {
   const bedId = c.req.param('id')!;
   const session = getSession(c)!;
   try {

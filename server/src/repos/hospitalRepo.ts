@@ -1,0 +1,105 @@
+import { randomBytes } from 'node:crypto';
+import type { Hospital, HospitalListItem, HospitalAdminInfo } from '@hmsi/shared';
+import { db, uuid } from '../../db/index.js';
+import { hashPassword } from '../lib/password.js';
+import { HttpConflict, HttpError, isUniqueViolation } from '../lib/errors.js';
+
+type Row = Record<string, unknown>;
+
+function mapHospital(r: Row): Hospital {
+  return {
+    id: String(r.id),
+    name_ar: String(r.name_ar),
+    name_en: String(r.name_en),
+    code: String(r.code),
+    is_active: r.is_active === undefined ? true : Boolean(Number(r.is_active)),
+    created_at: String(r.created_at),
+  };
+}
+
+export async function getHospital(id: string): Promise<Hospital | null> {
+  const rows = await db.execute({ sql: `SELECT * FROM hospitals WHERE id = ? LIMIT 1`, args: [id] });
+  return rows.rows.length > 0 ? mapHospital(rows.rows[0] as Row) : null;
+}
+
+export async function updateHospital(id: string, input: { name_ar?: string; name_en?: string; is_active?: boolean }): Promise<Hospital | null> {
+  await db.execute({
+    sql: `UPDATE hospitals SET name_ar = COALESCE(?, name_ar), name_en = COALESCE(?, name_en), is_active = COALESCE(?, is_active) WHERE id = ?`,
+    args: [input.name_ar ?? null, input.name_en ?? null, input.is_active === undefined ? null : input.is_active ? 1 : 0, id],
+  });
+  return getHospital(id);
+}
+
+/** قائمة المستشفيات مع إحصاءات مختصرة ومدرائها — للمدير العام */
+export async function listHospitals(): Promise<HospitalListItem[]> {
+  const rows = await db.execute({
+    sql: `SELECT h.*,
+            (SELECT COUNT(*) FROM users u WHERE u.hospital_id = h.id) AS users_count,
+            (SELECT COUNT(*) FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = h.id) AS beds_count,
+            (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = h.id AND a.status = 'active') AS active_admissions
+          FROM hospitals h ORDER BY h.created_at ASC`,
+    args: [],
+  });
+  const admins = await db.execute({
+    sql: `SELECT id, hospital_id, username, full_name_ar, is_active FROM users WHERE role = 'admin' ORDER BY full_name_ar`,
+    args: [],
+  });
+  const byHospital = new Map<string, HospitalAdminInfo[]>();
+  for (const row of admins.rows) {
+    const r = row as Row;
+    const list = byHospital.get(String(r.hospital_id)) ?? [];
+    list.push({ id: String(r.id), username: String(r.username), full_name_ar: String(r.full_name_ar), is_active: Boolean(Number(r.is_active)) });
+    byHospital.set(String(r.hospital_id), list);
+  }
+  return rows.rows.map((row) => {
+    const r = row as Row;
+    return {
+      ...mapHospital(r),
+      users_count: Number(r.users_count ?? 0),
+      beds_count: Number(r.beds_count ?? 0),
+      active_admissions: Number(r.active_admissions ?? 0),
+      admins: byHospital.get(String(r.id)) ?? [],
+    };
+  });
+}
+
+function generateHospitalCode(): string {
+  return `H-${randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+export async function createHospital(input: { name_ar: string; name_en: string; code?: string }): Promise<Hospital> {
+  const id = uuid('hosp');
+  const code = (input.code ?? generateHospitalCode()).toUpperCase();
+  try {
+    await db.execute({
+      sql: `INSERT INTO hospitals (id, code, name_ar, name_en) VALUES (?, ?, ?, ?)`,
+      args: [id, code, input.name_ar, input.name_en],
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) throw new HttpConflict('رمز المستشفى مستخدم بالفعل');
+    throw e;
+  }
+  return (await getHospital(id))!;
+}
+
+export async function createHospitalAdmin(
+  hospitalId: string,
+  input: { username: string; password: string; full_name_ar: string; full_name_en?: string; email?: string | null },
+): Promise<HospitalAdminInfo> {
+  if (!(await getHospital(hospitalId))) throw new HttpError('المستشفى غير موجود', 404);
+  const username = input.username.toLowerCase();
+  const existing = await db.execute({ sql: `SELECT id FROM users WHERE lower(username) = ? LIMIT 1`, args: [username] });
+  if (existing.rows.length > 0) throw new HttpConflict('اسم المستخدم مستخدم بالفعل');
+  const id = uuid('us');
+  await db.execute({
+    sql: `INSERT INTO users (id, hospital_id, username, full_name_ar, full_name_en, email, role, password_hash, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, 'admin', ?, 1)`,
+    args: [id, hospitalId, username, input.full_name_ar, input.full_name_en ?? null, input.email ?? null, await hashPassword(input.password)],
+  });
+  return { id, username, full_name_ar: input.full_name_ar, is_active: true };
+}
+
+/** المدير العام يعمل داخل مستشفى آخر؛ null = العودة لمستشفاه الأصلي */
+export async function setActiveHospital(sessionId: string, hospitalId: string | null): Promise<void> {
+  await db.execute({ sql: `UPDATE sessions SET active_hospital_id = ? WHERE id = ?`, args: [hospitalId, sessionId] });
+}

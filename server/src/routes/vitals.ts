@@ -5,6 +5,7 @@ import { getAdmissionScope } from '../repos/chartRepo.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit, addTimeline } from '../lib/audit.js';
 import { db, uuid } from '../../db/index.js';
+import { clientIp } from '../config.js';
 
 export const vitalsRoutes = new Hono();
 
@@ -15,6 +16,7 @@ vitalsRoutes.post('/', requireAuth(), requirePermission('vitals.write'), async (
   const session = getSession(c)!;
   const scope = await getAdmissionScope(input.admission_id, session.user.hospital_id);
   if (!scope) return c.json({ message: 'غير موجود' }, 404);
+  if (scope.admission.status !== 'active') return c.json({ message: 'التنويم منتهٍ — لا يمكن تسجيل علامات حيوية' }, 409);
 
   const id = uuid('vt');
   const recordedAt = new Date().toISOString();
@@ -37,7 +39,7 @@ vitalsRoutes.post('/', requireAuth(), requirePermission('vitals.write'), async (
     ],
   });
   await addTimeline({ admissionId: input.admission_id, actor: session.user.full_name_ar, actorId: session.user.id, type: 'vitals', titleAr: 'تسجيل علامات حيوية', titleEn: 'Vitals recorded' }, recordedAt);
-  await writeAudit({ actorId: session.user.id, action: 'vitals_added', resourceType: 'vitals', resourceId: id, ip: c.req.header('x-forwarded-for') });
+  await writeAudit({ actorId: session.user.id, action: 'vitals_added', resourceType: 'vitals', resourceId: id, ip: clientIp(c) });
   return c.json(
     {
       id,
@@ -93,9 +95,9 @@ vitalsRoutes.patch('/:id', requireAuth(), requirePermission('vitals.write'), asy
   args.push(id);
   await db.execute({ sql: `UPDATE vitals SET ${sets.join(', ')} WHERE id = ?`, args });
   await addTimeline({ admissionId: String(row.admission_id), actor: session.user.full_name_ar, actorId: session.user.id, type: 'vitals', titleAr: 'تعديل علامات حيوية', titleEn: 'Vitals updated' }, new Date().toISOString());
-  await writeAudit({ actorId: session.user.id, action: 'vitals_updated', resourceType: 'vitals', resourceId: id, ip: c.req.header('x-forwarded-for') });
+  await writeAudit({ actorId: session.user.id, action: 'vitals_updated', resourceType: 'vitals', resourceId: id, ip: clientIp(c) });
   const updated = await db.execute({ sql: `SELECT * FROM vitals WHERE id = ? LIMIT 1`, args: [id] });
-  return c.json(updated.rows[0], 200);
+  return c.json({ ...(updated.rows[0] as Record<string, unknown>) }, 200);
 });
 
 vitalsRoutes.delete('/:id', requireAuth(), requirePermission('vitals.write'), async (c) => {
@@ -108,6 +110,6 @@ vitalsRoutes.delete('/:id', requireAuth(), requirePermission('vitals.write'), as
   if (!scope) return c.json({ message: 'غير موجود' }, 404);
   await db.execute({ sql: `DELETE FROM vitals WHERE id = ?`, args: [id] });
   await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'vitals', titleAr: 'حذف علامات حيوية', titleEn: 'Vitals deleted' }, new Date().toISOString());
-  await writeAudit({ actorId: session.user.id, action: 'vitals_deleted', resourceType: 'vitals', resourceId: id, ip: c.req.header('x-forwarded-for') });
+  await writeAudit({ actorId: session.user.id, action: 'vitals_deleted', resourceType: 'vitals', resourceId: id, ip: clientIp(c) });
   return c.body(null, 204);
 });

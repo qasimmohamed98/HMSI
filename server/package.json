@@ -5,11 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file=.env src/dev.ts",
+    "dev:local": "tsx watch src/dev.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
+    "db:gen": "node scripts/gen-migrations.mjs",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
-    "db:seed": "tsx --env-file=.env scripts/seed.ts"
+    "db:seed": "tsx --env-file=.env scripts/seed.ts",
+    "test:smoke": "tsx scripts/smoke.ts",
+    "db:seed:local": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@hmsi/shared": "0.1.0",

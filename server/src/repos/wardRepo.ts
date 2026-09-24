@@ -23,7 +23,7 @@ export async function getWards(hospitalId: string): Promise<Ward[]> {
       room: String(r.room),
       bed_no: String(r.bed_no),
       status: String(r.status) === 'occupied' ? 'occupied' : 'free',
-      code: String(r.code),
+      code: String(r.code ?? ''),
     };
     const list = byWard.get(bed.ward_id) ?? [];
     list.push(bed);

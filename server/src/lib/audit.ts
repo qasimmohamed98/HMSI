@@ -1,4 +1,10 @@
+import type { InStatement } from '@libsql/client';
 import { db, uuid } from '../../db/index.js';
+
+/** أي منفّذ SQL — العميل العادي أو transaction */
+export interface Executor {
+  execute(stmt: InStatement): Promise<unknown>;
+}
 
 export interface AuditMeta {
   actorId: string | null;
@@ -9,8 +15,8 @@ export interface AuditMeta {
   ip?: string | null;
 }
 
-export async function writeAudit(entry: AuditMeta): Promise<void> {
-  await db.execute({
+export async function writeAudit(entry: AuditMeta, exec: Executor = db): Promise<void> {
+  await exec.execute({
     sql: `INSERT INTO audit_logs (id, actor_id, action, resource_type, resource_id, meta_json, ip)
           VALUES (?, ?, ?, ?, ?, ?, ?)`,
     args: [
@@ -34,8 +40,8 @@ export interface TimelineMeta {
   titleEn: string;
 }
 
-export async function addTimeline(meta: TimelineMeta, at: string): Promise<void> {
-  await db.execute({
+export async function addTimeline(meta: TimelineMeta, at: string = new Date().toISOString(), exec: Executor = db): Promise<void> {
+  await exec.execute({
     sql: `INSERT INTO timeline_events (id, admission_id, actor_id, actor, type, title_ar, title_en, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [uuid('tl'), meta.admissionId, meta.actorId, meta.actor, meta.type, meta.titleAr, meta.titleEn, at],

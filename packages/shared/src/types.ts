@@ -26,7 +26,9 @@ export const PERMISSIONS = [
   'notes.write.doctor',
   'notes.write.nursing',
   'medications.manage',
+  'lab.order',
   'lab.add_result',
+  'radiology.order',
   'radiology.add_report',
   'admissions.manage',
   'discharge.approve',
@@ -38,24 +40,31 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
+const ADMIN_PERMISSIONS: readonly Permission[] = [
+  'users.manage',
+  'patients.create',
+  'patients.update',
+  'patients.archive',
+  'patients.view',
+  'chart.view',
+  'admissions.manage',
+  'discharge.approve',
+  'departments.manage',
+  'wards.manage',
+  'settings.manage',
+  'audit.view',
+  'reports.view',
+  'files.manage',
+];
+
+/**
+ * المدير العام (super_admin) = صلاحيات مدير المستشفى + إدارة المستشفيات.
+ * لا يملك صلاحيات سريرية (كتابة ملاحظات/أدوية/نتائج) — مبدأ أقل صلاحية.
+ * يستطيع التبديل إلى أي مستشفى والعمل فيه كمدير.
+ */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  super_admin: [...PERMISSIONS],
-  admin: [
-    'users.manage',
-    'patients.create',
-    'patients.update',
-    'patients.archive',
-    'patients.view',
-    'chart.view',
-    'admissions.manage',
-    'discharge.approve',
-    'departments.manage',
-    'wards.manage',
-    'settings.manage',
-    'audit.view',
-    'reports.view',
-    'files.manage',
-  ],
+  super_admin: [...ADMIN_PERMISSIONS, 'hospitals.manage'],
+  admin: ADMIN_PERMISSIONS,
   doctor: [
     'patients.create',
     'patients.update',
@@ -63,6 +72,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'chart.view',
     'notes.write.doctor',
     'medications.manage',
+    'lab.order',
+    'radiology.order',
     'admissions.manage',
     'reports.view',
     'files.manage',
@@ -76,11 +87,16 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'files.manage',
   ],
   pharmacist: ['patients.view', 'chart.view', 'medications.manage'],
-  lab: ['patients.view', 'chart.view', 'lab.add_result'],
-  radiology: ['patients.view', 'chart.view', 'radiology.add_report'],
+  lab: ['patients.view', 'chart.view', 'lab.order', 'lab.add_result'],
+  radiology: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report'],
   reception: ['patients.create', 'patients.update', 'patients.archive', 'patients.view', 'admissions.manage'],
   viewer: ['patients.view', 'chart.view'],
 };
+
+export function hasPermission(role: Role | undefined | null, permission: Permission): boolean {
+  if (!role) return false;
+  return (ROLE_PERMISSIONS[role] ?? []).includes(permission);
+}
 
 export const GENDERS = ['male', 'female'] as const;
 export type Gender = (typeof GENDERS)[number];
@@ -141,6 +157,8 @@ export interface User {
   role: Role;
   is_active: boolean;
   created_at: string;
+  /** المستشفى الأصلي للمستخدم (يختلف عن hospital_id عندما يتصفح المدير العام مستشفى آخر) */
+  home_hospital_id?: string;
 }
 
 export interface PublicUser {
@@ -182,7 +200,15 @@ export interface AdmissionSummary {
   admitted_at: string;
   discharged_at?: string | null;
   status: AdmissionStatus;
+  reason?: string | null;
+  discharge_type?: DischargeType | null;
+  discharge_summary?: string | null;
+  /** رمز متابعة ذوي المريض عبر صفحة QR (يظهر للطاقم فقط) */
+  family_pin?: string | null;
 }
+
+export const DISCHARGE_TYPES = ['home', 'transfer', 'death', 'ama'] as const;
+export type DischargeType = (typeof DISCHARGE_TYPES)[number];
 
 export interface Vitals {
   id: string;
@@ -349,6 +375,8 @@ export interface Ward {
 export interface ChartData {
   patient: Patient & { admission: AdmissionSummary | null };
   admissionId: string | null;
+  /** كل تنويمات المريض (الأحدث أولاً) للتنقل بين السجلات السابقة */
+  admissions: AdmissionSummary[];
   vitals: Vitals[];
   notes: MedicalNote[];
   diagnoses: Diagnosis[];
@@ -366,6 +394,7 @@ export interface Hospital {
   name_ar: string;
   name_en: string;
   code: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -384,47 +413,39 @@ export interface UnassignedPatient {
   admitted_at: string;
 }
 
-export interface PublicTrackBed {
-  id: string;
-  code: string;
+/** ما يراه أي شخص يمسح QR السرير — بدون أي بيانات طبية أو اسم كامل */
+export interface PublicTrackInfo {
+  hospital: { name_ar: string; name_en: string };
+  department: { name_ar: string; name_en: string } | null;
+  ward: { name_ar: string; name_en: string } | null;
   room: string;
   bed_no: string;
-  ward_id: string;
+  occupied: boolean;
+  admission: {
+    admitted_at: string;
+    days: number;
+    /** الأحرف الأولى فقط، مثل «م. ع.» */
+    patient_initials: string;
+    last_update: string | null;
+  } | null;
 }
 
-export interface PublicTrackData {
-  bed: PublicTrackBed;
-  hospital: { id: string; name_ar: string; name_en: string };
-  ward: { id: string; name_ar: string; name_en: string } | null;
-  department: { id: string; name_ar: string; name_en: string } | null;
-  occupied: boolean;
+/** ما يراه ذوو المريض بعد إدخال رمز العائلة الصحيح */
+export interface PublicTrackFamily extends PublicTrackInfo {
   patient: {
-    id: string;
-    file_number: string;
     full_name_ar: string;
     full_name_en: string;
     gender: Gender;
-    birth_date: string;
-    blood_type: BloodType;
-    allergies: string[];
-    critical_alerts: string[];
+  };
+  attending_doctor: string | null;
+  latest_vitals: {
+    recorded_at: string;
+    temperature: number | null;
+    pulse: number | null;
+    bp_systolic: number | null;
+    bp_diastolic: number | null;
+    spo2: number | null;
   } | null;
-  admission: {
-    id: string;
-    status: AdmissionStatus;
-    admitted_at: string;
-    discharged_at: string | null;
-    reason: string | null;
-    attending_doctor: string | null;
-  } | null;
-  vitals: Vitals[];
-  notes: MedicalNote[];
-  diagnoses: Diagnosis[];
-  medications: Medication[];
-  labs: LabResult[];
-  radiology: RadiologyReport[];
-  consultations: Consultation[];
-  procedures: Procedure[];
 }
 
 export interface HospitalAdminInfo {
@@ -436,5 +457,21 @@ export interface HospitalAdminInfo {
 
 export interface HospitalListItem extends Hospital {
   users_count: number;
+  beds_count: number;
+  active_admissions: number;
   admins: HospitalAdminInfo[];
+}
+
+export interface ReportOverview {
+  from: string;
+  to: string;
+  totalAdmissions: number;
+  totalDischarges: number;
+  activeAdmissions: number;
+  criticalAlerts: number;
+  pendingLabs: number;
+  admissionsTrend: { label: string; count: number }[];
+  dischargesTrend: { label: string; count: number }[];
+  occupancy: { ward_name_ar: string; ward_name_en: string; used: number; total: number }[];
+  recentActivity: { id: string; admission_id: string; actor: string; type: string; title_ar: string; created_at: string }[];
 }

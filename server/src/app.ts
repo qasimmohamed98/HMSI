@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
-import { securityHeaders, csrfProtection } from './middleware/security.js';
+import { securityHeaders, csrfProtection, requireSecretOutsideLocal } from './middleware/security.js';
 import { setUser } from './middleware/auth.js';
+import { ensureMigrated } from './seed/migrate.js';
+import { HttpError } from './lib/errors.js';
 import { authRoutes } from './routes/auth.js';
 import { dashboardRoutes } from './routes/dashboard.js';
 import { patientRoutes } from './routes/patients.js';
@@ -15,10 +17,16 @@ import { reportRoutes } from './routes/reports.js';
 import { staffRoutes } from './routes/staff.js';
 import { orgRoutes } from './routes/org.js';
 import { hospitalRoutes } from './routes/hospitals.js';
+import { publicTrackRoutes } from './routes/publicTrack.js';
 
 export const api = new Hono();
 
 api.use('*', securityHeaders());
+api.use('*', requireSecretOutsideLocal());
+api.use('*', async (_c, next) => {
+  await ensureMigrated();
+  await next();
+});
 api.use('*', setUser);
 api.use('*', csrfProtection());
 
@@ -37,4 +45,11 @@ api.route('/api/__staff', staffRoutes);
 api.route('/api/org', orgRoutes);
 api.route('/api/hospitals', hospitalRoutes);
 api.route('/api/public', publicTrackRoutes);
+
 api.notFound((c) => c.json({ message: 'المسار غير موجود' }, 404));
+
+api.onError((err, c) => {
+  if (err instanceof HttpError) return c.json({ message: err.message }, err.status);
+  console.error('[hmsi] unhandled error', err);
+  return c.json({ message: 'حدث خطأ غير متوقع في الخادم' }, 500);
+});

@@ -22,9 +22,11 @@ export async function createUser(input: {
   email?: string | null;
   role: 'admin' | 'doctor' | 'nurse' | 'pharmacist' | 'lab' | 'radiology' | 'reception' | 'viewer';
 }, hospitalId: string): Promise<User> {
+  // اسم المستخدم فريد على مستوى النظام كله (كل المستشفيات)
+  const username = input.username.toLowerCase();
   const exists = await db.execute({
-    sql: `SELECT id FROM users WHERE username = ? AND hospital_id = ? LIMIT 1`,
-    args: [input.username, hospitalId],
+    sql: `SELECT id FROM users WHERE lower(username) = ? LIMIT 1`,
+    args: [username],
   });
   if (exists.rows.length > 0) throw new UserExistsError('اسم المستخدم مستخدم من قبل');
 
@@ -33,7 +35,7 @@ export async function createUser(input: {
   await db.execute({
     sql: `INSERT INTO users (id, hospital_id, username, full_name_ar, full_name_en, email, role, password_hash)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, hospitalId, input.username, input.full_name_ar, input.full_name_en ?? null, input.email ?? null, input.role, passwordHash],
+    args: [id, hospitalId, username, input.full_name_ar, input.full_name_en ?? null, input.email ?? null, input.role, passwordHash],
   });
   return (await getUserById(id))!;
 }
@@ -60,8 +62,10 @@ export async function updateUser(
     is_active?: boolean;
   },
 ): Promise<User | null> {
-  const existing = await db.execute({ sql: `SELECT id FROM users WHERE id = ? AND hospital_id = ? LIMIT 1`, args: [id, hospitalId] });
+  const existing = await db.execute({ sql: `SELECT id, role FROM users WHERE id = ? AND hospital_id = ? LIMIT 1`, args: [id, hospitalId] });
   if (existing.rows.length === 0) return null;
+  // حساب المدير العام لا يُعدَّل من إدارة المستخدمين في المستشفى
+  if (String((existing.rows[0] as Record<string, unknown>).role) === 'super_admin') throw new UserProtectedError('لا يمكن تعديل حساب المدير العام');
 
   const sets: string[] = [];
   const args: (string | number | null)[] = [];
@@ -75,6 +79,13 @@ export async function updateUser(
     await db.execute({ sql: `UPDATE users SET ${sets.join(', ')} WHERE id = ?`, args });
   }
   return getUserById(id);
+}
+
+export class UserProtectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UserProtectedError';
+  }
 }
 
 export class UserExistsError extends Error {
