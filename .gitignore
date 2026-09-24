@@ -38,5 +38,11 @@ src-tauri/target/
 # Netlify
 .netlify/
 
-# Scratch files
-REEDME.md.txt
+# Build / typecheck logs produced by tools and agents
+*typecheck*.txt
+*build*.txt
+web/web_*.txt
+
+# Local test databases & temp bundles
+server/smoke.db*
+server/.fn-*

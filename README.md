@@ -1,9 +1,11 @@
 # HMSI — نظام إدارة المستشفى (Hospital Management System)
 
-تطبيق إدارة مستشفى متعدد المنصات من قاعدة كود واحدة:
-**ويب (React PWA) + ويندوز (Tauri) + أندرويد (PWA/Tauri) + Backend (Hono + Turso) على Vercel**.
+تطبيق إدارة مستشفى متعدد المستشفيات ومتعدد المنصات من قاعدة كود واحدة:
+**ويب (React PWA) + ويندوز (Tauri) + Backend (Hono + Turso) منشور على Netlify**.
 
-التصميم عربي بالافتراضي (RTL) مع دعم الإنجليزي (LTR) عبر `i18n` — لا نصوص مكتوبة بشكل ثابت.
+التصميم عربي بالافتراضي (RTL) مع دعم الإنجليزي (LTR) عبر `i18n`.
+
+> 📌 حالة المشروع والأخطاء المعروفة وخارطة الطريق: [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)
 
 ---
 
@@ -11,27 +13,41 @@
 
 ```
 web/                      React + Vite + PWA (الواجهة)
-  src/lib/api-live.ts     عميل الـ API (بالوضع live يشير إلى /api)
-api/                      Backend Hono + libsql/Turso
-  src/routes/             auth, dashboard, patients, records, vitals, wards, admissions, users, staff
-  src/seed/               migrations + seed (وحدات قابلة لإعادة الاستخدام)
-  scripts/                migrate.ts / seed.ts / smoke.ts
-  index.ts                entrypoint Vercel (hono/vercel)
-packages/shared/          الأنواع والصلاحيات المشتركة (RBAC)
+  src/lib/api.ts          واجهة الـ API — live (الخادم) أو demo (بيانات وهمية في المتصفح)
+server/                   Backend: Hono + libsql/Turso (اسم الحزمة @hmsi/api)
+  src/routes/             المسارات (auth, patients, records, admissions, hospitals, public ...)
+  src/repos/              الوصول لقاعدة البيانات (كل استعلام مقيّد بـ hospital_id)
+  db/migrations/*.sql     ملفات الـ migrations (المصدر)
+  db/migrations.ts        نسخة مضمّنة مولّدة منها (npm run db:gen -w @hmsi/api)
+  scripts/smoke.ts        اختبار e2e شامل (74 فحصاً)
+netlify/functions/hmsi.ts دالة Netlify التي تشغّل الـ API على /api/*
+packages/shared/          الأنواع + التحقق (Zod) + الصلاحيات (RBAC) المشتركة
 tauri/                    غلاف ويندوز (Tauri v2)
-docs/                     01-09: معمارية، أمان، قاعدة بيانات، نشر
-REEDME.md.txt             مواصفات النظام الأصلية
+docs/                     00: المواصفات الأصلية — 01..09: المعمارية — PROJECT_STATUS
 ```
 
-### واجهة الويب (حالة)
-صفحات كاملة: تسجيل الدخول، لوحة التحكم، المرضى + الملف الطبي، الردهات، **المختبر**، **الأشعة**،
-**الصيدلية** (كلها مقرونة بحساب الحالة — أقسام خدمات)، **التقارير** (إحصاءات/إشغال/نشاط)،
-**المستخدمون** (`GET /api/users` لإدارة حقيقية)، **الإعدادات** (لغة/مظهر).
+## الأدوار
 
-### الصلاحيات (RBAC)
-حسابات ديمو بكلمة مرور `password123`:
-`admin` (super_admin)، `doctor`، `doctor2`، `doctor3`، `nurse`، `nurse2`، `pharmacist`،
-`lab`، `radiology`، `reception`، `viewer`. الصلاحيات في `packages/shared/src/types.ts`.
+| الدور | الصلاحيات الأساسية |
+|---|---|
+| `super_admin` (المدير العام) | إدارة المستشفيات ومدرائها + الدخول لأي مستشفى كمدير. **لا** صلاحيات سريرية |
+| `admin` (مدير المستشفى) | المستخدمون، الأقسام والردهات والأسرّة، التنويم والخروج، التقارير |
+| `doctor` | الملاحظات الطبية، التشخيص، الأدوية، **طلب** المختبر والأشعة، الاستشارات |
+| `nurse` | ملاحظات التمريض، العلامات الحيوية، التنويم |
+| `lab` / `radiology` | إدخال نتائج المختبر / تقارير الأشعة |
+| `pharmacist` | الأدوية |
+| `reception` | تسجيل المرضى والتنويم (ويحصل على رمز العائلة) |
+| `viewer` | قراءة فقط |
+
+الصلاحيات معرّفة في [packages/shared/src/types.ts](packages/shared/src/types.ts).
+
+## متابعة ذوي المريض (QR)
+
+- لكل سرير رمز QR (من صفحة الردهات ← السرير ← طباعة) يفتح `/track/<code>` **بدون تسجيل دخول**.
+- الصفحة العامة تعرض فقط: المستشفى، القسم، الردهة، السرير، تاريخ الدخول، مدته، والأحرف الأولى من اسم المريض.
+- عند التنويم يُولَّد **رمز عائلة من 6 أرقام** يُسلَّم لذوي المريض؛ بإدخاله يرون الاسم الكامل والطبيب المعالج وآخر علامات حيوية.
+- الرمز يتغيّر مع كل تنويم ويُلغى عند الخروج، ويمكن إصدار رمز جديد من ملف المريض. المحاولات محدودة (5 لكل جهاز و20 للسرير كل 15 دقيقة).
+- لا تُعرض أي ملاحظات أو تشخيصات أو أدوية أو نتائج على الصفحة العامة.
 
 ---
 
@@ -39,77 +55,59 @@ REEDME.md.txt             مواصفات النظام الأصلية
 
 ```bash
 npm install
-npm run typecheck        # فحص كل الـ workspaces
-npm run dev              # API (:3000) + web (:5173) معاً عبر concurrently
+npm run dev:local     # API على :8787 بقاعدة محلية server/local.db + الواجهة على :5173
+npm run dev           # نفس الشيء لكن الـ API يقرأ server/.env (قد يشير إلى Turso الحقيقي!)
+npm run typecheck     # فحص كل الحزم
+npm test              # اختبار e2e شامل على قاعدة مؤقتة (يرفض العمل إذا ضُبط TURSO_URL)
+npm run build         # بناء الإنتاج (shared + web)
 ```
 
-الـ API له وضعان:
-- **ملف محلي** (`file:local.db`) عند غياب `TURSO_URL` — كافٍ للتطوير والديمو.
-- **Turso** عند توفر `TURSO_URL` + `TURSO_AUTH_TOKEN`.
+- الواجهة تعمل في **وضع العرض (demo)** افتراضياً محلياً. لتتصل بالـ API أنشئ `web/.env.local` فيه `VITE_API_MODE=live`.
+- الـ migrations تُطبَّق **تلقائياً** عند أول طلب للـ API. لتعبئة قاعدة محلية ببيانات تجريبية:
+  `npm run db:seed:local -w @hmsi/api` (قاعدة محلية). ⚠ يمسح كل البيانات.
+- حسابات تجريبية (كلمة المرور `password123`): `admin` (مدير عام)، `manager` (مدير مستشفى)، `admin2` (مستشفى ثانٍ)،
+  `doctor`، `nurse`، `lab`، `radiology`، `pharmacist`، `reception`، `viewer`.
 
-```bash
-npm run db:migrate -w @hmsi/api   # تطبيق الـ migrations (تتتبعها schema_migrations)
-npm run db:seed    -w @hmsi/api   # زرع البيانات (8 مرضى، 11 مستخدم) وأي إعادة تشغيل
-$env:SEED_TOKEN='test-token-123'; npx tsx scripts/smoke.ts   # فحص e2e
-```
+### إضافة migration
 
-> ملاحظة: SQLite المضمّن في `@libsql/client` لا يدعم `ADD COLUMN IF NOT EXISTS`
-> — لِذلك تُضاف الأعمدة عبر ALTER يُسجَّل مرة واحدة في `schema_migrations`.
-> عند مشاكل DB محلياً: احذف `server/local.db{, -wal, -shm}` وأعد migrate/seed.
+1. أنشئ `server/db/migrations/00N_وصف.sql` (لا تعدّل الملفات القديمة).
+2. `npm run db:gen -w @hmsi/api` لتحديث `server/db/migrations.ts`.
 
 ---
 
-## متغيرات البيئة
+## النشر على Netlify
+
+الإعداد في [netlify.toml](netlify.toml): البناء `npm run build`، النشر من `web/dist`، والـ API كدالة على `/api/*`.
+
+متغيرات البيئة المطلوبة (Site settings → Environment variables):
 
 | المتغير | الغرض |
 | --- | --- |
-| `TURSO_URL` | رابط قاعدة Turso (إن غاب → ملف محلي) |
+| `TURSO_URL` | رابط قاعدة Turso |
 | `TURSO_AUTH_TOKEN` | توكن Turso |
-| `SESSION_SECRET` | توقيع الجلسة (ضروري في الإنتاج) |
-| `SEED_TOKEN` | يحمي `POST /api/__staff/seed` (header `x-staff-token`) |
-| `ALLOWED_ORIGINS` | قائمة الأصول المسموح بها في الإنتاج (CSRF/CORS) |
-| `VITE_API_MODE` | `live` أو `mock` لواجهة الويب |
-| `VITE_API_URL` | أساس API خارجي اختياري (يُسبق `/api`) — مفيد لغلاف Tauri |
+| `SESSION_SECRET` | **إلزامي** — نص عشوائي طويل؛ بدونه يرفض الـ API العمل |
+| `SEED_TOKEN` | اختياري — لنقاط الصيانة `/api/__staff/*` (رأس `x-staff-token`) |
+| `ALLOWED_ORIGINS` | اختياري — أصول إضافية مسموحة (مثل تطبيق سطح المكتب) |
 
----
+`VITE_API_MODE=live` مضبوط في `netlify.toml`.
 
-## نشر Vercel
+نقاط الصيانة (تُعيد 404 بدون التوكن الصحيح):
+- `POST /api/__staff/migrate` — تطبيق الـ migrations فقط (آمن).
+- `POST /api/__staff/seed` مع `{"confirm":"WIPE_ALL_DATA"}` — ⚠ يمسح كل البيانات ويزرع بيانات تجريبية.
 
-- `vercel.json`: build = `npm run build:vercel`، output = `web/dist`،
-  route `/api/*` → `api/index.ts`، fallback → `/index.html`، headers أمنية.
-- استبدل توكن وظيفة `api/index.ts` بالمتغيرات البيئية أعلاه (Vercel → Settings → Environment Variables).
-- بعد النشر أعد تعبئة البيانات مرة واحدة عبر:
-  `POST {BASE}/api/__staff/seed` مع `x-staff-token: <SEED_TOKEN>` (يعيد `{"ok":true,...}`).
-- الـ migrations تُطبق تلقائياً عند تشغيل الـ API (محدثة لـ seed وكذلك نشر).
+## الأمان
 
-### الأمان
-- جلسة كوكي `hmsi_session` (HttpOnly، SameSite) + توكن `X-CSRF-Token` للكتابة مع جلسة.
-- كلمات مرور بـ Argon2id، استعلامات Parameterized فقط، تسجيل Audits.
-- `GET /api/me` بلا جلسة → `200 null` (الواجهة تقرر).
-
----
+- جلسة كوكي `hmsi_session` (HttpOnly، SameSite=Lax، Secure على HTTPS) + توكن CSRF لكل طلب كتابة.
+- Argon2id لكلمات المرور، استعلامات بمعاملات فقط، سجل تدقيق (audit) لكل عملية حساسة.
+- حماية التخمين على الدخول وتغيير كلمة المرور ورمز العائلة.
+- عزل كامل بين المستشفيات: كل استعلام مقيّد بمستشفى المستخدم.
+- المرفقات في قاعدة البيانات (حتى 4MB): صور، PDF، نص، Word، Excel فقط، وتُنزَّل دائماً كملف.
 
 ## ويندوز (Tauri v2)
 
-البنية جاهزة في `tauri/src-tauri/` (أيقونات مولّدة لكل المنصات).
-
-> البناء يتطلب **Rust + MSVC** على الجهاز — حالياً غير متوفر هنا،
-> فالبنية مكتوبة ومتحقق منها فقط بالـ CLI.
-
 ```bash
-npm run tauri:dev       # تطوير داخل نافذة سطح المكتب (يعمل على :5173)
-npm run tauri:build     # إنتاج NSIS + MSI (يحتاج Rust)
-npm run tauri:icon      # إعادة توليد الأيقونات من tauri/src-tauri/icons/icon.png
+npm run tauri:dev       # يحتاج Rust + MSVC
+npm run tauri:build     # NSIS + MSI
 ```
 
-في غلاف سطح المكتب عند الحاجة لوصل API خارجي: عيّن `VITE_API_URL` أثناء البناء.
-
----
-
-## الاختبار
-
-```bash
-npx tsx server/scripts/smoke.ts    # سلسلة e2e: auth/RBAC/CSRF/discharge/staff-seed
-npm run typecheck               # tsc لكل الـ workspaces
-npm run build:vercel            # بناء النشر الفعلي
-```
+انظر [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) لما تبقى لربط نسخة ويندوز بالـ API المنشور.

@@ -1,15 +1,32 @@
+# النشر على Netlify: الواجهة (web/dist) + الـ API كـ Netlify Function على /api/*
+# متغيرات البيئة المطلوبة في لوحة Netlify (Site settings → Environment variables):
+#   TURSO_URL, TURSO_AUTH_TOKEN, SESSION_SECRET (إلزامي), SEED_TOKEN (اختياري للصيانة)
+
 [build]
   command = "npm run build"
   publish = "web/dist"
 
   [build.environment]
     NODE_VERSION = "22"
+    # الواجهة تتصل بالـ API الحقيقي (وليس بيانات العرض التوضيحي)
+    VITE_API_MODE = "live"
 
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  # وحدات أصلية (native) لا يمكن دمجها في الـ bundle
+  external_node_modules = ["@node-rs/argon2", "@libsql/client", "libsql"]
 
-# SPA fallback (stays after static files & API function)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains"
+
+# SPA fallback (بعد الملفات الثابتة ودالة الـ API)
 [[redirects]]
   from = "/*"
   to = "/index.html"

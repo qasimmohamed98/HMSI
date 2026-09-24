@@ -2,22 +2,23 @@
   "name": "hmsi",
   "private": true,
   "version": "0.1.0",
-  "description": "Hospital Management System - Multi-platform (Web / Windows / Android)",
+  "description": "Hospital Management System - Multi-platform (Web / Windows / Android), deployed on Netlify",
   "workspaces": [
     "web",
     "server",
     "packages/shared"
   ],
   "scripts": {
-    "dev": "concurrently -k -c auto -n api,web \"npm run dev -w @hmsi/api\" \"npm run dev -w @hmsi/web\"",
-    "dev:web": "npm run dev -w web",
-    "dev:api": "npm run dev -w api",
-    "build": "npm run build -w packages/shared && npm run build -w web",
-    "build:vercel": "npm run build && npm run build -w @hmsi/api",
+    "dev": "npm run build -w packages/shared && concurrently -k -c auto -n api,web \"npm run dev -w @hmsi/api\" \"npm run dev -w @hmsi/web\"",
+    "dev:local": "npm run build -w packages/shared && concurrently -k -c auto -n api,web \"npm run dev:local -w @hmsi/api\" \"npm run dev -w @hmsi/web\"",
+    "dev:web": "npm run dev -w @hmsi/web",
+    "dev:api": "npm run dev -w @hmsi/api",
+    "build": "npm run build -w packages/shared && npm run build -w @hmsi/web",
+    "typecheck": "npm run build -w packages/shared && npm run typecheck -w @hmsi/api && npm run typecheck -w @hmsi/web",
+    "test": "npm run build -w packages/shared && npm run test:smoke -w @hmsi/api",
     "tauri:dev": "tauri dev --project-dir tauri/src-tauri",
     "tauri:build": "tauri build --project-dir tauri/src-tauri",
     "tauri:icon": "tauri icon tauri/src-tauri/icons/icon.png",
-    "typecheck": "npm run typecheck --workspaces --if-present",
     "audit": "npm audit"
   },
   "engines": {
