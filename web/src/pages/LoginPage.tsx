@@ -39,7 +39,12 @@ export default function LoginPage() {
       await login(username, password);
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error && err.message === 'unauthorized' ? t('auth.invalid') : t('auth.invalid'));
+      // «بيانات غير صحيحة» فقط عند 401 — أعطال الخادم أو الشبكة أو حد المحاولات تُعرض كما هي
+      const status = (err as { status?: number })?.status;
+      if (status === undefined || status === 401) setError(t('auth.invalid'));
+      else if (status === 429) setError(t('auth.tooMany'));
+      else if (status === 0) setError(t('auth.network'));
+      else setError(currentLang() === 'ar' && err instanceof Error && err.message ? err.message : t('auth.serverError'));
     } finally {
       setBusy(false);
     }

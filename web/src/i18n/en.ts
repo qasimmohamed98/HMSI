@@ -44,6 +44,9 @@ export const en: Dict = {
     soon: 'Soon',
   },
   auth: {
+    tooMany: 'Too many attempts — try again in 15 minutes',
+    network: 'Cannot reach the server — check your network',
+    serverError: 'The server is unavailable — contact your administrator',
     welcome: 'Welcome back',
     subtitle: 'Sign in to continue to the medical system',
     username: 'Username',
