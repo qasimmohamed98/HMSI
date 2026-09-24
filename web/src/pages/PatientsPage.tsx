@@ -3,8 +3,8 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Patient } from '@hmsi/shared';
-import { Search, UserPlus, BedDouble, Stethoscope, Pencil, Archive } from 'lucide-react';
-import { Card, Button, Badge, Skeleton, EmptyState, Avatar, TableRoot, THead, TBody, Th, Td, TRow, StatusBadge, ConfirmDialog } from '@/components/ui';
+import { Search, UserPlus, BedDouble, Stethoscope, Pencil, Archive, KeyRound } from 'lucide-react';
+import { Card, Button, Badge, Skeleton, EmptyState, Avatar, TableRoot, THead, TBody, Th, Td, TRow, StatusBadge, ConfirmDialog, Dialog } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Input } from '@/components/ui/Input';
 import { API, type PatientUpdateInput } from '@/lib/api';
@@ -28,6 +28,8 @@ export default function PatientsPage() {
   const [admittedOnly, setAdmittedOnly] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [admitTarget, setAdmitTarget] = useState<Patient | null>(null);
+  // رمز العائلة يُعرض مرة بعد التنويم ليُسلَّم لذوي المريض
+  const [admittedPin, setAdmittedPin] = useState<{ name: string; pin: string } | null>(null);
   const [editTarget, setEditTarget] = useState<Patient | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<Patient | null>(null);
 
@@ -58,8 +60,10 @@ export default function PatientsPage() {
 
   const admitMut = useMutation({
     mutationFn: API.admitPatient,
-    onSuccess: () => {
+    onSuccess: (res) => {
       invalidatePatients();
+      void qc.invalidateQueries({ queryKey: ['wards'] });
+      if (admitTarget) setAdmittedPin({ name: admitTarget.full_name_ar, pin: res.family_pin });
       setAdmitTarget(null);
     },
   });
@@ -239,6 +243,21 @@ export default function PatientsPage() {
           busy={archiveMut.isPending}
           onConfirm={() => archiveMut.mutate(archiveTarget.id)}
         />
+      )}
+      {admittedPin && (
+        <Dialog
+          open
+          onClose={() => setAdmittedPin(null)}
+          title={`${t('familyPin.admittedTitle')} — ${admittedPin.name}`}
+          footer={<Button onClick={() => setAdmittedPin(null)}>{t('common.close')}</Button>}
+        >
+          <div className="space-y-3 text-center">
+            <KeyRound className="mx-auto h-8 w-8 text-brand-600" />
+            <p className="text-sm font-bold text-ink/60">{t('familyPin.title')}</p>
+            <p className="font-mono text-4xl font-extrabold tracking-[0.35em] text-ink" dir="ltr">{admittedPin.pin}</p>
+            <p className="text-sm leading-relaxed text-ink/60">{t('familyPin.admittedHint')}</p>
+          </div>
+        </Dialog>
       )}
       {admitTarget && (
         <AdmitDialog open onClose={() => setAdmitTarget(null)} patient={admitTarget} onSubmit={(input) => admitMut.mutate(input)} busy={admitMut.isPending} />

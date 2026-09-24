@@ -18,6 +18,7 @@ const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const TrackPage = lazy(() => import('@/pages/TrackPage'));
+const HospitalsPage = lazy(() => import('@/pages/HospitalsPage'));
 
 function PageLoader() {
   return (
@@ -58,6 +59,7 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    // صفحة عامة لذوي المريض (بدون تسجيل دخول)
     path: '/track/:code',
     element: withSuspense(<TrackPage />),
   },
@@ -80,6 +82,7 @@ export const router = createBrowserRouter([
       { path: 'reports', element: withSuspense(<ReportsPage />) },
       { path: 'users', element: withSuspense(<UsersPage />) },
       { path: 'settings', element: withSuspense(<SettingsPage />) },
+      { path: 'hospitals', element: withSuspense(<HospitalsPage />) },
       { path: '*', element: withSuspense(<NotFoundPage />) },
     ],
   },

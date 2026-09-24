@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, ScanLine } from 'lucide-react';
+import { PenLine, Plus, ScanLine } from 'lucide-react';
 import { Button, Dialog, Input, Textarea, Badge, Skeleton, EmptyState, Card, CardContent } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { API, type RadiologyInput } from '@/lib/api';
+import { API, type RadiologyInput, type RadiologyUpdateInput } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { fmtDateTime } from '@/lib/format';
 import { AdmittedPatientCard, useAdmittedCharts } from '@/features/departments';
@@ -14,6 +14,17 @@ export default function RadiologyPage() {
   const { data, isLoading, error, refetch, refetchAll } = useAdmittedCharts();
   const toast = useToast();
   const [dialog, setDialog] = useState<string | null>(null);
+  const [reportFor, setReportFor] = useState<{ admissionId: string; id: string; study: string } | null>(null);
+
+  // كتابة تقرير لطلب أشعة موجود (بدل إنشاء سجل جديد)
+  const reportMut = useMutation({
+    mutationFn: (args: { admissionId: string; id: string; input: RadiologyUpdateInput }) => API.updateRadiology(args.admissionId, args.id, args.input),
+    onSuccess: () => {
+      refetchAll();
+      setReportFor(null);
+      toast.success(t('common.done'));
+    },
+  });
 
   const mut = useMutation({
     mutationFn: API.addRadiology,
@@ -62,7 +73,19 @@ export default function RadiologyPage() {
                         <Badge variant={r.report ? 'success' : 'warning'}>{r.report ? t('laboratory.statuses.resulted') : t('laboratory.statuses.ordered')}</Badge>
                       </div>
                       <p className="mt-0.5 text-xs text-ink/50">{fmtDateTime(r.ordered_at)}</p>
-                      {r.report && <p className="mt-2 text-sm leading-relaxed text-ink/80">{r.report}</p>}
+                      {r.report ? (
+                        <p className="mt-2 text-sm leading-relaxed text-ink/80">{r.report}</p>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          icon={<PenLine className="h-3.5 w-3.5" />}
+                          onClick={() => setReportFor({ admissionId: r.admission_id, id: r.id, study: r.study_type_ar })}
+                        >
+                          {t('actions.enterReport')}
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -82,7 +105,16 @@ export default function RadiologyPage() {
         </div>
       )}
 
-      <AddReportDialog admissionId={dialog} open={Boolean(dialog)} onClose={() => setDialog(null)} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
+      {dialog && <AddReportDialog key={dialog} admissionId={dialog} open onClose={() => setDialog(null)} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />}
+      {reportFor && (
+        <WriteReportDialog
+          key={reportFor.id}
+          study={reportFor.study}
+          onClose={() => setReportFor(null)}
+          onSubmit={(input) => reportMut.mutate({ admissionId: reportFor.admissionId, id: reportFor.id, input })}
+          busy={reportMut.isPending}
+        />
+      )}
     </div>
   );
 }
@@ -132,6 +164,29 @@ function AddReportDialog({
         <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder="أشعة مقطعية CT صدر" />
         <Textarea label={t('radiology.report')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} />
       </div>
+    </Dialog>
+  );
+}
+function WriteReportDialog({ study, onClose, onSubmit, busy }: { study: string; onClose: () => void; onSubmit: (i: RadiologyUpdateInput) => void; busy: boolean }) {
+  const { t } = useTranslation();
+  const [report, setReport] = useState('');
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={`${t('actions.enterReport')} — ${study}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={() => onSubmit({ report: report.trim() })} loading={busy} disabled={report.trim().length < 2}>
+            {t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      <Textarea label={t('radiology.report')} rows={5} value={report} onChange={(e) => setReport(e.target.value)} autoFocus />
     </Dialog>
   );
 }

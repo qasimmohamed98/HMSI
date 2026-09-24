@@ -202,9 +202,18 @@ function EditUserDialog({ open, user, onClose, onSuccess }: { open: boolean; use
     onSuccess,
   });
   const set = <K extends keyof UpdateUserInput>(k: K, v: UpdateUserInput[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const toast = useToast();
+  const [newPassword, setNewPassword] = useState('');
+  const resetMut = useMutation({
+    mutationFn: () => API.resetUserPassword(user.id, newPassword),
+    onSuccess: () => {
+      setNewPassword('');
+      toast.success(t('common.done'));
+    },
+  });
   const submit = () => {
     if ((form.fullNameAr ?? '').trim().length < 2) return;
-    mut.mutate({ ...form, fullNameAr: form.fullNameAr?.trim() });
+    mut.mutate({ ...form, fullNameAr: form.fullNameAr?.trim(), email: form.email?.trim() || null, fullNameEn: form.fullNameEn?.trim() || null });
   };
 
   return (
@@ -235,6 +244,25 @@ function EditUserDialog({ open, user, onClose, onSuccess }: { open: boolean; use
           onChange={(e) => set('role', e.target.value as UpdateUserInput['role'])}
           options={CREATABLE_ROLES.map((r) => ({ value: r, label: t(`user.role.${r}`) }))}
         />
+        <div className="space-y-2 border-t border-ink/8 pt-4 dark:border-white/10">
+          <p className="text-sm font-bold text-ink">{t('password.reset')}</p>
+          <p className="text-xs text-ink/50">{t('password.resetHint')}</p>
+          <div className="flex items-end gap-2">
+            <Input
+              label={t('password.new')}
+              hint={t('password.rule')}
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              dir="ltr"
+              containerClassName="flex-1"
+            />
+            <Button variant="outline" loading={resetMut.isPending} disabled={newPassword.length < 8} onClick={() => resetMut.mutate()}>
+              {t('password.reset')}
+            </Button>
+          </div>
+        </div>
       </div>
     </Dialog>
   );

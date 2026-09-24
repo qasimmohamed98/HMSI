@@ -38,6 +38,17 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
         <span className="hidden text-sm font-bold text-ink md:block">{t('nav.hospital')}</span>
         <span className="hidden text-ink/25 md:block">·</span>
         <span className="truncate text-sm text-ink/55">{user?.hospital_name_ar}</span>
+        {user?.home_hospital_id && user.home_hospital_id !== user.hospital_id && (
+          // المدير العام يعمل داخل مستشفى آخر
+          <button
+            type="button"
+            onClick={() => navigate('/hospitals')}
+            className="truncate rounded-full bg-warning-100 px-2.5 py-0.5 text-xs font-bold text-warning-800 hover:bg-warning-200 dark:bg-warning-900/40 dark:text-warning-200"
+            title={t('hospitals.actingBanner', { name: user.hospital_name_ar })}
+          >
+            {t('hospitals.back')}
+          </button>
+        )}
       </div>
 
       <Button variant="ghost" size="sm" onClick={switchLang} className="hidden xs:inline-flex sm:inline-flex">

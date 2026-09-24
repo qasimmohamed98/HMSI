@@ -33,6 +33,8 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           navigateFallback: '/index.html',
+          // طلبات الـ API لا تُخدم أبداً من الكاش (بيانات طبية حساسة ومتغيرة)
+          navigateFallbackDenylist: [/^\/api\//],
           globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         },
       }),

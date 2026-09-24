@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, FlaskConical } from 'lucide-react';
 import { Button, Dialog, Input, Textarea, Badge, Skeleton, EmptyState, Card, CardContent } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { API, type LabInput } from '@/lib/api';
+import { API, type LabResultInput } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { fmtDateTime } from '@/lib/format';
 import { AdmittedPatientCard, useAdmittedCharts } from '@/features/departments';
@@ -13,10 +13,10 @@ export default function LaboratoryPage() {
   const { t } = useTranslation();
   const { data, isLoading, error, refetch, refetchAll } = useAdmittedCharts();
   const toast = useToast();
-  const [dialog, setDialog] = useState<{ admissionId: string; test: string } | null>(null);
+  const [dialog, setDialog] = useState<{ admissionId: string; labId: string; test: string } | null>(null);
 
   const mut = useMutation({
-    mutationFn: API.addLabResult,
+    mutationFn: (args: { admissionId: string; labId: string; input: LabResultInput }) => API.updateLabResult(args.admissionId, args.labId, args.input),
     onSuccess: () => {
       refetchAll();
       setDialog(null);
@@ -83,7 +83,7 @@ export default function LaboratoryPage() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => setDialog({ admissionId: l.admission_id, test: l.test_name_ar })}
+                            onClick={() => setDialog({ admissionId: l.admission_id, labId: l.id, test: l.test_name_ar })}
                             icon={<Plus className="h-3.5 w-3.5" />}
                           >
                             {t('laboratory.updateResult')}
@@ -99,72 +99,52 @@ export default function LaboratoryPage() {
         </div>
       )}
 
-      <AddResultDialog
-        admissionId={dialog?.admissionId ?? null}
-        preset={dialog?.test ?? ''}
-        open={Boolean(dialog)}
-        onClose={() => setDialog(null)}
-        onSubmit={(i) => mut.mutate(i)}
-        busy={mut.isPending}
-      />
+      {dialog && (
+        <EnterResultDialog
+          key={dialog.labId}
+          test={dialog.test}
+          onClose={() => setDialog(null)}
+          onSubmit={(input) => mut.mutate({ admissionId: dialog.admissionId, labId: dialog.labId, input })}
+          busy={mut.isPending}
+        />
+      )}
     </div>
   );
 }
 
-function AddResultDialog({
-  open,
-  onClose,
-  admissionId,
-  preset,
-  onSubmit,
-  busy,
-}: {
-  open: boolean;
-  onClose: () => void;
-  admissionId: string | null;
-  preset: string;
-  onSubmit: (i: LabInput) => void;
-  busy: boolean;
-}) {
+function EnterResultDialog({ test, onClose, onSubmit, busy }: { test: string; onClose: () => void; onSubmit: (i: LabResultInput) => void; busy: boolean }) {
   const { t } = useTranslation();
-  const [testNameAr, setTestNameAr] = useState(preset);
   const [result, setResult] = useState('');
   const [unit, setUnit] = useState('');
   const [reference, setReference] = useState('');
-
-  if (!admissionId) return null;
-  const submit = () => {
-    if (testNameAr.trim().length < 2) return;
-    onSubmit({ admissionId, testNameAr: testNameAr.trim(), result, unit: unit || null, referenceRange: reference || null });
-    setTestNameAr('');
-    setResult('');
-    setUnit('');
-    setReference('');
-  };
+  const [abnormal, setAbnormal] = useState(false);
 
   return (
     <Dialog
-      open={open}
+      open
       onClose={onClose}
-      title={t('laboratory.addResult')}
+      title={`${t('actions.enterResult')} — ${test}`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={submit} loading={busy} icon={<FlaskConical className="h-4 w-4" />}>
-            {t('laboratory.updateResult')}
+          <Button onClick={() => onSubmit({ result: result.trim(), unit: unit || null, referenceRange: reference || null, abnormal })} loading={busy} disabled={!result.trim()} icon={<FlaskConical className="h-4 w-4" />}>
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input label={t('laboratory.test')} value={testNameAr} onChange={(e) => setTestNameAr(e.target.value)} autoFocus />
         <div className="grid grid-cols-3 gap-3">
           <Input label={t('laboratory.unit')} value={unit} onChange={(e) => setUnit(e.target.value)} dir="ltr" containerClassName="col-span-1" />
           <Input label={t('laboratory.reference')} value={reference} onChange={(e) => setReference(e.target.value)} dir="ltr" containerClassName="col-span-2" />
         </div>
-        <Textarea label={t('laboratory.result')} rows={3} value={result} onChange={(e) => setResult(e.target.value)} />
+        <Textarea label={t('laboratory.result')} rows={3} value={result} onChange={(e) => setResult(e.target.value)} autoFocus />
+        <label className="flex items-center gap-2 text-sm font-semibold text-danger-600">
+          <input type="checkbox" checked={abnormal} onChange={(e) => setAbnormal(e.target.checked)} className="h-4 w-4 accent-danger-500" />
+          {t('orders.abnormal')}
+        </label>
       </div>
     </Dialog>
   );

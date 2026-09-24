@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Patient, AdmissionSummary } from '@hmsi/shared';
-import { ArrowRight, CalendarClock, MapPin, Stethoscope, UserRound } from 'lucide-react';
-import { Badge, Chip, Avatar } from '@/components/ui';
+import { ArrowRight, CalendarClock, KeyRound, MapPin, RefreshCw, Stethoscope, UserRound } from 'lucide-react';
+import { Badge, Chip, Avatar, Button, useToast } from '@/components/ui';
+import { API } from '@/lib/api';
 import { calcAge, fmtDate } from '@/lib/format';
 import { jsonParse } from '@/lib/demo-data';
 
@@ -9,12 +11,23 @@ export function PatientHeader({
   patient,
   admission,
   onBack,
+  canManagePin = false,
 }: {
   patient: Patient;
   admission: AdmissionSummary | null;
   onBack: () => void;
+  canManagePin?: boolean;
 }) {
   const { t } = useTranslation();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const pinMut = useMutation({
+    mutationFn: (admissionId: string) => API.regenerateFamilyPin(admissionId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chart', patient.id] });
+      toast.success(t('familyPin.regenerated'));
+    },
+  });
   const allergies = jsonParse<string[]>(patient.allergies_json, []);
   const alerts = jsonParse<string[]>(patient.critical_alerts_json, []);
   const hasIssues = allergies.length > 0 || alerts.length > 0;
@@ -65,6 +78,23 @@ export function PatientHeader({
                 {t('status.' + admission.status)}
               </Badge>
             </div>
+            {admission.reason && (
+              <div className="col-span-2 sm:col-span-4 lg:col-span-3">
+                <Meta icon={<Stethoscope className="h-4 w-4" />} label={t('history.reason')} value={admission.reason} />
+              </div>
+            )}
+            {admission.status === 'active' && admission.family_pin && (
+              <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-brand-300 px-3 py-2 sm:col-span-4 lg:col-span-3 dark:border-brand-800" title={t('familyPin.hint')}>
+                <KeyRound className="h-4 w-4 text-brand-600" />
+                <span className="text-xs font-bold text-ink/55">{t('familyPin.title')}:</span>
+                <span className="font-mono text-base font-extrabold tracking-[0.3em] text-ink" dir="ltr">{admission.family_pin}</span>
+                {canManagePin && (
+                  <Button size="sm" variant="ghost" className="ms-auto" loading={pinMut.isPending} icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => pinMut.mutate(admission.id)}>
+                    {t('familyPin.regenerate')}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
 

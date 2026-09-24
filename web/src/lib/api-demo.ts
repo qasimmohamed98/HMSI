@@ -16,8 +16,13 @@ import type {
   Attachment,
   AdmissionSummary,
   Hospital,
+  HospitalListItem,
+  HospitalAdminInfo,
   Department,
   UnassignedPatient,
+  Bed,
+  PublicTrackInfo,
+  PublicTrackFamily,
 } from '@hmsi/shared';
 import type {
   Api,
@@ -51,6 +56,8 @@ import type {
   NewUserInput,
   UpdateUserInput,
   ReportOverview,
+  CreateHospitalInput,
+  HospitalAdminInput,
 } from './api';
 import { createDemoStore, jsonParse, DEMO_DEPARTMENTS, type DemoStore, type AdmissionRecord } from './demo-data';
 
@@ -60,6 +67,9 @@ export const resetStore = () => {
 };
 
 const delay = (ms = 260) => new Promise((r) => setTimeout(r, ms));
+const demoPin = () => String(Math.floor(100000 + Math.random() * 900000));
+/** مستشفيات إضافية أنشأها المدير العام في وضع العرض (في الذاكرة فقط) */
+const extraHospitals: Hospital[] = [];
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const requireUser = (): User => {
@@ -105,6 +115,7 @@ function buildChart(patientId: string): ChartData {
   return {
     patient,
     admissionId: record?.admission.id ?? null,
+    admissions: record ? [record.admission] : [],
     vitals: record ? [...record.vitals].sort((a, b) => (a.recorded_at > b.recorded_at ? -1 : 1)) : [],
     notes: record ? [...record.notes].sort((a, b) => (a.recorded_at > b.recorded_at ? -1 : 1)) : [],
     diagnoses: record ? [...record.diagnoses] : [],
@@ -239,7 +250,7 @@ export const demoApi: Api = {
     delete store.patients[id];
   },
 
-  async getChart(patientId: string): Promise<ChartData> {
+  async getChart(patientId: string, _admissionId?: string): Promise<ChartData> {
     await delay(320);
     return buildChart(patientId);
   },
@@ -377,12 +388,12 @@ export const demoApi: Api = {
       category: input.category ?? '',
       ordered_by: actorName(u),
       ordered_at: new Date().toISOString(),
-      result: input.result,
+      result: input.result || null,
       unit: input.unit ?? null,
       reference_range: input.referenceRange ?? null,
-      status: 'resulted',
-      resulted_by: actorName(u),
-      resulted_at: new Date().toISOString(),
+      status: input.result ? 'resulted' : 'ordered',
+      resulted_by: input.result ? actorName(u) : null,
+      resulted_at: input.result ? new Date().toISOString() : null,
     };
     record.labs.unshift(lab);
     pushTimeline(record, actorName(u), 'lab', `إضافة نتيجة مختبر: ${lab.test_name_ar}`, `Lab result: ${lab.test_name_ar}`, lab.ordered_at);
@@ -399,9 +410,9 @@ export const demoApi: Api = {
       study_type_en: input.studyTypeEn ?? null,
       ordered_by: actorName(u),
       ordered_at: new Date().toISOString(),
-      report: input.report,
-      status: 'resulted',
-      performed_by: actorName(u),
+      report: input.report || null,
+      status: input.report ? 'resulted' : 'ordered',
+      performed_by: input.report ? actorName(u) : null,
     };
     record.radiology.unshift(rad);
     pushTimeline(record, actorName(u), 'radiology', `تقرير أشعة: ${rad.study_type_ar}`, `Radiology: ${rad.study_type_ar}`, rad.ordered_at);
@@ -449,6 +460,9 @@ export const demoApi: Api = {
     const record = findRecord(input.admissionId);
     record.admission.status = 'discharged';
     record.admission.discharged_at = new Date().toISOString();
+    record.admission.discharge_type = input.type;
+    record.admission.discharge_summary = input.summary || null;
+    record.admission.family_pin = null;
     const patient = Object.values(store.patients).find((x) => x.record === record);
     if (patient) patient.patient.status = 'discharged';
     pushTimeline(record, actorName(u), 'discharge', `تسجيل خروج: ${input.summary.slice(0, 60)}`, 'Discharge recorded', new Date().toISOString());
@@ -531,16 +545,16 @@ export const demoApi: Api = {
     store.wards = store.wards.filter((w) => w.id !== id);
   },
 
-  async createBed(input: BedInput): Promise<{ id: string; ward_id: string; room: string; bed_no: string; status: 'free' | 'occupied' }> {
+  async createBed(input: BedInput): Promise<Bed> {
     await delay(200);
     const ward = store.wards.find((w) => w.id === input.wardId);
     if (!ward) throw new Error('not_found');
-    const bed = { id: uid(), ward_id: input.wardId, room: input.room, bed_no: input.bedNo, status: 'free' as const };
+    const bed: Bed = { id: uid(), ward_id: input.wardId, room: input.room, bed_no: input.bedNo, status: 'free', code: `bdemo${uid()}` };
     ward.beds.push(bed);
     return bed;
   },
 
-  async updateBed(id: string, input: { room?: string; bedNo?: string }): Promise<{ id: string; ward_id: string; room: string; bed_no: string; status: 'free' | 'occupied' }> {
+  async updateBed(id: string, input: { room?: string; bedNo?: string }): Promise<Bed> {
     await delay(200);
     const bed = store.wards.flatMap((w) => w.beds).find((b) => b.id === id);
     if (!bed) throw new Error('not_found');
@@ -642,6 +656,19 @@ export const demoApi: Api = {
     return { ...store.hospital };
   },
 
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const u = requireUser();
+    const rec = store.users.find((x) => x.id === u.id);
+    if (!rec || rec.password !== currentPassword) throw new Error('كلمة المرور الحالية غير صحيحة');
+    rec.password = newPassword;
+  },
+
+  async resetUserPassword(userId: string, password: string): Promise<void> {
+    const rec = store.users.find((x) => x.id === userId);
+    if (!rec) throw new Error('not_found');
+    rec.password = password;
+  },
+
   async listUsers(): Promise<User[]> {
     await delay(250);
     return store.users.map(({ password: _pw, ...pub }) => {
@@ -650,132 +677,83 @@ export const demoApi: Api = {
     });
   },
 
-  async listHospitals(): Promise<Hospital[]> {
+  async listHospitals(): Promise<HospitalListItem[]> {
     await delay(150);
-    return [{ id: store.hospital.id, name_ar: store.hospital.name_ar, name_en: store.hospital.name_en, code: store.hospital.code }];
+    const active = Object.values(store.patients).filter((e) => e.record?.admission.status === 'active').length;
+    const adminsOf = (hid: string): HospitalAdminInfo[] =>
+      store.users.filter((u) => u.hospital_id === hid && u.role === 'admin').map((u) => ({ id: u.id, username: u.username, full_name_ar: u.full_name_ar, is_active: u.is_active }));
+    return [
+      { ...store.hospital, users_count: store.users.filter((u) => u.hospital_id === store.hospital.id).length, beds_count: store.wards.reduce((n, w) => n + w.beds.length, 0), active_admissions: active, admins: adminsOf(store.hospital.id) },
+      ...extraHospitals.map((h) => ({ ...h, users_count: store.users.filter((u) => u.hospital_id === h.id).length, beds_count: 0, active_admissions: 0, admins: adminsOf(h.id) })),
+    ];
   },
 
-  async createHospital(input: { nameAr: string; nameEn?: string; code?: string }): Promise<Hospital> {
+  async createHospital(input: CreateHospitalInput): Promise<Hospital> {
     await delay(200);
-    throw new Error('إنشاء مستشفى جديد غير مدعوم في وضع العرض التوضيحي');
+    const h: Hospital = { id: uid(), name_ar: input.nameAr, name_en: input.nameEn, code: (input.code || `H-${uid().slice(0, 6)}`).toUpperCase(), is_active: true, created_at: new Date().toISOString() };
+    extraHospitals.push(h);
+    return h;
   },
 
-  async addHospitalAdmin(input: { username: string; password: string; fullNameAr: string; fullNameEn?: string; email?: string }): Promise<{ id: string; username: string; fullNameAr: string }> {
+  async updateHospitalById(id: string, input: { nameAr?: string; nameEn?: string; isActive?: boolean }): Promise<Hospital> {
+    await delay(150);
+    const h = id === store.hospital.id ? store.hospital : extraHospitals.find((x) => x.id === id);
+    if (!h) throw new Error('not_found');
+    if (input.nameAr !== undefined) h.name_ar = input.nameAr;
+    if (input.nameEn !== undefined) h.name_en = input.nameEn;
+    if (input.isActive !== undefined) h.is_active = input.isActive;
+    return { ...h };
+  },
+
+  async addHospitalAdmin(hospitalId: string, input: HospitalAdminInput): Promise<HospitalAdminInfo> {
     await delay(200);
-    const existing = store.users.some((u) => u.username === input.username);
-    if (existing) throw new Error('اسم المستخدم مستخدم من قبل');
-    const newAdmin = {
-      id: 'adm-' + Math.random().toString(36).slice(2, 9),
-      hospital_id: store.hospital.id,
-      hospital_name_ar: store.hospital.name_ar,
-      hospital_name_en: store.hospital.name_en,
-      username: input.username,
+    const username = input.username.toLowerCase();
+    if (store.users.some((u) => u.username === username)) throw new Error('اسم المستخدم مستخدم من قبل');
+    const h = hospitalId === store.hospital.id ? store.hospital : extraHospitals.find((x) => x.id === hospitalId);
+    if (!h) throw new Error('not_found');
+    const created: User & { password: string } = {
+      id: uid(),
+      hospital_id: h.id,
+      hospital_name_ar: h.name_ar,
+      hospital_name_en: h.name_en,
+      username,
       full_name_ar: input.fullNameAr,
-      full_name_en: input.fullNameEn ?? input.fullNameAr,
+      full_name_en: input.fullNameEn ?? '',
       email: input.email ?? null,
       role: 'admin',
       is_active: true,
       created_at: new Date().toISOString(),
       password: input.password,
     };
-    store.users.push(newAdmin);
-    const { password: _pw, ...pub } = newAdmin;
-    void _pw;
-    return { id: newAdmin.id, username: newAdmin.username, fullNameAr: newAdmin.full_name_ar };
+    store.users.push(created);
+    return { id: created.id, username, full_name_ar: created.full_name_ar, is_active: true };
   },
 
-  async publicTrack(code: string): Promise<{ bed: { id: string; code: string; room: string; bed_no: string; ward_id: string }; hospital: { id: string; name_ar: string; name_en: string }; ward: { id: string; name_ar: string; name_en: string } | null; department: { id: string; name_ar: string; name_en: string } | null; patient: { id: string; file_number: string; full_name_ar: string; full_name_en: string; gender: string; birth_date: string; blood_type: string; allergies: string[]; critical_alerts: string[] } | null; admission: { id: string; status: string; admitted_at: string; discharged_at: string | null; reason: string | null; attending_doctor: string | null } | null; vitals: any[]; notes: any[]; diagnoses: any[]; medications: any[]; labs: any[]; radiology: any[]; consultations: any[]; procedures: any[] } | null> {
-    await delay(300);
-    // Find bed by code in wards
-    let bed = null;
-    let ward = null;
-    let department = null;
-    for (const w of store.wards) {
-      const foundBed = w.beds.find((b) => b.code === code);
-      if (foundBed) {
-        bed = foundBed;
-        ward = { id: w.id, name_ar: w.name_ar, name_en: w.name_en };
-        // Find department
-        const dept = store.departments.find((d) => d.id === w.department_id);
-        department = dept ? { id: dept.id, name_ar: dept.name_ar, name_en: dept.name_en } : null;
-        break;
-      }
-    }
-    if (!bed) return null;
+  async switchHospital(hospitalId: string): Promise<Hospital> {
+    await delay(150);
+    if (hospitalId !== store.hospital.id) throw new Error('التبديل بين المستشفيات غير متاح في وضع العرض التوضيحي');
+    return { ...store.hospital };
+  },
 
-    // Find active admission for this bed
-    let patient = null;
-    let admission = null;
-    let vitals: any[] = [];
-    let notes: any[] = [];
-    let diagnoses: any[] = [];
-    let medications: any[] = [];
-    let labs: any[] = [];
-    let radiology: any[] = [];
-    let consultations: any[] = [];
-    let procedures: any[] = [];
+  async publicTrack(code: string): Promise<PublicTrackInfo> {
+    await delay(250);
+    return demoTrack(code).info;
+  },
 
-    const admissionEntry = Object.values(store.patients).find((e) => e.record?.admission.ward_id === bed.ward_id && e.record?.admission.bed_no === bed.bed_no && e.record?.admission.status === 'active');
-    if (admissionEntry?.record) {
-      const rec = admissionEntry.record;
-      // Patient
-      patient = {
-        id: rec.patient.id,
-        file_number: rec.patient.file_number,
-        full_name_ar: rec.patient.full_name_ar,
-        full_name_en: rec.patient.full_name_en,
-        gender: rec.patient.gender,
-        birth_date: rec.patient.birth_date,
-        blood_type: rec.patient.blood_type,
-        allergies: rec.patient.allergies_json ? JSON.parse(rec.patient.allergies_json) : [],
-        critical_alerts: rec.patient.critical_alerts_json ? JSON.parse(rec.patient.critical_alerts_json) : [],
-      };
-      // Admission
-      admission = {
-        id: rec.admission.id,
-        status: rec.admission.status,
-        admitted_at: rec.admission.admitted_at,
-        discharged_at: null,
-        reason: rec.admission.reason ?? '',
-        attending_doctor: rec.admission.attending_doctor ?? null,
-      };
-      // Vitals
-      vitals = rec.vitals.map((v: any) => ({ recorded_at: v.recorded_at, temperature: v.temperature, pulse: v.pulse, spo2: v.spo2 }));
-      // Notes
-      notes = rec.notes.map((n: any) => ({ id: n.id, content: n.content, recorded_at: n.recorded_at, author: n.author }));
-      // Diagnoses
-      diagnoses = rec.diagnoses.map((d: any) => ({ icd10: d.icd10, title_ar: d.title_ar, title_en: d.title_en ?? '', status: d.status }));
-      // Medications
-      medications = rec.medications.map((m: any) => ({ id: m.id, name_ar: m.name_ar, name_en: m.name_en ?? '', dose: m.dose, route: m.route, frequency: m.frequency, status: m.status }));
-      // Labs
-      labs = rec.labs.map((l: any) => ({ id: l.id, test_name_ar: l.test_name_ar, test_name_en: l.test_name_en ?? '', category: l.category ?? '', ordered_by: l.ordered_by ?? '', result: l.result, unit: l.unit ?? '', reference_range: l.reference_range ?? '', status: l.status }));
-      // Radiology
-      radiology = rec.radiology.map((r: any) => ({ id: r.id, study_type_ar: r.study_type_ar, study_type_en: r.study_type_en ?? '', ordered_by: r.ordered_by ?? '', status: r.status }));
-      // Consultations
-      consultations = rec.consultations.map((c: any) => ({ id: c.id, requested_by: c.requested_by, specialty: c.specialty, reason: c.reason, response: c.response ?? '' }));
-      // Procedures
-      procedures = rec.procedures.map((p: any) => ({ id: p.id, name_ar: p.name_ar, name_en: p.name_en ?? '', performed_by: p.performed_by ?? '', performed_at: p.performed_at ?? '', notes: p.notes ?? '' }));
-    }
-
+  async familyTrack(code: string, pin: string): Promise<PublicTrackFamily> {
+    await delay(250);
+    const { info, entry } = demoTrack(code);
+    if (!entry?.record || entry.record.admission.family_pin !== pin) throw new Error('رمز العائلة غير صحيح');
+    const v = entry.record.vitals[0];
     return {
-      bed: { id: bed.id, code: bed.code, room: bed.room, bed_no: bed.bed_no, ward_id: bed.ward_id },
-      hospital: { id: store.hospital.id, name_ar: store.hospital.name_ar, name_en: store.hospital.name_en },
-      ward,
-      department,
-      patient,
-      admission,
-      vitals,
-      notes,
-      diagnoses,
-      medications,
-      labs,
-      radiology,
-      consultations,
-      procedures,
+      ...info,
+      patient: { full_name_ar: entry.patient.full_name_ar, full_name_en: entry.patient.full_name_en, gender: entry.patient.gender },
+      attending_doctor: entry.record.admission.attending_doctor,
+      latest_vitals: v ? { recorded_at: v.recorded_at, temperature: v.temperature, pulse: v.pulse, bp_systolic: v.bp_systolic, bp_diastolic: v.bp_diastolic, spo2: v.spo2 } : null,
     };
   },
 
-  async admitPatient(input: AdmitInput): Promise<void> {
+  async admitPatient(input: AdmitInput): Promise<{ admission_id: string; family_pin: string }> {
     const u = requireUser();
     const entry = store.patients[input.patientId];
     if (!entry) throw new Error('not_found');
@@ -799,6 +777,8 @@ export const demoApi: Api = {
       attending_doctor: doc?.full_name_ar ?? null,
       admitted_at: new Date().toISOString(),
       status: 'active',
+      reason: input.reason ?? null,
+      family_pin: demoPin(),
     };
     entry.record = {
       admission,
@@ -815,6 +795,14 @@ export const demoApi: Api = {
     };
     entry.patient.status = 'active';
     pushTimeline(entry.record, actorName(u), 'admission', 'إدخال المريض إلى المستشفى', 'Patient admitted', admission.admitted_at);
+    return { admission_id: admission.id, family_pin: admission.family_pin! };
+  },
+
+  async regenerateFamilyPin(admissionId: string): Promise<{ family_pin: string }> {
+    const record = findRecord(admissionId);
+    if (record.admission.status !== 'active') throw new Error('التنويم غير نشط');
+    record.admission.family_pin = demoPin();
+    return { family_pin: record.admission.family_pin };
   },
 
   async transferPatient(input: TransferInput): Promise<void> {
@@ -838,7 +826,7 @@ export const demoApi: Api = {
     found.result = input.result;
     found.unit = input.unit ?? null;
     found.reference_range = input.referenceRange ?? null;
-    found.status = 'resulted';
+    found.status = input.abnormal ? 'abnormal' : 'resulted';
     found.resulted_by = actorName(u);
     found.resulted_at = new Date().toISOString();
     return found;
@@ -1031,6 +1019,39 @@ export const demoApi: Api = {
     };
   },
 };
+
+function demoTrack(code: string) {
+  const ward = store.wards.find((w) => w.beds.some((b) => b.code === code));
+  const bed = ward?.beds.find((b) => b.code === code);
+  if (!ward || !bed) throw new Error('السرير غير موجود');
+  const dept = store.departments.find((d) => d.id === ward.department_id);
+  const entry = Object.values(store.patients).find(
+    (e) => e.record?.admission.status === 'active' && e.record.admission.ward_id === ward.id && e.record.admission.bed_no === bed.bed_no,
+  );
+  const adm = entry?.record?.admission;
+  const info: PublicTrackInfo = {
+    hospital: { name_ar: store.hospital.name_ar, name_en: store.hospital.name_en },
+    department: dept ? { name_ar: dept.name_ar, name_en: dept.name_en } : null,
+    ward: { name_ar: ward.name_ar, name_en: ward.name_en },
+    room: bed.room,
+    bed_no: bed.bed_no,
+    occupied: Boolean(adm),
+    admission:
+      adm && entry
+        ? {
+            admitted_at: adm.admitted_at,
+            days: Math.max(0, Math.floor((Date.now() - Date.parse(adm.admitted_at)) / 86_400_000)),
+            patient_initials: entry.patient.full_name_ar
+              .split(/\s+/)
+              .slice(0, 2)
+              .map((p) => `${p[0]}.`)
+              .join(' '),
+            last_update: entry.record?.timeline[0]?.created_at ?? null,
+          }
+        : null,
+  };
+  return { info, entry };
+}
 
 function findRecordContaining(key: 'vitals' | 'notes' | 'diagnoses' | 'medications' | 'labs' | 'radiology' | 'consultations' | 'procedures' | 'attachments', id: string): AdmissionRecord {
   const entry = Object.values(store.patients).find((x) => x.record?.[key].some((r) => r.id === id));

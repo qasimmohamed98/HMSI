@@ -41,6 +41,7 @@ export interface DemoStore {
     name_ar: string;
     name_en: string;
     code: string;
+    is_active: boolean;
     created_at: string;
   };
   activity: TimelineEvent[];
@@ -209,7 +210,7 @@ export function createDemoStore(): DemoStore {
   function makeBeds(wardId: string, count: number, prefix: string) {
     const beds: Bed[] = [];
     for (let i = 1; i <= count; i++) {
-      beds.push({ id: id('bed'), ward_id: wardId, room: `${prefix}-${Math.ceil(i / 2)}`, bed_no: `B${i}`, status: 'free' });
+      beds.push({ id: id('bed'), ward_id: wardId, room: `${prefix}-${Math.ceil(i / 2)}`, bed_no: `B${i}`, status: 'free', code: `bdemo${wardId.replace(/\W/g, '')}${i}` });
     }
     return beds;
   }
@@ -489,6 +490,8 @@ export function createDemoStore(): DemoStore {
   const activity: TimelineEvent[] = [];
   Object.values(patients).forEach(({ record }) => {
     if (record) activity.push(...record.timeline);
+    // رمز عائلة ثابت في وضع العرض التوضيحي
+    if (record && record.admission.status === 'active') record.admission.family_pin = '123456';
   });
   activity.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 
@@ -497,7 +500,7 @@ export function createDemoStore(): DemoStore {
     patients,
     departments: DEMO_DEPARTMENTS.map((d) => ({ ...d, hospital_id: 'h-1' })),
     wards,
-    hospital: { id: 'h-1', name_ar: 'مستشفى المدينة الجامعي', name_en: 'City University Hospital', code: 'H-1', created_at: daysAgo(400) },
+    hospital: { id: 'h-1', name_ar: 'مستشفى المدينة الجامعي', name_en: 'City University Hospital', code: 'H-1', is_active: true, created_at: daysAgo(400) },
     activity,
     currentUser: null,
     sideEffects: 0,

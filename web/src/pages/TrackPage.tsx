@@ -1,257 +1,204 @@
-import { useState, useEffect } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@/components/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { BedDouble, Building2, CalendarClock, HeartPulse, Languages, Lock, RefreshCw, ShieldCheck, Stethoscope, UserRound } from 'lucide-react';
+import type { PublicTrackFamily } from '@hmsi/shared';
+import { Card, CardContent, Badge, Button, Input, Skeleton } from '@/components/ui';
+import { Logo } from '@/components/layout/Logo';
 import { API } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { fmtDate, fmtDateTime } from '@/lib/format';
+import { currentLang, setLanguage } from '@/i18n';
 
+/**
+ * صفحة عامة لذوي المريض — تُفتح بمسح QR السرير (/track/:code).
+ * بدون رمز العائلة: الموقع وحالة التنويم والأحرف الأولى فقط.
+ * مع الرمز: الاسم الكامل والطبيب المعالج وآخر علامات حيوية.
+ */
 export default function TrackPage() {
   const { t } = useTranslation();
-  const { code } = useParams<{ code: string }>();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const { code = '' } = useParams<{ code: string }>();
+  const lang = currentLang();
+  const name = (o: { name_ar: string; name_en: string } | null | undefined) => (o ? (lang === 'ar' ? o.name_ar : o.name_en || o.name_ar) : '—');
 
-  const { data, isLoading, error } = useQuery({
+  const info = useQuery({
     queryKey: ['publicTrack', code],
     queryFn: () => API.publicTrack(code),
-    enabled: !!code,
+    enabled: Boolean(code),
+    retry: false,
+    refetchInterval: 60_000,
   });
 
-  if (!code) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
-          <CardContent>
-            <CardTitle>{t('tracks.selectCode')}</CardTitle>
-            <p className="mt-2 text-ink/60">{t('tracks.scanQR')}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const [pin, setPin] = useState('');
+  const [family, setFamily] = useState<PublicTrackFamily | null>(null);
+  const familyMut = useMutation({
+    mutationFn: (p: string) => API.familyTrack(code, p),
+    onSuccess: (d) => setFamily(d),
+    onError: () => setFamily(null),
+  });
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
-          <CardContent>
-            <CardTitle>{t('tracks.loading')}</CardTitle>
-            <p className="mt-2 text-ink/60">جاري تحميل بيانات السرير...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (/^\d{6}$/.test(pin)) familyMut.mutate(pin);
+  };
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
-          <CardContent>
-            <CardTitle>{t('tracks.notFound')}</CardTitle>
-            <p className="mt-2 text-danger-500">{error.message || t('tracks.codeInvalid')}</p>
-            <Button onClick={() => navigate(-1)}>{t('common.back')}</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
-          <CardContent>
-            <CardTitle>{t('tracks.notFound')}</CardTitle>
-            <p className="mt-2 text-ink/60">{t('tracks.noDataForCode')}</p>
-            <p className="mt-3 text-sm text-ink/60">{t('tracks.scanDifferentCode')}</p>
-            <Button onClick={() => navigate(-1)} className="mt-3">{t('common.back')}</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const {
-    bed,
-    hospital,
-    ward,
-    department,
-    patient,
-    admission,
-    vitals,
-    notes,
-    diagnoses,
-    medications,
-    labs,
-    radiology,
-    consultations,
-    procedures,
-  } = data;
+  const data = family ?? info.data;
 
   return (
-    <div className="min-h-screen py-8">
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader className="flex flex-col sm:flex-row justify-between items-start">
-          <CardTitle>{t('tracks.title', { code })}</CardTitle>
-          <CardContent />
-        </CardHeader>
-        <CardContent>
-          {patient && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div>
-                <p className="text-sm text-ink/60">{t('tracks.patient')}</p>
-                <p className="font-bold text-2xl">{patient.full_name_ar}</p>
-                {patient.full_name_en && <p className="text-ink/60 small">{patient.full_name_en}</p>}
-                <p className="text-ink/60 small">
-                  {t('tracks.fileNumber')}: {patient.file_number}
-                </p>
-                <p className="text-ink/60 small">
-                  {t('tracks.admittedAt')}: {admission?.admitted_at ? new Date(admission.admitted_at).toLocaleDateString() : '-'}
-                </p>
-              </div>
-              {ward && (
-                <div>
-                  <p className="text-sm text-ink/60">{t('tracks.ward')}</p>
-                  <p className="font-bold">{ward.name_ar}</p>
-                  {ward.name_en && <p className="text-ink/60 small">{ward.name_en}</p>}
+    <div className="min-h-dvh bg-surface px-4 py-6 sm:py-10">
+      <div className="mx-auto flex max-w-xl flex-col gap-4">
+        <header className="flex items-center justify-between">
+          <Logo compact />
+          <Button variant="ghost" size="sm" onClick={() => setLanguage(lang === 'ar' ? 'en' : 'ar')}>
+            <Languages className="h-4 w-4" />
+            <span className="font-bold">{lang === 'ar' ? 'EN' : 'ع'}</span>
+          </Button>
+        </header>
+
+        <div>
+          <h1 className="text-2xl font-extrabold text-ink">{t('track.title')}</h1>
+          <p className="text-sm text-ink/55">{t('track.subtitle')}</p>
+        </div>
+
+        {info.isLoading ? (
+          <Card>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-6 w-1/2" />
+              <Skeleton className="h-20 w-full" />
+            </CardContent>
+          </Card>
+        ) : info.error || !data ? (
+          <Card>
+            <CardContent className="py-10 text-center">
+              <BedDouble className="mx-auto h-10 w-10 text-ink/30" />
+              <p className="mt-3 font-bold text-ink">{t('track.notFound')}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="flex items-center gap-2 font-bold text-ink">
+                    <Building2 className="h-5 w-5 text-brand-600" />
+                    {name(data.hospital)}
+                  </p>
+                  <Badge variant={data.occupied ? 'success' : 'neutral'} dot>
+                    {data.occupied ? t('track.occupied') : t('track.bedFree')}
+                  </Badge>
                 </div>
-              }}
-              {department && (
-                <div>
-                  <p className="text-sm text-ink/60">{t('tracks.department')}</p>
-                  <p className="font-bold">{department.name_ar}</p>
-                  {department.name_en && <p className="text-ink/60 small">{department.name_en}</p>}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Field label={t('track.department')} value={name(data.department)} />
+                  <Field label={t('track.ward')} value={name(data.ward)} />
+                  <Field label={t('track.room')} value={data.room} mono />
+                  <Field label={t('track.bed')} value={data.bed_no} mono />
                 </div>
-              )}
-            </div>
-          )}
 
-          {admission && (
-            <div className="mb-4">
-              <p className="text-sm text-ink/60">{t('tracks.admissionStatus')}</p>
-              <Badge variant={admission.status === 'active' ? 'brand' : 'outline'}>
-                {t(`admission.${admission.status}`)}
-              </Badge>
-            </div>
-          )}
-
-          {vitals.length > 0 && (
-            <div>
-              <p className="text-sm text-ink/60">{t('tracks.vitals')}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {vitals.map((v, i) => (
-                  <div key={i} className="p-2 rounded bg-surface-muted dark:bg-white/10">
-                    <p className="text-ink/60 small">{v.recorded_at ? new Date(v.recorded_at).toLocaleString() : '-'}</p>
-                    <p className="font-bold">{t('tracks.temperature')}: {v.temperature ?? '-''} °C</p>
-                    <p className="font-bold">{t('tracks.pulse')}: {v.pulse ?? '-'}</p>
-                    <p className="font-bold">{t('tracks.spo2')}: {v.spo2 ?? '-'}%</p>
+                {data.admission && (
+                  <div className="grid grid-cols-2 gap-3 rounded-xl bg-surface-muted/70 p-3 sm:grid-cols-3 dark:bg-white/5">
+                    <Field
+                      icon={<UserRound className="h-3.5 w-3.5" />}
+                      label={t('track.patient')}
+                      value={family ? (lang === 'ar' ? family.patient.full_name_ar : family.patient.full_name_en || family.patient.full_name_ar) : data.admission.patient_initials}
+                    />
+                    <Field icon={<CalendarClock className="h-3.5 w-3.5" />} label={t('track.admittedAt')} value={fmtDate(data.admission.admitted_at, { day: 'numeric', month: 'short', year: 'numeric' })} />
+                    <Field label={t('track.days')} value={t('track.daysValue', { count: data.admission.days })} />
+                    {data.admission.last_update && <Field label={t('track.lastUpdate')} value={fmtDateTime(data.admission.last_update)} />}
+                    {family && <Field icon={<Stethoscope className="h-3.5 w-3.5" />} label={t('track.doctor')} value={family.attending_doctor ?? '—'} />}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                )}
+              </CardContent>
+            </Card>
 
-          {notes.length > 0 && (
-            <div>
-              <p className="text-sm text-ink/60">{t('tracks.notes')}</p>
-              <div className="space-y-2">
-                {notes.slice(0, 5).map((n) => (
-                  <div key={n.id} className="p-2 rounded bg-surface-muted dark:bg-white/10 small">
-                    <p className="font-bold">{n.author}:</p>
-                    <p className="text-ink/60">{n.content}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            {data.occupied && !family && (
+              <Card>
+                <CardContent>
+                  <form onSubmit={submit} className="space-y-3">
+                    <p className="flex items-center gap-2 font-bold text-ink">
+                      <Lock className="h-4 w-4 text-brand-600" />
+                      {t('track.familyTitle')}
+                    </p>
+                    <p className="text-sm text-ink/60">{t('track.familyHint')}</p>
+                    <div className="flex items-end gap-2">
+                      <Input
+                        label={t('track.pinLabel')}
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        dir="ltr"
+                        containerClassName="flex-1"
+                        className="text-center text-lg tracking-[0.4em] tabular"
+                        error={familyMut.error ? (familyMut.error as Error).message : undefined}
+                      />
+                      <Button type="submit" loading={familyMut.isPending} disabled={pin.length !== 6}>
+                        {t('track.show')}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
 
-          {diagnoses.length > 0 && (
-            <div>
-              <p className="text-sm text-ink/60">{t('tracks.diagnoses')}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {diagnoses.map((d) => (
-                  <div key={d.icd10} className="p-2 rounded bg-surface-muted dark:bg-white/10 small">
-                    <p className="font-bold">{d.title_ar}</p>
-                    <p className="text-ink/60 small">{d.status}</p>
+            {family && (
+              <Card>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="flex items-center gap-2 font-bold text-ink">
+                      <HeartPulse className="h-5 w-5 text-danger-500" />
+                      {t('track.latestVitals')}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => familyMut.mutate(pin)} loading={familyMut.isPending} icon={<RefreshCw className="h-3.5 w-3.5" />}>
+                        {t('track.refresh')}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setFamily(null); setPin(''); }}>
+                        {t('track.hide')}
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  {family.latest_vitals ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <Field label={t('track.temperature')} value={family.latest_vitals.temperature != null ? `${family.latest_vitals.temperature} °C` : '—'} mono />
+                        <Field label={t('track.pulse')} value={family.latest_vitals.pulse != null ? `${family.latest_vitals.pulse}` : '—'} mono />
+                        <Field
+                          label={t('track.bp')}
+                          value={family.latest_vitals.bp_systolic != null ? `${family.latest_vitals.bp_systolic}/${family.latest_vitals.bp_diastolic ?? '—'}` : '—'}
+                          mono
+                        />
+                        <Field label={t('track.spo2')} value={family.latest_vitals.spo2 != null ? `${family.latest_vitals.spo2}%` : '—'} mono />
+                      </div>
+                      <p className="text-xs text-ink/45">{fmtDateTime(family.latest_vitals.recorded_at)}</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-ink/55">{t('track.noVitals')}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
 
-          {medications.length > 0 && (
-            <div>
-              <p className="text-sm text-ink/60">{t('tracks.medications')}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {medications.map((m) => (
-                  <div key={m.id} className="p-2 rounded bg-surface-muted dark:bg-white/10 small">
-                    <p className="font-bold">{m.name_ar}</p>
-                    <p className="text-ink/60 small">{m.frequency}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-ink/50">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+          {t('track.privacy')}
+        </p>
+      </div>
+    </div>
+  );
+}
 
-          {labResults.length > 0 && (
-            <div>
-              <p className="text-sm text-ink/60">{t('tracks.labs')}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {labResults.map((l) => (
-                  <div key={l.id} className="p-2 rounded bg-surface-muted dark:bg-white/10 small">
-                    <p className="font-bold">{l.test_name_ar}</p>
-                    <p className="text-ink/60 small">{l.result || '-'}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {radiology.length > 0 && (
-            <div>
-              <p className="text-sm text-ink/60">{t('tracks.radiology')}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {radiology.map((r) => (
-                  <div key={r.id} className="p-2 rounded bg-surface-muted dark:bg-white/10 small">
-                    <p className="font-bold">{r.study_type_ar}</p>
-                    <p className="text-ink/60 small">{r.status}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {consultations.length > 0 && (
-            <div>
-              <p className="text-sm text-ink/60">{t('tracks.consultations')}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {consultations.map((c) => (
-                  <div key={c.id} className="p-2 rounded bg-surface-muted dark:bg-white/10 small">
-                    <p className="font-bold">{c.specialty}</p>
-                    <p className="text-ink/60 small">{c.response || '-'}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {procedures.length > 0 && (
-            <div>
-              <p className="text-sm text-ink/60">{t('tracks.procedures')}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {procedures.map((p) => (
-                  <div key={p.id} className="p-2 rounded bg-surface-muted dark:bg-white/10 small">
-                    <p className="font-bold">{p.name_ar}</p>
-                    <p className="text-ink/60 small">{p.performed_at || '-'}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+function Field({ label, value, mono, icon }: { label: string; value: string; mono?: boolean; icon?: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="flex items-center gap-1 text-[0.7rem] font-bold text-ink/45">
+        {icon}
+        {label}
+      </p>
+      <p className={`truncate text-sm font-bold text-ink ${mono ? 'tabular' : ''}`} dir={mono ? 'ltr' : undefined}>
+        {value}
+      </p>
     </div>
   );
 }

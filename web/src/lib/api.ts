@@ -1,7 +1,6 @@
 import type {
   User,
   Patient,
-  AdmissionSummary,
   Vitals,
   MedicalNote,
   Diagnosis,
@@ -11,31 +10,24 @@ import type {
   Consultation,
   Procedure,
   Attachment,
-  TimelineEvent,
   DashboardStats,
   Ward,
   PublicUser,
   Hospital,
+  HospitalListItem,
+  HospitalAdminInfo,
   Department,
   UnassignedPatient,
+  Bed,
+  ChartData,
+  ReportOverview,
+  PublicTrackInfo,
+  PublicTrackFamily,
 } from '@hmsi/shared';
 import { demoApi } from './api-demo';
 import { liveApi } from './api-live';
 
-export interface ChartData {
-  patient: Patient & { admission: AdmissionSummary | null };
-  admissionId: string | null;
-  vitals: Vitals[];
-  notes: MedicalNote[];
-  diagnoses: Diagnosis[];
-  medications: Medication[];
-  labs: LabResult[];
-  radiology: RadiologyReport[];
-  consultations: Consultation[];
-  procedures: Procedure[];
-  attachments: Attachment[];
-  timeline: TimelineEvent[];
-}
+export type { ChartData, ReportOverview };
 
 export interface PatientListParams {
   search?: string;
@@ -83,8 +75,9 @@ export interface LabInput {
   admissionId: string;
   testNameAr: string;
   testNameEn?: string | null;
-  category?: string;
-  result: string;
+  category?: string | null;
+  /** اختياري: بدون نتيجة = طلب فحص */
+  result?: string | null;
   unit?: string | null;
   referenceRange?: string | null;
 }
@@ -93,7 +86,8 @@ export interface RadiologyInput {
   admissionId: string;
   studyTypeAr: string;
   studyTypeEn?: string | null;
-  report: string;
+  /** اختياري: بدون تقرير = طلب أشعة */
+  report?: string | null;
 }
 
 export interface ConsultationInput {
@@ -132,6 +126,7 @@ export interface LabResultInput {
   result: string;
   unit?: string | null;
   referenceRange?: string | null;
+  abnormal?: boolean;
 }
 
 export interface RadiologyUpdateInput {
@@ -239,18 +234,18 @@ export interface UpdateUserInput {
   isActive?: boolean;
 }
 
-export interface ReportOverview {
-  from: string;
-  to: string;
-  totalAdmissions: number;
-  totalDischarges: number;
-  activeAdmissions: number;
-  criticalAlerts: number;
-  pendingLabs: number;
-  admissionsTrend: { label: string; count: number }[];
-  dischargesTrend: { label: string; count: number }[];
-  occupancy: { ward_name_ar: string; ward_name_en: string; used: number; total: number }[];
-  recentActivity: { id: string; admission_id: string; actor: string; type: string; title_ar: string; created_at: string }[];
+export interface CreateHospitalInput {
+  nameAr: string;
+  nameEn: string;
+  code?: string;
+}
+
+export interface HospitalAdminInput {
+  username: string;
+  password: string;
+  fullNameAr: string;
+  fullNameEn?: string;
+  email?: string | null;
 }
 
 export interface Api {
@@ -263,9 +258,10 @@ export interface Api {
   createPatient(input: NewPatientInput): Promise<Patient>;
   updatePatient(id: string, input: PatientUpdateInput): Promise<Patient>;
   deletePatient(id: string): Promise<void>;
-  admitPatient(input: AdmitInput): Promise<void>;
+  admitPatient(input: AdmitInput): Promise<{ admission_id: string; family_pin: string }>;
+  regenerateFamilyPin(admissionId: string): Promise<{ family_pin: string }>;
   transferPatient(input: TransferInput): Promise<void>;
-  getChart(patientId: string): Promise<ChartData>;
+  getChart(patientId: string, admissionId?: string): Promise<ChartData>;
   addVitals(input: NewVitalsInput): Promise<Vitals>;
   updateVitals(vitalsId: string, input: VitalsUpdateInput): Promise<Vitals>;
   deleteVitals(vitalsId: string): Promise<void>;
@@ -299,8 +295,8 @@ export interface Api {
   createWard(input: WardInput): Promise<Ward>;
   updateWard(id: string, input: Partial<Omit<WardInput, 'departmentId'>>): Promise<Ward>;
   deleteWard(id: string): Promise<void>;
-  createBed(input: BedInput): Promise<{ id: string; ward_id: string; room: string; bed_no: string; status: 'free' | 'occupied' }>;
-  updateBed(id: string, input: { room?: string; bedNo?: string }): Promise<{ id: string; ward_id: string; room: string; bed_no: string; status: 'free' | 'occupied' }>;
+  createBed(input: BedInput): Promise<Bed>;
+  updateBed(id: string, input: { room?: string; bedNo?: string }): Promise<Bed>;
   deleteBed(id: string): Promise<void>;
   listUnassigned(): Promise<UnassignedPatient[]>;
   assignBed(bedId: string, admissionId: string): Promise<void>;
@@ -309,6 +305,8 @@ export interface Api {
   hospitalProfile(): Promise<Hospital>;
   updateHospital(input: HospitalProfileInput): Promise<Hospital>;
   listUsers(): Promise<User[]>;
+  changePassword(currentPassword: string, newPassword: string): Promise<void>;
+  resetUserPassword(userId: string, password: string): Promise<void>;
   createUser(input: NewUserInput): Promise<User>;
   updateUser(id: string, input: UpdateUserInput): Promise<User>;
   listDoctors(): Promise<PublicUser[]>;
@@ -316,10 +314,15 @@ export interface Api {
   deleteAttachment(admissionId: string, attachmentId: string): Promise<void>;
   attachmentUrl(admissionId: string, attachmentId: string): string;
   reportsOverview(from: string, to: string): Promise<ReportOverview>;
-  listHospitals(): Promise<Hospital[]>;
-  createHospital(input: { nameAr: string; nameEn?: string; code?: string }): Promise<Hospital>;
-  addHospitalAdmin(input: { username: string; password: string; fullNameAr: string; fullNameEn?: string; email?: string }): Promise<{ id: string; username: string; fullNameAr: string }>;
-  publicTrack(code: string): Promise<{ bed: { id: string; code: string; room: string; bed_no: string; ward_id: string }; hospital: { id: string; name_ar: string; name_en: string }; ward: { id: string; name_ar: string; name_en: string } | null; department: { id: string; name_ar: string; name_en: string } | null; patient: { id: string; file_number: string; full_name_ar: string; full_name_en: string; gender: string; birth_date: string; blood_type: string; allergies: string[]; critical_alerts: string[] } | null; admission: { id: string; status: string; admitted_at: string; discharged_at: string | null; reason: string | null; attending_doctor: string | null } | null; vitals: any[]; notes: any[]; diagnoses: any[]; medications: any[]; labs: any[]; radiology: any[]; consultations: any[]; procedures: any[] } | null>;
+  // المدير العام
+  listHospitals(): Promise<HospitalListItem[]>;
+  createHospital(input: CreateHospitalInput): Promise<Hospital>;
+  updateHospitalById(id: string, input: { nameAr?: string; nameEn?: string; isActive?: boolean }): Promise<Hospital>;
+  addHospitalAdmin(hospitalId: string, input: HospitalAdminInput): Promise<HospitalAdminInfo>;
+  switchHospital(hospitalId: string): Promise<Hospital>;
+  // صفحة ذوي المريض (عامة)
+  publicTrack(code: string): Promise<PublicTrackInfo>;
+  familyTrack(code: string, pin: string): Promise<PublicTrackFamily>;
 }
 
 export interface NewPatientInput {
@@ -332,28 +335,6 @@ export interface NewPatientInput {
   bloodType: string;
   allergies: string[];
   criticalAlerts: string[];
-}
-
-export interface Api {
-  mode: 'demo' | 'live';
-  login(username: string, password: string): Promise<User>;
-  logout(): Promise<void>;
-  me(): Promise<User | null>;
-  dashboard(): Promise<DashboardStats>;
-  listPatients(params?: PatientListParams): Promise<Patient[]>;
-  createPatient(input: NewPatientInput): Promise<Patient>;
-  getChart(patientId: string): Promise<ChartData>;
-  addVitals(input: NewVitalsInput): Promise<Vitals>;
-  addNote(input: NoteInput): Promise<MedicalNote>;
-  addDiagnosis(input: DiagnosisInput): Promise<Diagnosis>;
-  addMedication(input: MedicationInput): Promise<Medication>;
-  addLabResult(input: LabInput): Promise<LabResult>;
-  addRadiology(input: RadiologyInput): Promise<RadiologyReport>;
-  addConsultation(input: ConsultationInput): Promise<Consultation>;
-  addProcedure(input: ProcedureInput): Promise<Procedure>;
-  discharge(input: DischargeInput): Promise<void>;
-  wards(): Promise<Ward[]>;
-  listUsers(): Promise<User[]>;
 }
 
 export const API: Api = import.meta.env.VITE_API_MODE === 'live' ? liveApi : demoApi;

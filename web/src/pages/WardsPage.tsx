@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Building2, BedDouble, Plus, Pencil, Trash2, Copy, Users, Stethoscope } from 'lucide-react';
-import QRCode from 'qrcode.react';
+import { Building2, BedDouble, Plus, Pencil, Trash2, Copy, Users, Stethoscope, Printer } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent, CardHeader, CardTitle, Skeleton, EmptyState, Badge, Button, Dialog, Input, Select, ConfirmDialog } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API, type WardInput, type BedInput } from '@/lib/api';
@@ -12,7 +12,6 @@ import { useAuth } from '@/lib/auth';
 import { ROLE_PERMISSIONS } from '@hmsi/shared';
 import type { Ward, Bed, Department } from '@hmsi/shared';
 import { cn } from '@/lib/utils';
-import { useEffect, useRef } from 'react';
 
 export default function WardsPage() {
   const { t } = useTranslation();
@@ -414,25 +413,59 @@ function BedDialog({
           </div>
         )}
 
-        {bed.code && (
-          <div className="mt-4 p-4 rounded-xl bg-surface-muted dark:bg-white/10">
-            <p className="text-sm font-medium text-ink/60">{t('beds.barcodeLabel')}</p>
-            <div className="flex items-center gap-3">
-              <span className="flex-1 font-mono text-sm text-ink">{bed.code}</span>
-              <Button size="icon-sm" variant="ghost" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/track/${bed.code}`)}>
-                <Copy className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            <QRCode
-              value={bed.code}
-              size={180}
-              bgColor="white"
-              fgColor="black"
-              correctLevel="M"
-            />
-          </div>
-        )}
+        {bed.code && <BedQrCard code={bed.code} title={`${ward.name_ar} — ${bed.room} / ${bed.bed_no}`} />}
       </div>
     </Dialog>
+  );
+}
+function escapeHtml(v: string): string {
+  return v.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+}
+
+/** رمز QR السرير: يفتح صفحة متابعة ذوي المريض /track/:code */
+function BedQrCard({ code, title }: { code: string; title: string }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const qrRef = useRef<HTMLDivElement>(null);
+  const url = `${window.location.origin}/track/${code}`;
+
+  const copy = () => {
+    void navigator.clipboard?.writeText(url).then(() => toast.success(t('familyPin.copied')));
+  };
+
+  const print = () => {
+    const svg = qrRef.current?.innerHTML ?? '';
+    const w = window.open('', '_blank', 'width=480,height=640');
+    if (!w) return;
+    w.document.write(
+      `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head>` +
+        `<body style="font-family:sans-serif;text-align:center;padding:24px">` +
+        `<h2 style="margin:0 0 16px">${escapeHtml(title)}</h2>${svg}` +
+        `<p style="margin-top:16px;font-size:14px">${escapeHtml(t('familyPin.qrHint'))}</p></body></html>`,
+    );
+    w.document.close();
+    w.focus();
+    w.print();
+  };
+
+  return (
+    <div className="mt-4 space-y-3 rounded-xl bg-surface-muted p-4 dark:bg-white/10">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-bold text-ink">{t('beds.barcodeLabel')}</p>
+        <div className="flex gap-1">
+          <Button size="sm" variant="ghost" icon={<Copy className="h-3.5 w-3.5" />} onClick={copy}>
+            {t('familyPin.copyLink')}
+          </Button>
+          <Button size="sm" variant="ghost" icon={<Printer className="h-3.5 w-3.5" />} onClick={print}>
+            {t('familyPin.print')}
+          </Button>
+        </div>
+      </div>
+      <div ref={qrRef} className="flex justify-center rounded-lg bg-white p-3">
+        <QRCodeSVG value={url} size={180} level="M" marginSize={1} />
+      </div>
+      <p className="text-center text-xs text-ink/50">{t('familyPin.qrHint')}</p>
+      <p className="truncate text-center font-mono text-[0.7rem] text-ink/40" dir="ltr">{url}</p>
+    </div>
   );
 }

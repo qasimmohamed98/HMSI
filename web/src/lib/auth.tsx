@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { User } from '@hmsi/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { API } from './api';
 
 type AuthStatus = 'loading' | 'authed' | 'guest';
@@ -9,6 +10,8 @@ interface AuthCtx {
   user: User | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** إعادة تحميل بيانات المستخدم (مثلاً بعد تبديل المستشفى) */
+  refresh: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -16,6 +19,7 @@ const Ctx = createContext<AuthCtx | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<User | null>(null);
+  const qc = useQueryClient();
 
   useEffect(() => {
     let alive = true;
@@ -30,16 +34,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => alive && setStatus('guest'));
+    // انتهاء الجلسة أثناء الاستخدام (401 من أي طلب)
+    const onUnauthorized = () => {
+      qc.clear();
+      setUser(null);
+      setStatus('guest');
+    };
+    window.addEventListener('hmsi:unauthorized', onUnauthorized);
     return () => {
       alive = false;
+      window.removeEventListener('hmsi:unauthorized', onUnauthorized);
     };
+  }, [qc]);
+
+  const refresh = useCallback(async () => {
+    const u = await API.me();
+    setUser(u);
+    setStatus(u ? 'authed' : 'guest');
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
     const u = await API.login(username, password);
+    qc.clear(); // لا تبقى بيانات مستخدم سابق في الذاكرة
     setUser(u);
     setStatus('authed');
-  }, []);
+  }, [qc]);
 
   const logout = useCallback(async () => {
     try {
@@ -47,11 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* best effort */
     }
+    qc.clear();
     setUser(null);
     setStatus('guest');
-  }, []);
+  }, [qc]);
 
-  const value = useMemo(() => ({ status, user, login, logout }), [status, user, login, logout]);
+  const value = useMemo(() => ({ status, user, login, logout, refresh }), [status, user, login, logout, refresh]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

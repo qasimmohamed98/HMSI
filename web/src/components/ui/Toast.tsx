@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +19,12 @@ const Ctx = createContext<ToastCtx | null>(null);
 
 let counter = 0;
 
+/** جسر لعرض الأخطاء من خارج React (مثل MutationCache في main.tsx) */
+let externalPush: ((kind: ToastKind, message: string) => void) | null = null;
+export function notifyError(message: string): void {
+  externalPush?.('error', message);
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
@@ -29,6 +35,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setItems((prev) => [...prev.slice(-3), { id, kind, message }]);
     setTimeout(() => setItems((prev) => prev.filter((t) => t.id !== id)), 4200);
   }, []);
+
+  useEffect(() => {
+    externalPush = push;
+    return () => {
+      if (externalPush === push) externalPush = null;
+    };
+  }, [push]);
 
   const value = useMemo<ToastCtx>(
     () => ({

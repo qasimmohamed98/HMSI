@@ -26,7 +26,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const tok = csrfToken();
     if (tok) headers['X-CSRF-Token'] = tok;
   }
-  const res = await fetch(`${BASE}${path}`, { ...init, headers, credentials: 'include' });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { ...init, headers, credentials: 'include' });
+  } catch {
+    throw new HttpError(0, 'تعذّر الاتصال بالخادم — تحقق من الشبكة');
+  }
+  if (res.status === 401 && !path.startsWith('/auth/') && !path.startsWith('/public/')) {
+    // انتهت الجلسة: أبلغ AuthProvider لإعادة التوجيه لصفحة الدخول
+    window.dispatchEvent(new Event('hmsi:unauthorized'));
+  }
   if (!res.ok) {
     let message = 'حدث خطأ';
     try {
@@ -112,6 +121,7 @@ export const liveApi: Api = {
     }),
   transferPatient: (input) =>
     request(`/admissions/${input.admissionId}/transfer`, { method: 'POST', body: JSON.stringify({ bed_id: input.bedId }) }),
+  regenerateFamilyPin: (admissionId) => request(`/admissions/${admissionId}/family-pin`, { method: 'POST' }),
   wards: () => request('/wards'),
   listDepartments: () => request('/org/departments'),
   createDepartment: (input) =>
@@ -135,7 +145,11 @@ export const liveApi: Api = {
   updateHospital: (input) =>
     request('/hospitals/me', { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn }) }),
   listUsers: () => request('/users'),
-  getChart: (patientId) => request(`/patients/${patientId}/chart`),
+  changePassword: (currentPassword, newPassword) =>
+    request('/auth/password', { method: 'POST', body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }),
+  resetUserPassword: (userId, password) => request(`/users/${userId}/password`, { method: 'POST', body: JSON.stringify({ password }) }),
+  getChart: (patientId, admissionId) =>
+    request(`/patients/${patientId}/chart${admissionId ? `?admission=${encodeURIComponent(admissionId)}` : ''}`),
   addVitals: (input) => request('/vitals', { method: 'POST', body: JSON.stringify(mapNewVitals(input)) }),
   updateVitals: (vitalsId, input) =>
     request(`/vitals/${vitalsId}`, {
@@ -199,8 +213,8 @@ export const liveApi: Api = {
         admission_id: input.admissionId,
         test_name_ar: input.testNameAr,
         test_name_en: input.testNameEn ?? null,
-        category: input.category ?? null,
-        result: input.result ?? '',
+        category: input.category || null,
+        result: input.result || null,
         unit: input.unit ?? null,
         reference_range: input.referenceRange ?? null,
       }),
@@ -212,7 +226,7 @@ export const liveApi: Api = {
         admission_id: input.admissionId,
         study_type_ar: input.studyTypeAr,
         study_type_en: input.studyTypeEn ?? null,
-        report: input.report ?? '',
+        report: input.report || null,
       }),
     }),
   addConsultation: (input) =>
@@ -262,29 +276,36 @@ export const liveApi: Api = {
     const qs = new URLSearchParams({ from, to });
     return request(`/reports/overview?${qs}`);
   },
-  listHospitals: () => request('/api/hospitals'),
+  listHospitals: () => request('/hospitals'),
   createHospital: (input) =>
-    request('/api/hospitals', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn, code: input.code }) }),
-  addHospitalAdmin: (input) =>
-    request('/api/hospitals/:id/admins', { method: 'POST', body: JSON.stringify({ username: input.username, password: input.password, full_name_ar: input.fullNameAr, full_name_en: input.fullNameEn, email: input.email }) },
-    ),
-  publicTrack: (code) => request(`/api/public/beds/${code}/chart`),
+    request('/hospitals', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn, code: input.code || undefined }) }),
+  updateHospitalById: (id, input) =>
+    request(`/hospitals/${id}`, { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn, is_active: input.isActive }) }),
+  addHospitalAdmin: (hospitalId, input) =>
+    request(`/hospitals/${hospitalId}/admins`, {
+      method: 'POST',
+      body: JSON.stringify({ username: input.username, password: input.password, full_name_ar: input.fullNameAr, full_name_en: input.fullNameEn || undefined, email: input.email || null }),
+    }),
+  switchHospital: (hospitalId) => request(`/hospitals/${hospitalId}/switch`, { method: 'POST' }),
+  publicTrack: (code) => request(`/public/track/${encodeURIComponent(code)}`),
+  familyTrack: (code, pin) => request(`/public/track/${encodeURIComponent(code)}/family`, { method: 'POST', body: JSON.stringify({ pin }) }),
 
   updateLabResult: (admissionId, labId, input) =>
     request(`/patients/${admissionId}/labs/${labId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ result: input.result, unit: input.unit ?? null, reference_range: input.referenceRange ?? null }),
+      body: JSON.stringify({ result: input.result, unit: input.unit ?? null, reference_range: input.referenceRange ?? null, abnormal: input.abnormal }),
     }),
   updateRadiology: (admissionId, radiologyId, input) =>
     request(`/patients/${admissionId}/radiology/${radiologyId}`, { method: 'PATCH', body: JSON.stringify({ report: input.report }) }),
   updateMedication: (admissionId, medicationId, input) =>
     request(`/patients/${admissionId}/medications/${medicationId}`, {
       method: 'PATCH',
+      // الحقول غير المعرّفة لا تُرسل (لا تُمسح)؛ null صريح = مسح القيمة
       body: JSON.stringify({
         status: input.status,
-        end_at: input.endAt ?? null,
+        end_at: input.endAt,
         name_ar: input.nameAr,
-        name_en: input.nameEn ?? null,
+        name_en: input.nameEn,
         dose: input.dose,
         route: input.route,
         frequency: input.frequency,
@@ -301,7 +322,7 @@ export const liveApi: Api = {
   updateProcedure: (admissionId, procedureId, input) =>
     request(`/patients/${admissionId}/procedures/${procedureId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, notes: input.notes ?? null }),
+      body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn, notes: input.notes }),
     }),
   deleteNote: (admissionId, noteId) => request(`/patients/${admissionId}/notes/${noteId}`, { method: 'DELETE' }),
   deleteDiagnosis: (admissionId, diagnosisId) => request(`/patients/${admissionId}/diagnoses/${diagnosisId}`, { method: 'DELETE' }),

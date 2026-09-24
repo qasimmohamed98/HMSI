@@ -8,15 +8,15 @@ import { API, type LabInput, type ChartData, type LabResultInput } from '@/lib/a
 import { fmtDateTime } from '@/lib/format';
 import { useToast } from '@/components/ui';
 
-export function LaboratorySection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
+/** canOrder: طلب فحص (الطبيب) — canResult: إدخال النتائج (فني المختبر) */
+export function LaboratorySection({ chart, canOrder, canResult }: { chart: ChartData; canOrder: boolean; canResult: boolean }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [editLab, setEditLab] = useState<(typeof chart.labs)[number] | null>(null);
 
-  const invalidate = () => void qc.invalidateQueries({ queryKey: ['chart', chart.patient.id] });
-  void invalidate;
+  const canAdd = (canOrder || canResult) && chart.patient.admission?.status === 'active';
 
   const mut = useMutation({
     mutationFn: API.addLabResult,
@@ -51,9 +51,9 @@ export function LaboratorySection({ chart, canWrite }: { chart: ChartData; canWr
     <SectionCard
       title={t('laboratory.title')}
       action={
-        canWrite && chart.admissionId ? (
+        canAdd && chart.admissionId ? (
           <Button size="sm" variant="secondary" onClick={() => setOpen(true)} icon={<Plus className="h-4 w-4" />}>
-            {t('laboratory.addResult')}
+            {canResult ? t('laboratory.addResult') : t('orders.labOrder')}
           </Button>
         ) : undefined
       }
@@ -79,21 +79,23 @@ export function LaboratorySection({ chart, canWrite }: { chart: ChartData; canWr
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={badge(l.status)}>{t(`laboratory.statuses.${l.status}`)}</Badge>
-                  {canWrite && chart.admissionId && (
+                  {chart.admissionId && (
                     <>
-                      {(l.status === 'ordered' || l.status === 'in_progress') && (
+                      {canResult && (l.status === 'ordered' || l.status === 'in_progress') && (
                         <Button size="sm" variant="outline" icon={<PenLine className="h-3.5 w-3.5" />} onClick={() => setEditLab(l)}>
                           {t('actions.enterResult')}
                         </Button>
                       )}
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                        onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: l.id })}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {(canResult || (canOrder && l.status === 'ordered')) && (
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
+                          onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: l.id })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>
@@ -119,7 +121,7 @@ export function LaboratorySection({ chart, canWrite }: { chart: ChartData; canWr
         </div>
       )}
 
-      <AddLabDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
+      <AddLabDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} withResult={canResult} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
       {editLab && chart.admissionId && (
         <UpdateLabDialog
           open
@@ -133,9 +135,10 @@ export function LaboratorySection({ chart, canWrite }: { chart: ChartData; canWr
   );
 }
 
-function AddLabDialog({ open, onClose, admissionId, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; onSubmit: (i: LabInput) => void; busy: boolean }) {
+function AddLabDialog({ open, onClose, admissionId, withResult, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; withResult: boolean; onSubmit: (i: LabInput) => void; busy: boolean }) {
   const { t } = useTranslation();
   const [testNameAr, setTestNameAr] = useState('');
+  const [category, setCategory] = useState('');
   const [result, setResult] = useState('');
   const [unit, setUnit] = useState('');
   const [reference, setReference] = useState('');
@@ -143,8 +146,9 @@ function AddLabDialog({ open, onClose, admissionId, onSubmit, busy }: { open: bo
   if (!admissionId) return null;
   const submit = () => {
     if (testNameAr.trim().length < 2) return;
-    onSubmit({ admissionId, testNameAr, result, unit: unit || null, referenceRange: reference || null });
+    onSubmit({ admissionId, testNameAr, category: category || null, result: withResult ? result.trim() || null : null, unit: unit || null, referenceRange: reference || null });
     setTestNameAr('');
+    setCategory('');
     setResult('');
     setUnit('');
     setReference('');
@@ -154,25 +158,30 @@ function AddLabDialog({ open, onClose, admissionId, onSubmit, busy }: { open: bo
     <Dialog
       open={open}
       onClose={onClose}
-      title={t('laboratory.addResult')}
+      title={withResult ? t('laboratory.addResult') : t('orders.labOrder')}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button onClick={submit} loading={busy} icon={<PenLine className="h-4 w-4" />}>
-            {t('laboratory.updateResult')}
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input label={t('laboratory.test')} value={testNameAr} onChange={(e) => setTestNameAr(e.target.value)} autoFocus placeholder="تعداد الدم الكامل CBC" />
-        <div className="grid grid-cols-3 gap-3">
-          <Input label={t('laboratory.unit')} value={unit} onChange={(e) => setUnit(e.target.value)} dir="ltr" containerClassName="col-span-1" />
-          <Input label={t('laboratory.reference')} value={reference} onChange={(e) => setReference(e.target.value)} dir="ltr" containerClassName="col-span-2" />
-        </div>
-        <Textarea label={t('laboratory.result')} rows={3} value={result} onChange={(e) => setResult(e.target.value)} />
+        <Input label={t('orders.category')} value={category} onChange={(e) => setCategory(e.target.value)} />
+        {withResult && (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <Input label={t('laboratory.unit')} value={unit} onChange={(e) => setUnit(e.target.value)} dir="ltr" containerClassName="col-span-1" />
+              <Input label={t('laboratory.reference')} value={reference} onChange={(e) => setReference(e.target.value)} dir="ltr" containerClassName="col-span-2" />
+            </div>
+            <Textarea label={t('orders.resultOptional')} rows={3} value={result} onChange={(e) => setResult(e.target.value)} />
+          </>
+        )}
       </div>
     </Dialog>
   );
@@ -195,6 +204,7 @@ function UpdateLabDialog({
   const [result, setResult] = useState(initial.result ?? '');
   const [unit, setUnit] = useState(initial.unit ?? '');
   const [reference, setReference] = useState(initial.reference_range ?? '');
+  const [abnormal, setAbnormal] = useState(false);
 
   return (
     <Dialog
@@ -206,7 +216,7 @@ function UpdateLabDialog({
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={() => onSubmit({ result, unit: unit || null, referenceRange: reference || null })} loading={busy}>
+          <Button onClick={() => onSubmit({ result, unit: unit || null, referenceRange: reference || null, abnormal })} loading={busy} disabled={!result.trim()}>
             {t('common.save')}
           </Button>
         </>
@@ -218,6 +228,10 @@ function UpdateLabDialog({
           <Input label={t('laboratory.reference')} value={reference} onChange={(e) => setReference(e.target.value)} dir="ltr" containerClassName="col-span-2" />
         </div>
         <Textarea label={t('laboratory.result')} rows={3} value={result} onChange={(e) => setResult(e.target.value)} autoFocus />
+        <label className="flex items-center gap-2 text-sm font-semibold text-danger-600">
+          <input type="checkbox" checked={abnormal} onChange={(e) => setAbnormal(e.target.checked)} className="h-4 w-4 accent-danger-500" />
+          {t('orders.abnormal')}
+        </label>
       </div>
     </Dialog>
   );

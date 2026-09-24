@@ -13,7 +13,7 @@ export { Tabs } from './Tabs';
 export type { TabItem } from './Tabs';
 export { Alert } from './Alert';
 export type { AlertVariant } from './Alert';
-export { ToastProvider, useToast } from './Toast';
+export { ToastProvider, useToast, notifyError } from './Toast';
 export { Skeleton, SkeletonCard } from './Skeleton';
 export { EmptyState, ErrorState } from './EmptyState';
 export { Avatar } from './Avatar';

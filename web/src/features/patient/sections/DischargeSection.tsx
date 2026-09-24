@@ -6,6 +6,7 @@ import { Button, Dialog, Textarea, Select, Alert } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type DischargeInput, type ChartData } from '@/lib/api';
 import { useToast } from '@/components/ui';
+import { fmtDateTime } from '@/lib/format';
 
 export function DischargeSection({ chart, canDischarge }: { chart: ChartData; canDischarge: boolean }) {
   const { t } = useTranslation();
@@ -42,6 +43,22 @@ export function DischargeSection({ chart, canDischarge }: { chart: ChartData; ca
             <DoorOpen className="h-7 w-7" />
           </span>
           <p className="mt-1 font-bold text-ink">{t('status.discharged')}</p>
+          {chart.patient.admission?.discharge_type && (
+            <p className="text-sm text-ink/60">
+              {t('history.dischargeType')}: {t(`discharge.types.${chart.patient.admission.discharge_type}`)}
+            </p>
+          )}
+          {chart.patient.admission?.discharged_at && (
+            <p className="text-sm text-ink/60">
+              {t('history.dischargedAt')}: {fmtDateTime(chart.patient.admission.discharged_at)}
+            </p>
+          )}
+          {chart.patient.admission?.discharge_summary && (
+            <div className="mt-2 w-full max-w-xl rounded-lg bg-surface-muted/80 px-4 py-3 text-start dark:bg-white/5">
+              <p className="text-xs font-bold text-ink/50">{t('history.dischargeSummary')}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-ink/85">{chart.patient.admission.discharge_summary}</p>
+            </div>
+          )}
         </div>
       ) : (
         <EmptyLine>{t('discharge.reason')}</EmptyLine>
@@ -88,7 +105,7 @@ function DischargeDialog({ open, onClose, admissionId, onSubmit, busy }: { open:
           onChange={(e) => setType(e.target.value)}
           options={['home', 'transfer', 'death', 'ama'].map((k) => ({ value: k, label: t(`discharge.types.${k}`) }))}
         />
-        <Textarea label={t('discharge.reason')} rows={4} value={summary} onChange={(e) => setSummary(e.target.value)} />
+        <Textarea label={t('history.dischargeSummary')} rows={4} value={summary} onChange={(e) => setSummary(e.target.value)} />
       </div>
     </Dialog>
   );

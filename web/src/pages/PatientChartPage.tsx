@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { ChartSection } from '@hmsi/shared';
+import { hasPermission, type ChartSection, type Permission } from '@hmsi/shared';
 import { useAuth } from '@/lib/auth';
-import { ROLE_PERMISSIONS } from '@hmsi/shared';
 import { API } from '@/lib/api';
-import { Card, CardContent, Skeleton, EmptyState } from '@/components/ui';
+import { Card, CardContent, Skeleton, EmptyState, Alert, Select } from '@/components/ui';
+import { fmtDate } from '@/lib/format';
 import { PatientHeader } from '@/features/patient/PatientHeader';
 import { OverviewSection } from '@/features/patient/sections/OverviewSection';
 import { VitalsSection } from '@/features/patient/sections/VitalsSection';
@@ -44,16 +44,19 @@ export default function PatientChartPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [section, setSection] = useState<ChartSection>('overview');
+  // التنويم المعروض: undefined = الحالي/الأحدث
+  const [admissionId, setAdmissionId] = useState<string | undefined>(undefined);
 
   const { data: chart, isLoading, error, refetch } = useQuery({
-    queryKey: ['chart', id],
-    queryFn: () => API.getChart(id!),
+    // المفتاح الأول ['chart', id] يبقى ثابتاً حتى تعمل invalidateQueries في الأقسام
+    queryKey: ['chart', id, admissionId ?? 'current'],
+    queryFn: () => API.getChart(id!, admissionId),
     enabled: Boolean(id),
   });
 
   const sectionKey = (s: ChartSection) => `chart.sections.${s}`;
 
-  const perms = useMemo(() => (user ? ROLE_PERMISSIONS[user.role] : []), [user]);
+  const can = useMemo(() => (p: Permission) => hasPermission(user?.role, p), [user]);
 
   if (isLoading) {
     return (
@@ -84,19 +87,23 @@ export default function PatientChartPage() {
     );
   }
 
-  const admissionId = chart.admissionId;
+  // التنويم المنتهي: للقراءة (عدا الملاحظات المتأخرة ونتائج الفحوص المطلوبة قبل الخروج)
+  const active = chart.patient.admission?.status === 'active';
+  const viewingPast = Boolean(admissionId) && chart.admissions[0]?.id !== chart.admissionId;
   const canWrite = {
-    vitals: perms.includes('vitals.write' as never),
-    doctor: perms.includes('notes.write.doctor' as never),
-    nursing: perms.includes('notes.write.nursing' as never),
-    diagnosis: perms.includes('notes.write.doctor' as never),
-    medication: perms.includes('medications.manage' as never),
-    lab: perms.includes('lab.add_result' as never),
-    radiology: perms.includes('radiology.add_report' as never),
-    consultation: perms.includes('notes.write.doctor' as never),
-    procedure: perms.includes('notes.write.doctor' as never),
-    files: perms.includes('files.manage' as never),
-    discharge: perms.includes('discharge.approve' as never),
+    vitals: active && can('vitals.write'),
+    doctor: can('notes.write.doctor'),
+    nursing: can('notes.write.nursing'),
+    diagnosis: active && can('notes.write.doctor'),
+    medication: active && can('medications.manage'),
+    labOrder: can('lab.order'),
+    labResult: can('lab.add_result'),
+    radOrder: can('radiology.order'),
+    radResult: can('radiology.add_report'),
+    consultation: active && can('notes.write.doctor'),
+    procedure: active && can('notes.write.doctor'),
+    files: can('files.manage'),
+    discharge: can('discharge.approve'),
   };
 
   const renderSection = () => {
@@ -114,9 +121,9 @@ export default function PatientChartPage() {
       case 'medications':
         return <MedicationsSection chart={chart} canWrite={canWrite.medication} />;
       case 'laboratory':
-        return <LaboratorySection chart={chart} canWrite={canWrite.lab} />;
+        return <LaboratorySection chart={chart} canOrder={canWrite.labOrder} canResult={canWrite.labResult} />;
       case 'radiology':
-        return <RadiologySection chart={chart} canWrite={canWrite.radiology} />;
+        return <RadiologySection chart={chart} canOrder={canWrite.radOrder} canResult={canWrite.radResult} />;
       case 'consultations':
         return <ConsultationsSection chart={chart} canWrite={canWrite.consultation} />;
       case 'procedures':
@@ -132,7 +139,27 @@ export default function PatientChartPage() {
 
   return (
     <div className="space-y-4">
-      <PatientHeader patient={chart.patient} admission={chart.patient.admission} onBack={() => navigate('/patients')} />
+      <PatientHeader
+        patient={chart.patient}
+        admission={chart.patient.admission}
+        onBack={() => navigate('/patients')}
+        canManagePin={can('admissions.manage')}
+      />
+
+      {chart.admissions.length > 1 && (
+        <div className="min-w-[16rem] max-w-md">
+          <Select
+            label={t('history.title')}
+            value={chart.admissionId ?? ''}
+            onChange={(e) => setAdmissionId(e.target.value === chart.admissions[0]?.id ? undefined : e.target.value)}
+            options={chart.admissions.map((a, i) => ({
+              value: a.id,
+              label: `${fmtDate(a.admitted_at, { day: 'numeric', month: 'short', year: 'numeric' })}${a.discharged_at ? ` → ${fmtDate(a.discharged_at, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · ${a.department_name_ar}${i === 0 ? ` (${t('history.current')})` : ''}`,
+            }))}
+          />
+        </div>
+      )}
+      {viewingPast && <Alert variant="info">{t('history.viewingPast')}</Alert>}
 
       {/* Section tabs */}
       <div
@@ -164,7 +191,7 @@ export default function PatientChartPage() {
       <div key={section} className="animate-fade-up">
         {renderSection()}
       </div>
-      {!admissionId && (
+      {!chart.admissionId && (
         <p className="text-center text-xs font-medium text-ink/40">
           {t('errors.notFound')} — {t('status.discharged')}
         </p>

@@ -8,6 +8,7 @@ import {
   FileBarChart2,
   ShieldCheck,
   Settings,
+  Hospital,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -44,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     group: 'system',
     items: [
+      { to: '/hospitals', key: 'hospitals', icon: Hospital, permission: 'hospitals.manage' },
       { to: '/reports', key: 'reports', icon: FileBarChart2, permission: 'reports.view' },
       { to: '/users', key: 'users', icon: ShieldCheck, permission: 'users.manage' },
       { to: '/settings', key: 'settings', icon: Settings },

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil } from 'lucide-react';
+import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil, KeyRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Dialog, Input, Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useTheme } from '@/lib/theme';
@@ -83,6 +83,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ChangePasswordCard />
 
       {/* Hospital */}
       <Card>
@@ -193,5 +195,56 @@ function SegmentedOption({ active, onClick, children }: { active: boolean; onCli
     >
       {children}
     </button>
+  );
+}
+function ChangePasswordCard() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const mismatch = confirm.length > 0 && next !== confirm;
+  const mut = useMutation({
+    mutationFn: () => API.changePassword(current, next),
+    onSuccess: () => {
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+      toast.success(t('password.changed'));
+    },
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <KeyRound className="h-5 w-5 text-brand-600" />
+          {t('password.title')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!mismatch && current && next) mut.mutate();
+          }}
+        >
+          <Input label={t('password.current')} type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} dir="ltr" />
+          <Input label={t('password.new')} hint={t('password.rule')} type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} dir="ltr" />
+          <Input
+            label={t('password.confirm')}
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            dir="ltr"
+            error={mismatch ? t('password.mismatch') : undefined}
+          />
+          <Button type="submit" loading={mut.isPending} disabled={!current || next.length < 8 || next !== confirm}>
+            {t('common.save')}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

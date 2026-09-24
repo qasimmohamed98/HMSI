@@ -8,12 +8,15 @@ import { API, type RadiologyInput, type RadiologyUpdateInput, type ChartData } f
 import { fmtDateTime } from '@/lib/format';
 import { useToast } from '@/components/ui';
 
-export function RadiologySection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
+/** canOrder: طلب أشعة (الطبيب) — canResult: كتابة التقرير (فني الأشعة) */
+export function RadiologySection({ chart, canOrder, canResult }: { chart: ChartData; canOrder: boolean; canResult: boolean }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [editRad, setEditRad] = useState<(typeof chart.radiology)[number] | null>(null);
+
+  const canAdd = (canOrder || canResult) && chart.patient.admission?.status === 'active';
 
   const mut = useMutation({
     mutationFn: API.addRadiology,
@@ -45,9 +48,9 @@ export function RadiologySection({ chart, canWrite }: { chart: ChartData; canWri
     <SectionCard
       title={t('radiology.title')}
       action={
-        canWrite && chart.admissionId ? (
+        canAdd && chart.admissionId ? (
           <Button size="sm" variant="secondary" onClick={() => setOpen(true)} icon={<Plus className="h-4 w-4" />}>
-            {t('radiology.add')}
+            {canResult ? t('radiology.add') : t('orders.radOrder')}
           </Button>
         ) : undefined
       }
@@ -72,21 +75,23 @@ export function RadiologySection({ chart, canWrite }: { chart: ChartData; canWri
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={r.report ? 'success' : 'warning'}>{r.report ? t('laboratory.statuses.resulted') : t('laboratory.statuses.ordered')}</Badge>
-                  {canWrite && chart.admissionId && (
+                  {chart.admissionId && (
                     <>
-                      {!r.report && (
+                      {canResult && !r.report && (
                         <Button size="sm" variant="outline" icon={<PenLine className="h-3.5 w-3.5" />} onClick={() => setEditRad(r)}>
                           {t('actions.enterReport')}
                         </Button>
                       )}
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
-                        onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: r.id })}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {(canResult || (canOrder && !r.report)) && (
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          className="text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30"
+                          onClick={() => deleteMut.mutate({ admissionId: chart.admissionId!, id: r.id })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>
@@ -102,7 +107,7 @@ export function RadiologySection({ chart, canWrite }: { chart: ChartData; canWri
         </div>
       )}
 
-      <AddRadiologyDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
+      <AddRadiologyDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} withReport={canResult} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
       {editRad && chart.admissionId && (
         <ReportRadiologyDialog
           open
@@ -155,7 +160,7 @@ function ReportRadiologyDialog({
   );
 }
 
-function AddRadiologyDialog({ open, onClose, admissionId, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; onSubmit: (i: RadiologyInput) => void; busy: boolean }) {
+function AddRadiologyDialog({ open, onClose, admissionId, withReport, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; withReport: boolean; onSubmit: (i: RadiologyInput) => void; busy: boolean }) {
   const { t } = useTranslation();
   const [studyTypeAr, setStudyTypeAr] = useState('');
   const [report, setReport] = useState('');
@@ -163,7 +168,7 @@ function AddRadiologyDialog({ open, onClose, admissionId, onSubmit, busy }: { op
   if (!admissionId) return null;
   const submit = () => {
     if (studyTypeAr.trim().length < 2) return;
-    onSubmit({ admissionId, studyTypeAr, report });
+    onSubmit({ admissionId, studyTypeAr, report: withReport ? report.trim() || null : null });
     setStudyTypeAr('');
     setReport('');
   };
@@ -172,7 +177,7 @@ function AddRadiologyDialog({ open, onClose, admissionId, onSubmit, busy }: { op
     <Dialog
       open={open}
       onClose={onClose}
-      title={t('radiology.add')}
+      title={withReport ? t('radiology.add') : t('orders.radOrder')}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -186,7 +191,7 @@ function AddRadiologyDialog({ open, onClose, admissionId, onSubmit, busy }: { op
     >
       <div className="space-y-4">
         <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder="أشعة مقطعية CT صدر" />
-        <Textarea label={t('radiology.report')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} />
+        {withReport && <Textarea label={t('orders.reportOptional')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} />}
       </div>
     </Dialog>
   );
