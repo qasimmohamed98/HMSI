@@ -4,8 +4,8 @@
 
 | العنوان | ما يعمل عليه |
 |---|---|
-| `qproductshub.com` / `www` | الموقع الرئيسي Q Products (ملفات ثابتة في `/var/www/qproducts`) |
-| `virexa.qproductshub.com` | نظام المستشفيات: الواجهة من `web/dist` + الخادم Node على `127.0.0.1:8787` |
+| `qproductshub.tech` / `www` | الموقع الرئيسي Q Products (ملفات ثابتة في `/var/www/qproducts`) |
+| `virexa.qproductshub.tech` | نظام المستشفيات: الواجهة من `web/dist` + الخادم Node على `127.0.0.1:8787` |
 
 | المسار على الخادم | المحتوى |
 |---|---|
@@ -32,7 +32,7 @@ ssh root@IP_الخادم
 
 ## 2. ربط النطاق بالخادم (DNS)
 
-في **hPanel ← Domains ← qproductshub.com ← DNS / Nameservers**:
+في **hPanel ← Domains ← qproductshub.tech ← DNS / Nameservers**:
 
 1. تأكد أن النطاق يستخدم **خوادم أسماء Hostinger** (الافتراضي).
 2. احذف أي سجل **A** قديم للاسم `@` أو `www` يشير إلى عنوان غير عنوان خادمك.
@@ -44,7 +44,7 @@ ssh root@IP_الخادم
 | A | `www` | IP الخادم | افتراضي |
 | A | `virexa` | IP الخادم | افتراضي |
 
-الانتشار يأخذ من دقائق إلى ساعات. للتحقق من PowerShell: `nslookup virexa.qproductshub.com` يجب أن يُظهر IP خادمك.
+الانتشار يأخذ من دقائق إلى ساعات. للتحقق من PowerShell: `nslookup virexa.qproductshub.tech` يجب أن يُظهر IP خادمك.
 
 ## 3. إعداد الخادم (مرة واحدة)
 
@@ -102,7 +102,7 @@ bash /root/deploy.sh
 بعد أن يشير النطاق إلى الخادم (الخطوة 2):
 
 ```bash
-certbot --nginx -d qproductshub.com -d www.qproductshub.com -d virexa.qproductshub.com --redirect --agree-tos -m بريدك@example.com
+certbot --nginx -d qproductshub.tech -d www.qproductshub.tech -d virexa.qproductshub.tech --redirect --agree-tos -m بريدك@example.com
 ```
 
 الشهادة تتجدد تلقائياً.
@@ -122,7 +122,7 @@ sudo -u hmsi bash -c 'set -a; . /etc/hmsi/hmsi.env; set +a; node dist/scripts/re
 systemctl start hmsi
 ```
 
-يجب أن ينتهي بـ `✓ الاستعادة سليمة` (كل جدول يطابق عدده). ثم ادخل إلى `https://virexa.qproductshub.com` وتحقق.
+يجب أن ينتهي بـ `✓ الاستعادة سليمة` (كل جدول يطابق عدده). ثم ادخل إلى `https://virexa.qproductshub.tech` وتحقق.
 
 > ⚠ `restore-drill` **يستبدل** القاعدة الموجودة. استخدمه فقط عند النقل الأول.
 

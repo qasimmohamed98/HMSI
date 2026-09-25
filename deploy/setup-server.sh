@@ -44,7 +44,7 @@ if [ ! -f /var/www/qproducts/index.html ]; then
 <title>Q Products</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,Segoe UI,Tahoma,sans-serif;background:#f5f7f6;color:#13204A}
 main{text-align:center;padding:24px}h1{font-size:2.2rem;margin:0 0 8px}p{color:#4b5563}a{color:#0A9E88;font-weight:700}</style></head>
 <body><main><h1>Q Products</h1><p>الموقع قيد الإنشاء — Website under construction</p>
-<p><a href="https://virexa.qproductshub.com">Q VIREXA — نظام إدارة المستشفيات</a></p></main></body></html>
+<p><a href="https://virexa.qproductshub.tech">Q VIREXA — نظام إدارة المستشفيات</a></p></main></body></html>
 HTML
 fi
 
