@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { useTheme } from '@/lib/theme';
 import { setLanguage, currentLang } from '@/i18n';
 import { useAuth } from '@/lib/auth';
-import { API, type HospitalProfileInput } from '@/lib/api';
+import { API, type HospitalProfileInput, type AboutContent } from '@/lib/api';
 import { ROLE_PERMISSIONS } from '@hmsi/shared';
 import { useToast } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -89,6 +89,7 @@ export default function SettingsPage() {
       <ChangePasswordCard />
 
       {user?.role === 'super_admin' && <PaymentInfoCard />}
+      {user?.role === 'super_admin' && <AboutEditorCard />}
 
       {/* Hospital */}
       <Card>
@@ -351,6 +352,70 @@ function PaymentInfoCard() {
             <div className="sm:col-span-2">
               <Textarea label={t('billing.fields.notes')} value={v.notes} onChange={set('notes')} rows={3} />
             </div>
+            <div className="sm:col-span-2">
+              <Button type="submit" loading={save.isPending} disabled={!form}>
+                {t('common.save')}
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** المدير العام: محتوى صفحة «من نحن» العامة */
+function AboutEditorCard() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ['about'], queryFn: API.getAbout });
+  const [form, setForm] = useState<AboutContent | null>(null);
+  const v = form ?? data ?? null;
+  const set = (k: keyof AboutContent) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...(v as AboutContent), [k]: e.target.value });
+  const save = useMutation({
+    mutationFn: () => API.updateAbout(v!),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['about'] });
+      setForm(null);
+      toast.success(t('common.done'));
+    },
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between gap-2">
+          <span>{t('aboutPage.editTitle')}</span>
+          <a href="/about" target="_blank" rel="noreferrer" className="text-sm font-bold text-brand-700 hover:underline dark:text-brand-300">
+            {t('aboutPage.preview')}
+          </a>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!v ? (
+          <Skeleton className="h-40 w-full rounded-xl" />
+        ) : (
+          <form
+            className="grid gap-4 sm:grid-cols-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save.mutate();
+            }}
+          >
+            <Input label={t('aboutPage.name')} value={v.name} onChange={set('name')} />
+            <Input label={t('aboutPage.tagline')} value={v.tagline} onChange={set('tagline')} />
+            <div className="sm:col-span-2">
+              <Textarea label={t('aboutPage.intro')} value={v.intro} onChange={set('intro')} rows={4} />
+            </div>
+            <Textarea label={t('aboutPage.mission')} value={v.mission} onChange={set('mission')} rows={3} />
+            <Textarea label={t('aboutPage.vision')} value={v.vision} onChange={set('vision')} rows={3} />
+            <div className="sm:col-span-2">
+              <Textarea label={t('aboutPage.valuesHint')} value={v.values} onChange={set('values')} rows={4} />
+            </div>
+            <Input label={t('aboutPage.phone')} value={v.phone} onChange={set('phone')} dir="ltr" />
+            <Input label={t('aboutPage.email')} value={v.email} onChange={set('email')} dir="ltr" />
+            <Input label={t('aboutPage.address')} value={v.address} onChange={set('address')} />
+            <Input label={t('aboutPage.website')} value={v.website} onChange={set('website')} dir="ltr" />
             <div className="sm:col-span-2">
               <Button type="submit" loading={save.isPending} disabled={!form}>
                 {t('common.save')}

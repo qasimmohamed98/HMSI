@@ -23,6 +23,8 @@ const AuditPage = lazy(() => import('@/pages/AuditPage'));
 const TrashPage = lazy(() => import('@/pages/TrashPage'));
 const SignupPage = lazy(() => import('@/pages/SignupPage'));
 const BillingPage = lazy(() => import('@/pages/BillingPage'));
+const AboutPage = lazy(() => import('@/pages/AboutPage'));
+const SystemPage = lazy(() => import('@/pages/SystemPage'));
 
 function PageLoader() {
   return (
@@ -62,6 +64,9 @@ export const router = createBrowserRouter([
       </GuestOnly>
     ),
   },
+  // صفحات عامة للزوار والمستخدمين
+  { path: '/about', element: withSuspense(<AboutPage />) },
+  { path: '/system', element: withSuspense(<SystemPage />) },
   {
     path: '/signup',
     element: <GuestOnly>{withSuspense(<SignupPage />)}</GuestOnly>,

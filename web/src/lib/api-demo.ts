@@ -65,6 +65,7 @@ import type {
   ReportOverview,
   CreateHospitalInput,
   HospitalAdminInput,
+  AboutContent,
   FluidInput,
   AdministrationInput,
 } from './api';
@@ -80,6 +81,18 @@ const demoPin = () => String(Math.floor(100000 + Math.random() * 900000));
 /** مستشفيات إضافية أنشأها المدير العام في وضع العرض (في الذاكرة فقط) */
 const extraHospitals: Hospital[] = [];
 const uid = () => Math.random().toString(36).slice(2, 10);
+let demoAbout: AboutContent = {
+  name: 'فريق HMSI',
+  tagline: 'نبني أدوات رقمية تخدم المستشفيات والمرضى',
+  intro: 'نسخة عرض توضيحي — يعدّل المدير العام هذا المحتوى من الإعدادات.',
+  mission: 'تمكين كل مستشفى من إدارة مرضاه رقمياً.',
+  vision: 'ملف طبي رقمي آمن لكل مريض.',
+  values: 'خصوصية المريض أولاً\nالبساطة\nالموثوقية',
+  phone: '',
+  email: '',
+  address: 'العراق',
+  website: '',
+};
 
 const requireUser = (): User => {
   if (!store.currentUser) throw new Error('unauthorized');
@@ -1042,6 +1055,13 @@ export const demoApi: Api = {
   },
   async publicPaymentInfo() {
     return { ...{ price: '', bank_name: '', account_name: '', account_number: '', phone: '', notes: '' }, trial_days: 14 };
+  },
+  async getAbout() {
+    return demoAbout;
+  },
+  async updateAbout(content) {
+    demoAbout = content;
+    return content;
   },
   async billing() {
     return { subscription: { status: 'unlimited' as const, ends_at: null, days_left: null }, payment_info: { price: '', bank_name: '', account_name: '', account_number: '', phone: '', notes: '' }, notices: [], can_submit: false };

@@ -412,6 +412,15 @@ console.log('\n— التسجيل الذاتي والفترة التجريبية
   check('المدير العام غير مقيّد بالاشتراك', (await superA.get('/hospitals')).status === 200);
 }
 
+console.log('\n— صفحة من نحن');
+{
+  const about = await anon.get('/public/about');
+  check('صفحة من نحن عامة بمحتوى مبدئي', about.status === 200 && about.json.name.length > 0);
+  check('مدير المستشفى لا يعدّلها (403)', (await manager.put('/site/about', { ...about.json, name: 'x' })).status === 403);
+  check('المدير العام يعدّلها', (await superA.put('/site/about', { ...about.json, name: 'شركة الاختبار', phone: '0770' })).status === 200);
+  check('التعديل ظاهر للزوار', (await anon.get('/public/about')).json.name === 'شركة الاختبار');
+}
+
 console.log('\n— كلمات المرور');
 {
   const nurse2 = client(await login('nurse2'));

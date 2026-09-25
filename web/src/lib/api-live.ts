@@ -380,6 +380,8 @@ export const liveApi: Api = {
       }),
     }),
   publicPaymentInfo: () => request('/public/payment-info'),
+  getAbout: () => request('/public/about'),
+  updateAbout: (content) => request('/site/about', { method: 'PUT', body: JSON.stringify(content) }),
   billing: () => request('/billing'),
   submitPaymentNotice: (input) => request('/billing/notices', { method: 'POST', body: JSON.stringify(input) }),
   listPaymentNotices: (status) => request(`/billing/notices${status ? `?status=${status}` : ''}`),

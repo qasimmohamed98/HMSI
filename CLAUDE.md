@@ -9,5 +9,5 @@
 - كل استعلام في `server/src/repos` مقيّد بـ `hospitalId` (عزل المستشفيات)؛ السجلات الطبية عبر `getAdmissionScope`.
 - لا تشغّل seed على قاعدة الإنتاج (`server/.env` يشير إلى Turso حقيقي). `npm test` يستخدم قاعدة مؤقتة.
 - migration جديدة = `server/db/migrations/00N_*.sql` ثم `npm run db:gen -w @hmsi/api`.
-- نصوص الواجهة عبر `web/src/i18n/{ar,en}.ts` فقط؛ أي دالة API جديدة في `api.ts` و`api-live.ts` و`api-demo.ts` معاً.
+- نصوص الواجهة عبر `web/src/i18n/{ar,en}.ts` فقط (المحتوى الطويل للصفحات التعريفية والدليل في `web/src/i18n/content/` باللغتين)؛ أي دالة API جديدة في `api.ts` و`api-live.ts` و`api-demo.ts` معاً.
 - صفحة `/track/:code` عامة لذوي المريض: بدون رمز العائلة لا بيانات طبية إطلاقاً؛ بعد الرمز يظهر فقط ما فعّله الطاقم (`admissions.family_share`) ومن السجلات المكتملة فقط.

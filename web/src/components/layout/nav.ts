@@ -13,6 +13,8 @@ import {
   ScrollText,
   Trash2,
   CreditCard,
+  Info,
+  Users2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -56,6 +58,13 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/trash', key: 'trash', icon: Trash2 },
       { to: '/billing', key: 'billing', icon: CreditCard, permission: 'settings.manage' },
       { to: '/settings', key: 'settings', icon: Settings },
+    ],
+  },
+  {
+    group: 'help',
+    items: [
+      { to: '/system', key: 'aboutSystem', icon: Info },
+      { to: '/about', key: 'about', icon: Users2 },
     ],
   },
 ];

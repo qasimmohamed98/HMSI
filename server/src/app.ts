@@ -24,6 +24,7 @@ import { trashRoutes } from './routes/trash.js';
 import { billingRoutes } from './routes/billing.js';
 import { signupRoutes } from './routes/signup.js';
 import { subscriptionGuard } from './lib/subscription.js';
+import { siteRoutes, publicSiteRoutes } from './routes/site.js';
 
 export const api = new Hono();
 
@@ -57,6 +58,8 @@ api.route('/api/audit', auditRoutes);
 api.route('/api/trash', trashRoutes);
 api.route('/api/billing', billingRoutes);
 api.route('/api/public', signupRoutes);
+api.route('/api/public', publicSiteRoutes);
+api.route('/api/site', siteRoutes);
 
 api.notFound((c) => c.json({ message: 'المسار غير موجود' }, 404));
 

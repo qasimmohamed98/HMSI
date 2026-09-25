@@ -324,6 +324,20 @@ export interface BillingOverview {
   can_submit: boolean;
 }
 
+/** محتوى صفحة «من نحن» */
+export interface AboutContent {
+  name: string;
+  tagline: string;
+  intro: string;
+  mission: string;
+  vision: string;
+  values: string;
+  phone: string;
+  email: string;
+  address: string;
+  website: string;
+}
+
 export interface Api {
   mode: 'demo' | 'live';
   login(username: string, password: string): Promise<User>;
@@ -422,6 +436,8 @@ export interface Api {
   rejectPaymentNotice(id: string, note: string | null): Promise<void>;
   updateSubscription(hospitalId: string, input: { months?: number; until?: string; noticeId?: string }): Promise<Hospital>;
   updatePaymentInfo(info: PaymentInfo): Promise<PaymentInfo>;
+  getAbout(): Promise<AboutContent>;
+  updateAbout(content: AboutContent): Promise<AboutContent>;
   // صفحة ذوي المريض (عامة)
   publicTrack(code: string): Promise<PublicTrackInfo>;
   familyTrack(code: string, pin: string): Promise<PublicTrackFamily>;

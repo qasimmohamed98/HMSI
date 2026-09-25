@@ -74,7 +74,11 @@ export default function LoginPage() {
             ))}
           </ul>
         </div>
-        <p className="relative text-sm text-white/50">© 2026 Hospital Management System</p>
+        <p className="relative flex flex-wrap gap-3 text-sm text-white/60">
+          <span>© 2026 HMSI</span>
+          <Link to="/system" className="hover:text-white">{t('nav.aboutSystem')}</Link>
+          <Link to="/about" className="hover:text-white">{t('nav.about')}</Link>
+        </p>
       </div>
 
       {/* Form */}
@@ -139,6 +143,10 @@ export default function LoginPage() {
               </Link>
               <p className="mt-2 text-xs text-ink/45">{t('signup.staffHint')}</p>
             </div>
+            <p className="mt-4 flex justify-center gap-4 text-xs font-semibold text-ink/50 lg:hidden">
+              <Link to="/system" className="hover:underline">{t('nav.aboutSystem')}</Link>
+              <Link to="/about" className="hover:underline">{t('nav.about')}</Link>
+            </p>
 
             {/* تلميح الحسابات التجريبية فقط في وضع العرض — لا يظهر أبداً في الإنتاج */}
             {API.mode === 'demo' && (
