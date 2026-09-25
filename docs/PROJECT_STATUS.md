@@ -196,6 +196,7 @@ npm run db:seed:local -w @hmsi/api # بيانات تجريبية محلياً (�
 
 ## 7. قواعد العمل على المشروع
 
+- `packages/shared` يُبنى بصيغتين: ESM (`dist`) وCommonJS (`dist-cjs`) لأن دالة Netlify تحمّله بـ `require()` — لا تحذف أياً منهما.
 - ابنِ `packages/shared` قبل typecheck الـ server/web (يستوردان `dist/`) — `npm run typecheck` يفعل ذلك.
 - كل repo يستقبل `hospitalId` ويقيّد به. أي مسار سجلات طبية يمر عبر `getAdmissionScope`.
 - عمود جديد = ملف `server/db/migrations/00N_*.sql` جديد ثم `npm run db:gen -w @hmsi/api`. لا تعدّل migrations قديمة.
@@ -217,3 +218,4 @@ npm run db:seed:local -w @hmsi/api # بيانات تجريبية محلياً (�
 | 2026-09-25 | MAR، الألم/الوعي، ميزان السوائل، MEWS ولوحة الإنذار المبكر، طباعة A4 وملصقات باركود (HTML + ZPL)، فحص توقيع المرفقات، العمل دون اتصال (طابور + Background Sync)، بحث بالهاتف؛ migration 008؛ 107 فحوص. |
 | 2026-09-25 | دمج في `main` ونشر على https://hmsi.netlify.app — الـ API أعاد 502 لأن `TURSO_URL` غير مضبوط في Netlify؛ الدالة تعيد الآن 503 برسالة واضحة بدل خطأ خام عند نقص `TURSO_URL`/`SESSION_SECRET`. |
 | 2026-09-25 | ⚠ حادثة: لُصق ملف `.env` كاملاً في `TURSO_URL` على Netlify فكشفت رسالة خطأ Netlify الأسرار علناً. أُصلحت الدالة: لا تعرض أي خطأ داخلي أبداً وتتحقق من صيغة `TURSO_URL`. **يجب تدوير توكن Turso و`SESSION_SECRET` و`SEED_TOKEN`.** |
+| 2026-09-25 | ✅ الموقع يعمل على Netlify. السبب الأخير: Netlify يحمّل `@hmsi/shared` بـ `require()` ولا يدعم require لملفات ESM — أُضيفت نسخة CommonJS (`dist-cjs`، شرط `require` في exports). رصيد Netlify المجاني محدود: كل push إلى `main` = نشر. |
