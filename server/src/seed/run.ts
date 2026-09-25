@@ -38,7 +38,7 @@ export async function runSeed(): Promise<{ users: number; patients: number }> {
 
   const clearOrder = [
     'timeline_events', 'procedures', 'consultations', 'radiology_reports', 'lab_results',
-    'medication_administrations', 'fluid_entries', 'medications', 'diagnoses', 'medical_notes', 'vitals', 'attachments', 'audit_logs',
+    'trash', 'payment_notices', 'system_settings', 'medication_administrations', 'fluid_entries', 'medications', 'diagnoses', 'medical_notes', 'vitals', 'attachments', 'audit_logs',
     'sessions', 'login_attempts', 'admissions', 'patients', 'beds', 'wards', 'departments',
     'users', 'settings', 'hospitals',
   ];
