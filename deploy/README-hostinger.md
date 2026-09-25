@@ -118,13 +118,26 @@ certbot --nginx -d qproductshub.tech -d www.qproductshub.tech -d virexa.qproduct
 systemctl stop hmsi
 chown hmsi:hmsi /var/lib/hmsi/import.bak
 cd /opt/hmsi/app/server
-sudo -u hmsi bash -c 'set -a; . /etc/hmsi/hmsi.env; set +a; node dist/scripts/restore-drill.js /var/lib/hmsi/import.bak file:/var/lib/hmsi/hmsi.db'
+set -a; . /etc/hmsi/hmsi.env; set +a
+sudo --preserve-env=NODE_ENV,LOCAL_DB_URL,SESSION_SECRET,BACKUP_KEY,BACKUP_DIR -u hmsi node dist/scripts/restore-drill.js /var/lib/hmsi/import.bak file:/var/lib/hmsi/hmsi.db
 systemctl start hmsi
 ```
 
 يجب أن ينتهي بـ `✓ الاستعادة سليمة` (كل جدول يطابق عدده). ثم ادخل إلى `https://virexa.qproductshub.tech` وتحقق.
 
 > ⚠ `restore-drill` **يستبدل** القاعدة الموجودة. استخدمه فقط عند النقل الأول.
+
+## 8ب. تثبيت جديد بلا بيانات سابقة: أول مدير عام
+
+```bash
+cd /opt/hmsi/app/server
+set -a; . /etc/hmsi/hmsi.env; set +a
+sudo --preserve-env=NODE_ENV,LOCAL_DB_URL,SESSION_SECRET,BACKUP_KEY,BACKUP_DIR -u hmsi node dist/scripts/create-super-admin.js admin
+```
+
+يطبع كلمة مرور مؤقتة، ويُجبَر المدير على تغييرها عند أول دخول. نسيت كلمة المرور؟ الأمر نفسه مع `--reset` في آخره.
+
+> ملف الأسرار يقرؤه root فقط (مقصود)، لذلك تُقرأ القيم بصلاحية root وتُمرَّر إلى مستخدم الخدمة `hmsi`.
 
 ## 9. بعد الانتقال
 
