@@ -6,6 +6,7 @@ dist/
 web/dist/
 server/dist/
 packages/shared/dist/
+packages/shared/dist-cjs/
 *.tsbuildinfo
 
 # Local database (never commit DB files)

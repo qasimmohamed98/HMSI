@@ -9,16 +9,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
+      "require": "./dist-cjs/index.js",
       "default": "./dist/index.js"
     },
     "./validate": {
       "types": "./dist/validate.d.ts",
       "import": "./dist/validate.js",
+      "require": "./dist-cjs/validate.js",
       "default": "./dist/validate.js"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node -e \"require('fs').writeFileSync('dist-cjs/package.json', JSON.stringify({type:'commonjs'}))\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
