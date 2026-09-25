@@ -20,6 +20,7 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const TrackPage = lazy(() => import('@/pages/TrackPage'));
 const HospitalsPage = lazy(() => import('@/pages/HospitalsPage'));
 const AuditPage = lazy(() => import('@/pages/AuditPage'));
+const TrashPage = lazy(() => import('@/pages/TrashPage'));
 
 function PageLoader() {
   return (
@@ -85,6 +86,7 @@ export const router = createBrowserRouter([
       { path: 'settings', element: withSuspense(<SettingsPage />) },
       { path: 'hospitals', element: withSuspense(<HospitalsPage />) },
       { path: 'audit', element: withSuspense(<AuditPage />) },
+      { path: 'trash', element: withSuspense(<TrashPage />) },
       { path: '*', element: withSuspense(<NotFoundPage />) },
     ],
   },

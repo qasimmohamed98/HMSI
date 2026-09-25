@@ -37,6 +37,7 @@ export const PERMISSIONS = [
   'discharge.approve',
   'settings.manage',
   'audit.view',
+  'trash.manage',
   'reports.view',
   'files.manage',
 ] as const;

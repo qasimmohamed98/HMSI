@@ -2,6 +2,7 @@ import type { Patient, AdmissionSummary, FamilyShare } from '@hmsi/shared';
 import { FAMILY_SHARE_CATEGORIES } from '@hmsi/shared';
 import { db, uuid, withTx } from '../../db/index.js';
 import { isUniqueViolation } from '../lib/errors.js';
+import { recordArchive, type TrashActor } from '../lib/trash.js';
 
 export interface PatientListOptions {
   search?: string;
@@ -235,13 +236,16 @@ export async function updatePatient(id: string, hospitalId: string, input: {
   return getPatientById(id, hospitalId);
 }
 
-export async function archivePatient(id: string, hospitalId: string): Promise<boolean> {
+export async function archivePatient(id: string, hospitalId: string, actor: TrashActor): Promise<boolean> {
   return withTx(async (tx) => {
     const rows = await tx.execute({
-      sql: `SELECT id FROM patients WHERE id = ? AND hospital_id = ? AND archived_at IS NULL LIMIT 1`,
+      sql: `SELECT id, full_name_ar, file_number, status FROM patients WHERE id = ? AND hospital_id = ? AND archived_at IS NULL LIMIT 1`,
       args: [id, hospitalId],
     });
     if (rows.rows.length === 0) return false;
+    const p = rows.rows[0] as Record<string, unknown>;
+    // الأرشفة تظهر في سلة المحذوفات ويمكن التراجع عنها
+    await recordArchive({ patientId: id, hospitalId, label: `${String(p.full_name_ar)} · ${String(p.file_number)}`, previousStatus: String(p.status), actor }, tx);
 
     const active = await tx.execute({
       sql: `SELECT id, bed_id FROM admissions WHERE patient_id = ? AND status = 'active'`,

@@ -11,6 +11,7 @@ import {
   Hospital,
   Network,
   ScrollText,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -51,6 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/reports', key: 'reports', icon: FileBarChart2, permission: 'reports.view' },
       { to: '/users', key: 'users', icon: ShieldCheck, permission: 'users.manage' },
       { to: '/audit', key: 'audit', icon: ScrollText, permission: 'audit.view' },
+      { to: '/trash', key: 'trash', icon: Trash2 },
       { to: '/settings', key: 'settings', icon: Settings },
     ],
   },

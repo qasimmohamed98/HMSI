@@ -7,6 +7,7 @@ import { writeAudit, addTimeline } from '../lib/audit.js';
 import { db, uuid } from '../../db/index.js';
 import { clientIp } from '../config.js';
 import { resolveRecordedAt, existingClientRecord } from '../lib/offline.js';
+import { moveToTrash } from '../lib/trash.js';
 
 export const vitalsRoutes = new Hono();
 
@@ -102,12 +103,13 @@ vitalsRoutes.patch('/:id', requireAuth(), requirePermission('vitals.write'), asy
 vitalsRoutes.delete('/:id', requireAuth(), requirePermission('vitals.write'), async (c) => {
   const id = c.req.param('id')!;
   const session = getSession(c)!;
-  const rows = await db.execute({ sql: `SELECT admission_id FROM vitals WHERE id = ? LIMIT 1`, args: [id] });
+  const rows = await db.execute({ sql: `SELECT admission_id, recorded_at FROM vitals WHERE id = ? LIMIT 1`, args: [id] });
   if (rows.rows.length === 0) return c.json({ message: 'السجل غير موجود' }, 404);
   const admissionId = String((rows.rows[0] as Record<string, unknown>).admission_id);
   const scope = await getAdmissionScope(admissionId, session.user.hospital_id);
   if (!scope) return c.json({ message: 'غير موجود' }, 404);
-  await db.execute({ sql: `DELETE FROM vitals WHERE id = ?`, args: [id] });
+  const at = String((rows.rows[0] as Record<string, unknown>).recorded_at).slice(0, 16).replace('T', ' ');
+  await moveToTrash({ table: 'vitals', id, hospitalId: session.user.hospital_id, kind: 'vitals', label: at, actor: { id: session.user.id, name: session.user.full_name_ar }, admissionId });
   await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'vitals', titleAr: 'حذف علامات حيوية', titleEn: 'Vitals deleted' }, new Date().toISOString());
   await writeAudit({ actorId: session.user.id, action: 'vitals_deleted', resourceType: 'vitals', resourceId: id, ip: clientIp(c) });
   return c.body(null, 204);

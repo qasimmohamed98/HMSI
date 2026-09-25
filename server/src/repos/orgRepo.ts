@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { Department, Ward, Bed, UnassignedPatient } from '@hmsi/shared';
 import { db, uuid, withTx } from '../../db/index.js';
+import { moveToTrash, type TrashActor } from '../lib/trash.js';
 import { HttpConflict } from '../lib/errors.js';
 
 function mapDepartment(r: Record<string, unknown>): Department {
@@ -54,7 +55,7 @@ export async function updateDepartment(id: string, hospitalId: string, input: { 
   return getDepartment(id, hospitalId);
 }
 
-export async function deleteDepartment(id: string, hospitalId: string): Promise<boolean> {
+export async function deleteDepartment(id: string, hospitalId: string, actor: TrashActor): Promise<boolean> {
   if (!(await getDepartment(id, hospitalId))) return false;
   const wards = await db.execute({ sql: `SELECT COUNT(*) AS n FROM wards WHERE department_id = ?`, args: [id] });
   if (Number((wards.rows[0] as Record<string, unknown>).n) > 0) {
@@ -64,7 +65,8 @@ export async function deleteDepartment(id: string, hospitalId: string): Promise<
   if (Number((adm.rows[0] as Record<string, unknown>).n) > 0) {
     throw new HttpConflict('لا يمكن حذف قسم له سجل تنويم — أولِه لتصفير البيانات');
   }
-  await db.execute({ sql: `DELETE FROM departments WHERE id = ?`, args: [id] });
+  const dep = await getDepartment(id, hospitalId);
+  await moveToTrash({ table: 'departments', id, hospitalId, kind: 'department', label: dep?.name_ar ?? id, actor });
   return true;
 }
 
@@ -93,7 +95,7 @@ export async function updateWard(id: string, hospitalId: string, input: {
   return (await getWardById(id, hospitalId)) ?? null;
 }
 
-export async function deleteWard(id: string, hospitalId: string): Promise<boolean> {
+export async function deleteWard(id: string, hospitalId: string, actor: TrashActor): Promise<boolean> {
   const wards = await getWardById(id, hospitalId);
   if (!wards) return false;
   const beds = await db.execute({ sql: `SELECT COUNT(*) AS n FROM beds WHERE ward_id = ?`, args: [id] });
@@ -104,7 +106,8 @@ export async function deleteWard(id: string, hospitalId: string): Promise<boolea
   if (Number((adm.rows[0] as Record<string, unknown>).n) > 0) {
     throw new HttpConflict('لا يمكن حذف ردهة لها سجل تنويم');
   }
-  await db.execute({ sql: `DELETE FROM wards WHERE id = ?`, args: [id] });
+  const w = await db.execute({ sql: `SELECT name_ar FROM wards WHERE id = ?`, args: [id] });
+  await moveToTrash({ table: 'wards', id, hospitalId, kind: 'ward', label: String((w.rows[0] as Record<string, unknown> | undefined)?.name_ar ?? id), actor });
   return true;
 }
 
@@ -151,16 +154,17 @@ export async function updateBed(id: string, hospitalId: string, input: { room?: 
   return (await getBedById(id, hospitalId)) ?? null;
 }
 
-export async function deleteBed(id: string, hospitalId: string): Promise<boolean> {
+export async function deleteBed(id: string, hospitalId: string, actor: TrashActor): Promise<boolean> {
   const rows = await db.execute({
-    sql: `SELECT b.status FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE b.id = ? AND d.hospital_id = ? LIMIT 1`,
+    sql: `SELECT b.status, b.room, b.bed_no, w.name_ar AS ward_name FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE b.id = ? AND d.hospital_id = ? LIMIT 1`,
     args: [id, hospitalId],
   });
   if (rows.rows.length === 0) return false;
   if (String((rows.rows[0] as Record<string, unknown>).status) === 'occupied') {
     throw new HttpConflict('لا يمكن حذف سرير مشغول');
   }
-  await db.execute({ sql: `DELETE FROM beds WHERE id = ?`, args: [id] });
+  const bed = rows.rows[0] as Record<string, unknown>;
+  await moveToTrash({ table: 'beds', id, hospitalId, kind: 'bed', label: `${String(bed.ward_name)} · ${String(bed.room)}/${String(bed.bed_no)}`, actor });
   return true;
 }
 

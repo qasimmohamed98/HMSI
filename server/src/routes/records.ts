@@ -27,6 +27,7 @@ import { HttpError } from '../lib/errors.js';
 import { clientIp } from '../config.js';
 import { db, uuid } from '../../db/index.js';
 import { resolveRecordedAt, existingClientRecord } from '../lib/offline.js';
+import { moveToTrash, recordLabel, type TrashableTable } from '../lib/trash.js';
 
 export const recordRoutes = new Hono();
 
@@ -140,7 +141,8 @@ recordRoutes.patch('/:admissionId/notes/:id', requireAuth(), async (c) => {
 recordRoutes.delete('/:admissionId/notes/:id', requireAuth(), async (c) => {
   const s = getSession(c)!;
   const { admissionId, id } = await ownNote(c);
-  await db.execute({ sql: `DELETE FROM medical_notes WHERE id = ?`, args: [id] });
+  const note = await findRecord('medical_notes', id, admissionId);
+  await moveToTrash({ table: 'medical_notes', id, hospitalId: s.user.hospital_id, kind: 'medical_note', label: recordLabel(note), actor: { id: s.user.id, name: s.user.full_name_ar }, admissionId });
   await track(c, s, admissionId, 'note', 'حذف ملاحظة', 'Note deleted', 'note_deleted', 'medical_note', id);
   return c.body(null, 204);
 });
@@ -273,7 +275,7 @@ recordRoutes.delete('/:admissionId/administrations/:id', requireAuth(), requireP
   if (String(row.administered_by_id) !== s.user.id || Date.now() - Date.parse(String(row.created_at)) > 3600_000) {
     throw new HttpError('يمكن تصحيح الإدخال من قِبل مسجّله خلال ساعة فقط', 403);
   }
-  await db.execute({ sql: `DELETE FROM medication_administrations WHERE id = ?`, args: [id] });
+  await moveToTrash({ table: 'medication_administrations', id, hospitalId: s.user.hospital_id, kind: 'medication_administration', label: `${String(row.status)} · ${String(row.administered_at).slice(0, 16).replace('T', ' ')}`, actor: { id: s.user.id, name: s.user.full_name_ar }, admissionId: a.id });
   await track(c, s, a.id, 'medication', 'إلغاء تسجيل جرعة', 'Dose entry removed', 'medication_administration_deleted', 'medication_administration', id);
   return c.body(null, 204);
 });
@@ -488,7 +490,8 @@ function deleteRoute(path: string, permissions: Permission[], spec: DeleteSpec) 
     const id = c.req.param('id') ?? '';
     const row = await findRecord(spec.table, id, a.id);
     await spec.check?.(c, row);
-    await db.execute({ sql: `DELETE FROM ${spec.table} WHERE id = ?`, args: [id] });
+    // لا حذف نهائي: السجل ينتقل إلى سلة المحذوفات
+    await moveToTrash({ table: spec.table as TrashableTable, id, hospitalId: s.user.hospital_id, kind: spec.resourceType, label: recordLabel(row), actor: { id: s.user.id, name: s.user.full_name_ar }, admissionId: a.id });
     await track(c, s, a.id, spec.timelineType, spec.titleAr, spec.titleEn, `${spec.resourceType}_deleted`, spec.resourceType, id);
     return c.body(null, 204);
   });

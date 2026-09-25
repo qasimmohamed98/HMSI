@@ -1,5 +1,6 @@
 import type { Attachment } from '@hmsi/shared';
 import { db, uuid } from '../../db/index.js';
+import { moveToTrash, type TrashActor } from '../lib/trash.js';
 
 export async function getAttachment(id: string): Promise<Attachment & { data: string | null } | null> {
   const rows = await db.execute({
@@ -46,6 +47,8 @@ export async function insertAttachment(input: {
   };
 }
 
-export async function deleteAttachment(id: string): Promise<void> {
-  await db.execute({ sql: `DELETE FROM attachments WHERE id = ?`, args: [id] });
+/** لا حذف نهائي: المرفق (مع محتواه) ينتقل إلى سلة المحذوفات */
+export async function deleteAttachment(id: string, hospitalId: string, actor: TrashActor): Promise<void> {
+  const a = await getAttachment(id);
+  await moveToTrash({ table: 'attachments', id, hospitalId, kind: 'attachment', label: a?.file_name ?? id, actor, admissionId: a?.admission_id ?? null });
 }

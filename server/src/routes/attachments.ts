@@ -113,7 +113,7 @@ attachmentRoutes.delete('/:admissionId/attachments/:id', requireAuth(), requireP
   const id = c.req.param('id');
   const attachment = await getAttachment(id);
   if (!attachment || attachment.admission_id !== admissionId) return c.json({ message: 'الملف غير موجود' }, 404);
-  await deleteAttachment(id);
+  await deleteAttachment(id, session.user.hospital_id, { id: session.user.id, name: session.user.full_name_ar });
   await writeAudit({ actorId: session.user.id, action: 'attachment_deleted', resourceType: 'attachment', resourceId: id, ip: clientIp(c) });
   return c.body(null, 204);
 });

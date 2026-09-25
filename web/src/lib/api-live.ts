@@ -355,6 +355,9 @@ export const liveApi: Api = {
       }),
     }),
   deleteFluid: (admissionId, fluidId) => request(`/patients/${admissionId}/fluids/${fluidId}`, { method: 'DELETE' }),
+  listTrash: (restored) => request(`/trash${restored ? '?restored=1' : ''}`),
+  requestRestore: (trashId, note) => request(`/trash/${trashId}/request`, { method: 'POST', body: JSON.stringify({ note }) }),
+  restoreTrash: (trashId) => request(`/trash/${trashId}/restore`, { method: 'POST' }),
   labelZplUrl: (admissionId, kind) =>
     kind === 'wristband' ? `${BASE}/patients/${admissionId}/labels/wristband` : `${BASE}/patients/${admissionId}/labs/${kind.labId}/label`,
   listAudit: (params) => {

@@ -1014,6 +1014,16 @@ export const demoApi: Api = {
     record.fluids = (record.fluids ?? []).filter((x) => x.id !== fluidId);
   },
 
+  // وضع العرض: الحذف فيه مؤقت في الذاكرة، فالسلة فارغة دائماً
+  async listTrash() {
+    const u = requireUser();
+    return { items: [], canRestore: hasPermission(u.role, 'trash.manage') };
+  },
+  async requestRestore() {},
+  async restoreTrash(): Promise<never> {
+    throw new Error('غير متاح في وضع العرض');
+  },
+
   labelZplUrl() {
     return null;
   },

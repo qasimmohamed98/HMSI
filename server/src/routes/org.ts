@@ -75,7 +75,7 @@ orgRoutes.delete('/departments/:id', requireAuth(), requirePermission('departmen
   const id = c.req.param('id')!;
   const session = getSession(c)!;
   try {
-    const ok = await deleteDepartment(id, session.user.hospital_id);
+    const ok = await deleteDepartment(id, session.user.hospital_id, { id: session.user.id, name: session.user.full_name_ar });
     if (!ok) return c.json({ message: 'القسم غير موجود' }, 404);
   } catch (e) {
     const failed = await conflict(c, e);
@@ -121,7 +121,7 @@ orgRoutes.delete('/wards/:id', requireAuth(), requirePermission('wards.manage'),
   const id = c.req.param('id')!;
   const session = getSession(c)!;
   try {
-    const ok = await deleteWard(id, session.user.hospital_id);
+    const ok = await deleteWard(id, session.user.hospital_id, { id: session.user.id, name: session.user.full_name_ar });
     if (!ok) return c.json({ message: 'الردهة غير موجودة' }, 404);
   } catch (e) {
     const failed = await conflict(c, e);
@@ -166,7 +166,7 @@ orgRoutes.delete('/beds/:id', requireAuth(), requirePermission('wards.manage'), 
   const id = c.req.param('id')!;
   const session = getSession(c)!;
   try {
-    const ok = await deleteBed(id, session.user.hospital_id);
+    const ok = await deleteBed(id, session.user.hospital_id, { id: session.user.id, name: session.user.full_name_ar });
     if (!ok) return c.json({ message: 'السرير غير موجود' }, 404);
   } catch (e) {
     const failed = await conflict(c, e);

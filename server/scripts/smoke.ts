@@ -322,6 +322,42 @@ console.log('\n— الملصقات والمرفقات');
   check('تنزيل المرفق يتطلب جلسة (401)', (await anon.get('/patients/adm2/attachments/x')).status === 401);
 }
 
+console.log('\n— سلة المحذوفات والاستعادة');
+{
+  const dg = await doctor.post('/patients/adm2/diagnoses', { admission_id: 'adm2', title_ar: 'تشخيص للحذف', status: 'confirmed' });
+  check('حذف تشخيص (204)', (await doctor.del(`/patients/adm2/diagnoses/${dg.json.id}`)).status === 204);
+  check('المحذوف اختفى من الملف', !(await doctor.get('/patients/p2/chart')).json.diagnoses.some((d: any) => d.id === dg.json.id));
+  const mgrList = await manager.get('/trash');
+  const item = mgrList.json.items.find((x: any) => x.record_id === dg.json.id);
+  check('المدير يرى المحذوف في السلة مع اسم المريض', mgrList.json.canRestore === true && item?.kind === 'diagnosis' && item.patient_name_ar === 'سارة أحمد يوسف', item);
+  const docList = await doctor.get('/trash');
+  check('الطبيب يرى ما حذفه فقط ولا يستعيد', docList.json.canRestore === false && docList.json.items.every((x: any) => x.deleted_by_id === 'u_doctor') && docList.json.items.some((x: any) => x.id === item.id));
+  check('الممرض لا يرى محذوفات الطبيب', !(await nurse.get('/trash')).json.items.some((x: any) => x.id === item.id));
+  check('الطبيب لا يستعيد (403)', (await doctor.post(`/trash/${item.id}/restore`)).status === 403);
+  check('الممرض لا يطلب استعادة ما لم يحذفه (404)', (await nurse.post(`/trash/${item.id}/request`, { note: 'x' })).status === 404);
+  check('الطبيب يطلب الاستعادة', (await doctor.post(`/trash/${item.id}/request`, { note: 'حُذف بالخطأ' })).status === 204);
+  check('الطلب يظهر للمدير', (await manager.get('/trash')).json.items.find((x: any) => x.id === item.id)?.restore_request_note === 'حُذف بالخطأ');
+  check('المدير يستعيد (200)', (await manager.post(`/trash/${item.id}/restore`)).status === 200);
+  check('المستعاد عاد إلى الملف', (await doctor.get('/patients/p2/chart')).json.diagnoses.some((d: any) => d.id === dg.json.id));
+  check('لا استعادة مكررة (409)', (await manager.post(`/trash/${item.id}/restore`)).status === 409);
+  check('مستشفى آخر لا يرى السلة', !(await admin2.get('/trash')).json.items.some((x: any) => x.id === item.id));
+
+  const wardsNow = (await manager.get('/wards')).json as { beds: { id: string; status: string }[] }[];
+  const freeBed = wardsNow.flatMap((w) => w.beds).find((b) => b.status === 'free')!;
+  check('حذف سرير فارغ', (await manager.del(`/org/beds/${freeBed.id}`)).status === 204);
+  const bedItem = (await manager.get('/trash')).json.items.find((x: any) => x.record_id === freeBed.id);
+  check('السرير في السلة', bedItem?.kind === 'bed');
+  await manager.post(`/trash/${bedItem.id}/restore`);
+  check('استعادة السرير بنفس رمز QR', ((await manager.get('/wards')).json as any[]).flatMap((w) => w.beds).some((b: any) => b.id === freeBed.id && b.code));
+
+  const px = await reception.post('/patients', { full_name_ar: 'مريض للأرشفة', gender: 'male', birth_date: '1980-01-01' });
+  check('أرشفة مريض', (await reception.del(`/patients/${px.json.id}`)).status === 204);
+  const pItem = (await manager.get('/trash')).json.items.find((x: any) => x.record_id === px.json.id);
+  check('المريض المؤرشف في السلة', pItem?.mode === 'archive');
+  await manager.post(`/trash/${pItem.id}/restore`);
+  check('إلغاء الأرشفة يعيده للقائمة', ((await manager.get('/patients?search=' + encodeURIComponent('مريض للأرشفة'))).json as any[]).length === 1);
+}
+
 console.log('\n— كلمات المرور');
 {
   const nurse2 = client(await login('nurse2'));

@@ -281,6 +281,28 @@ export interface HospitalAdminInput {
   email?: string | null;
 }
 
+/** عنصر في سلة المحذوفات */
+export interface TrashItem {
+  id: string;
+  table_name: string;
+  record_id: string;
+  mode: 'delete' | 'archive';
+  kind: string;
+  label: string;
+  patient_id: string | null;
+  admission_id: string | null;
+  patient_name_ar: string | null;
+  patient_name_en: string | null;
+  deleted_by: string;
+  deleted_by_id: string | null;
+  deleted_at: string;
+  restore_requested_by: string | null;
+  restore_requested_at: string | null;
+  restore_request_note: string | null;
+  restored_by: string | null;
+  restored_at: string | null;
+}
+
 export interface Api {
   mode: 'demo' | 'live';
   login(username: string, password: string): Promise<User>;
@@ -317,6 +339,10 @@ export interface Api {
   /** رابط ملصق ZPL للطابعات الحرارية (null في وضع العرض) */
   labelZplUrl(admissionId: string, kind: 'wristband' | { labId: string }): string | null;
   listAudit(params?: { before?: string; action?: string }): Promise<AuditEntry[]>;
+  /** سلة المحذوفات: المدير يرى الكل ويستعيد، البقية يرون ما حذفوه ويطلبون الاستعادة */
+  listTrash(restored?: boolean): Promise<{ items: TrashItem[]; canRestore: boolean }>;
+  requestRestore(trashId: string, note: string | null): Promise<void>;
+  restoreTrash(trashId: string): Promise<TrashItem>;
   addLabResult(input: LabInput): Promise<LabResult>;
   updateLabResult(admissionId: string, labId: string, input: LabResultInput): Promise<LabResult>;
   deleteLabResult(admissionId: string, labId: string): Promise<void>;

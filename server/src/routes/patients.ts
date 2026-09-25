@@ -74,7 +74,7 @@ patientRoutes.patch('/:id', requireAuth(), requirePermission('patients.update'),
 patientRoutes.delete('/:id', requireAuth(), requirePermission('patients.archive'), async (c) => {
   const id = c.req.param('id');
   const session = getSession(c)!;
-  const archived = await archivePatient(id, session.user.hospital_id);
+  const archived = await archivePatient(id, session.user.hospital_id, { id: session.user.id, name: session.user.full_name_ar });
   if (!archived) return c.json({ message: 'المريض غير موجود' }, 404);
   await writeAudit({ actorId: session.user.id, action: 'patient_archived', resourceType: 'patient', resourceId: id, ip: clientIp(c) });
   return c.body(null, 204);
