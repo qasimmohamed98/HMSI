@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Hospital as HospitalIcon, LogIn, Plus, Power, PowerOff, UserPlus } from 'lucide-react';
+import { BellRing, CreditCard, Hospital as HospitalIcon, LogIn, Plus, Power, PowerOff, UserPlus } from 'lucide-react';
+import { SubscriptionDialog } from '@/features/billing/SubscriptionDialog';
+import { fmtDate } from '@/lib/format';
 import type { HospitalListItem } from '@hmsi/shared';
 import { Badge, Button, Card, CardContent, ConfirmDialog, Dialog, EmptyState, Input, Skeleton, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -22,6 +24,8 @@ export default function HospitalsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [adminFor, setAdminFor] = useState<HospitalListItem | null>(null);
   const [toggleTarget, setToggleTarget] = useState<HospitalListItem | null>(null);
+  const [subFor, setSubFor] = useState<HospitalListItem | null>(null);
+  const pendingTotal = (data ?? []).reduce((n, h) => n + (h.pending_payments ?? 0), 0);
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['hospitals'] });
 
@@ -73,6 +77,13 @@ export default function HospitalsPage() {
         }
       />
 
+      {pendingTotal > 0 && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm font-bold text-warning-900 dark:border-warning-900/60 dark:bg-warning-900/20 dark:text-warning-100">
+          <BellRing className="h-4 w-4" />
+          {t('subscriptionAdmin.pendingBanner', { count: pendingTotal })}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
           {Array.from({ length: 2 }).map((_, i) => (
@@ -109,6 +120,14 @@ export default function HospitalsPage() {
                       {isCurrent && <Badge variant="brand">{t('hospitals.current')}</Badge>}
                       {isHome && <Badge variant="neutral">{t('hospitals.home')}</Badge>}
                       {!h.is_active && <Badge variant="danger">{t('hospitals.disabled')}</Badge>}
+                      {h.subscription && h.subscription.status !== 'unlimited' && (
+                        <Badge variant={h.subscription.status === 'expired' ? 'danger' : h.subscription.status === 'trial' ? 'warning' : 'success'}>
+                          {t(`billing.status.${h.subscription.status}`)}
+                          {h.subscription.ends_at ? ` · ${fmtDate(h.subscription.ends_at, { day: 'numeric', month: 'short' })}` : ''}
+                        </Badge>
+                      )}
+                      {h.signup_source === 'self' && <Badge variant="info">{t('subscriptionAdmin.selfSignup')}</Badge>}
+                      {(h.pending_payments ?? 0) > 0 && <Badge variant="warning">{t('subscriptionAdmin.pending', { count: h.pending_payments })}</Badge>}
                     </div>
                   </div>
 
@@ -136,6 +155,9 @@ export default function HospitalsPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2 border-t border-ink/8 pt-3 dark:border-white/10">
+                    <Button size="sm" variant={(h.pending_payments ?? 0) > 0 ? 'primary' : 'outline'} icon={<CreditCard className="h-3.5 w-3.5" />} onClick={() => setSubFor(h)}>
+                      {t('subscriptionAdmin.manage')}
+                    </Button>
                     <Button size="sm" variant="outline" icon={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setAdminFor(h)}>
                       {t('hospitals.addAdmin')}
                     </Button>
@@ -172,6 +194,7 @@ export default function HospitalsPage() {
           busy={adminMut.isPending}
         />
       )}
+      {subFor && <SubscriptionDialog hospital={subFor} onClose={() => setSubFor(null)} />}
       <ConfirmDialog
         open={Boolean(toggleTarget)}
         onClose={() => setToggleTarget(null)}

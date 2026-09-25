@@ -4,6 +4,7 @@ import { db, uuid } from '../../db/index.js';
 import { hashPassword } from '../lib/password.js';
 import { HttpConflict, HttpError, isUniqueViolation } from '../lib/errors.js';
 import { logoUrl } from '../lib/logo.js';
+import { computeSubscription } from '../lib/subscription.js';
 
 type Row = Record<string, unknown>;
 
@@ -16,6 +17,14 @@ function mapHospital(r: Row): Hospital {
     is_active: r.is_active === undefined ? true : Boolean(Number(r.is_active)),
     created_at: String(r.created_at),
     logo_url: logoUrl(r.id, r.logo_updated_at),
+    subscription: computeSubscription(r.trial_ends_at, r.subscription_ends_at),
+    trial_ends_at: r.trial_ends_at ? String(r.trial_ends_at) : null,
+    subscription_ends_at: r.subscription_ends_at ? String(r.subscription_ends_at) : null,
+    signup_source: String(r.signup_source ?? 'admin') === 'self' ? 'self' : 'admin',
+    contact_name: r.contact_name ? String(r.contact_name) : null,
+    contact_phone: r.contact_phone ? String(r.contact_phone) : null,
+    contact_email: r.contact_email ? String(r.contact_email) : null,
+    city: r.city ? String(r.city) : null,
   };
 }
 
@@ -38,7 +47,8 @@ export async function listHospitals(): Promise<HospitalListItem[]> {
     sql: `SELECT h.*,
             (SELECT COUNT(*) FROM users u WHERE u.hospital_id = h.id) AS users_count,
             (SELECT COUNT(*) FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = h.id) AS beds_count,
-            (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = h.id AND a.status = 'active') AS active_admissions
+            (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = h.id AND a.status = 'active') AS active_admissions,
+            (SELECT COUNT(*) FROM payment_notices n WHERE n.hospital_id = h.id AND n.status = 'pending') AS pending_payments
           FROM hospitals h ORDER BY h.created_at ASC`,
     args: [],
   });
@@ -60,6 +70,7 @@ export async function listHospitals(): Promise<HospitalListItem[]> {
       users_count: Number(r.users_count ?? 0),
       beds_count: Number(r.beds_count ?? 0),
       active_admissions: Number(r.active_admissions ?? 0),
+      pending_payments: Number(r.pending_payments ?? 0),
       admins: byHospital.get(String(r.id)) ?? [],
     };
   });
@@ -69,13 +80,27 @@ function generateHospitalCode(): string {
   return `H-${randomBytes(3).toString('hex').toUpperCase()}`;
 }
 
-export async function createHospital(input: { name_ar: string; name_en: string; code?: string }): Promise<Hospital> {
+export async function createHospital(input: {
+  name_ar: string;
+  name_en: string;
+  code?: string;
+  trial_ends_at?: string | null;
+  signup_source?: 'admin' | 'self';
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  city?: string | null;
+}): Promise<Hospital> {
   const id = uuid('hosp');
   const code = (input.code ?? generateHospitalCode()).toUpperCase();
   try {
     await db.execute({
-      sql: `INSERT INTO hospitals (id, code, name_ar, name_en) VALUES (?, ?, ?, ?)`,
-      args: [id, code, input.name_ar, input.name_en],
+      sql: `INSERT INTO hospitals (id, code, name_ar, name_en, trial_ends_at, signup_source, contact_name, contact_phone, contact_email, city)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        id, code, input.name_ar, input.name_en, input.trial_ends_at ?? null, input.signup_source ?? 'admin',
+        input.contact_name ?? null, input.contact_phone ?? null, input.contact_email ?? null, input.city ?? null,
+      ],
     });
   } catch (e) {
     if (isUniqueViolation(e)) throw new HttpConflict('رمز المستشفى مستخدم بالفعل');
@@ -130,4 +155,10 @@ export async function getHospitalLogo(id: string): Promise<{ data: Buffer; mime:
   const r = rows.rows[0] as Row | undefined;
   if (!r) return null;
   return { data: Buffer.from(String(r.logo_data), 'base64'), mime: String(r.logo_mime) };
+}
+
+/** تفعيل/تمديد الاشتراك حتى تاريخ (نهاية اليوم) */
+export async function setSubscriptionUntil(id: string, until: string): Promise<Hospital | null> {
+  await db.execute({ sql: `UPDATE hospitals SET subscription_ends_at = ?, is_active = 1 WHERE id = ?`, args: [until, id] });
+  return getHospital(id);
 }

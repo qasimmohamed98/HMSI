@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LayoutDashboard, Users, Building2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth';
 
 const ITEMS = [
   { to: '/', key: 'dashboard', icon: LayoutDashboard },
@@ -13,6 +14,8 @@ const ITEMS = [
 export function BottomNav() {
   const { t } = useTranslation();
   const location = useLocation();
+  const { user } = useAuth();
+  if (user?.role !== 'super_admin' && user?.subscription?.status === 'expired') return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 print:hidden border-t border-ink/10 bg-surface-raised/95 backdrop-blur-md dark:border-white/10 dark:bg-surface-raised/95 sm:hidden">

@@ -9,11 +9,15 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const perms = user ? ROLE_PERMISSIONS[user.role] : [];
+  // اشتراك منتهٍ: لا يظهر إلا «الاشتراك والدفع» (بقية الصفحات محجوبة)
+  const expired = user?.role !== 'super_admin' && user?.subscription?.status === 'expired';
 
   return (
     <nav className="flex flex-col gap-1">
       {NAV_GROUPS.map((group, gi) => {
-        const visible = group.items.filter((item) => !item.permission || perms.includes(item.permission as never));
+        const visible = expired
+          ? group.items.filter((item) => item.to === '/billing')
+          : group.items.filter((item) => !item.permission || perms.includes(item.permission as never));
         if (visible.length === 0) return null;
         return (
           <div key={gi} className="flex flex-col gap-1">

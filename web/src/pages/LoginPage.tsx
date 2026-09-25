@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Activity, ShieldCheck, HeartPulse, Stethoscope, Lock, User as UserIcon, LogIn } from 'lucide-react';
 import { Button, Input, Alert } from '@/components/ui';
 import { Logo } from '@/components/layout/Logo';
@@ -130,6 +130,15 @@ export default function LoginPage() {
                 {t('auth.signIn')}
               </Button>
             </form>
+
+            {/* لمن لا يملك حساباً: تسجيل مستشفى بفترة تجريبية دون التواصل مع مدير النظام */}
+            <div className="mt-6 rounded-xl border border-ink/10 p-4 text-center dark:border-white/10">
+              <p className="text-sm font-semibold text-ink/70">{t('signup.noAccount')}</p>
+              <Link to="/signup" className="mt-2 inline-flex items-center justify-center rounded-lg bg-brand-50 px-4 py-2 text-sm font-extrabold text-brand-700 hover:bg-brand-100 dark:bg-brand-900/40 dark:text-brand-200">
+                {t('signup.cta')}
+              </Link>
+              <p className="mt-2 text-xs text-ink/45">{t('signup.staffHint')}</p>
+            </div>
 
             {/* تلميح الحسابات التجريبية فقط في وضع العرض — لا يظهر أبداً في الإنتاج */}
             {API.mode === 'demo' && (

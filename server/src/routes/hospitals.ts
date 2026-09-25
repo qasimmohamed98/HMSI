@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
-import { UpdateHospitalSchema, CreateHospitalSchema, CreateHospitalAdminSchema, AdminUpdateHospitalSchema } from '@hmsi/shared/validate';
+import { UpdateHospitalSchema, CreateHospitalSchema, CreateHospitalAdminSchema, AdminUpdateHospitalSchema, SubscriptionUpdateSchema } from '@hmsi/shared/validate';
+import { db } from '../../db/index.js';
+import { HttpError } from '../lib/errors.js';
 import { getSession, requireAuth, requirePermission } from '../middleware/auth.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit } from '../lib/audit.js';
 import { clientIp } from '../config.js';
-import { listHospitals, createHospital, createHospitalAdmin, getHospital, updateHospital, setActiveHospital, setHospitalLogo, clearHospitalLogo, MAX_LOGO_BYTES } from '../repos/hospitalRepo.js';
+import { listHospitals, createHospital, createHospitalAdmin, getHospital, updateHospital, setActiveHospital, setHospitalLogo, clearHospitalLogo, MAX_LOGO_BYTES, setSubscriptionUntil } from '../repos/hospitalRepo.js';
 import { contentMatchesMime } from './attachments.js';
 
 export const hospitalRoutes = new Hono();
@@ -48,6 +50,39 @@ hospitalRoutes.delete('/me/logo', requireAuth(), requirePermission('settings.man
 });
 
 // ------------------------------ المدير العام (hospitals.manage)
+
+/**
+ * تفعيل/تمديد اشتراك مستشفى: بعدد أشهر (من نهاية الاشتراك الحالي إن لم ينتهِ، وإلا من اليوم) أو حتى تاريخ.
+ * مع notice_id يُعتمد إشعار الدفع المرتبط.
+ */
+hospitalRoutes.post('/:id/subscription', requireAuth(), requirePermission('hospitals.manage'), async (c) => {
+  const parsed = await parseBody(c, SubscriptionUpdateSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof SubscriptionUpdateSchema)['_output'];
+  const session = getSession(c)!;
+  const id = c.req.param('id');
+  const hospital = await getHospital(id);
+  if (!hospital) return c.json({ message: 'المستشفى غير موجود' }, 404);
+
+  let until: Date;
+  if (input.until) {
+    until = new Date(`${input.until}T23:59:59.000Z`);
+    if (until.getTime() <= Date.now()) throw new HttpError('التاريخ يجب أن يكون في المستقبل', 422);
+  } else {
+    const current = hospital.subscription?.ends_at ? Date.parse(hospital.subscription.ends_at) : 0;
+    until = new Date(Math.max(current, Date.now()));
+    until.setUTCMonth(until.getUTCMonth() + input.months!);
+  }
+  const updated = await setSubscriptionUntil(id, until.toISOString());
+  if (input.notice_id) {
+    await db.execute({
+      sql: `UPDATE payment_notices SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE id = ? AND hospital_id = ? AND status = 'pending'`,
+      args: [session.user.full_name_ar, new Date().toISOString(), input.review_note ?? null, input.notice_id, id],
+    });
+  }
+  await writeAudit({ actorId: session.user.id, action: 'subscription_updated', resourceType: 'hospital', resourceId: id, ip: clientIp(c), meta: { until: until.toISOString(), notice_id: input.notice_id ?? null } });
+  return c.json(updated, 200);
+});
 
 hospitalRoutes.get('/', requireAuth(), requirePermission('hospitals.manage'), async (c) => {
   return c.json(await listHospitals(), 200);

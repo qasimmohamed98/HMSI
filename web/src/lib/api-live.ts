@@ -32,6 +32,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   } catch {
     throw new HttpError(0, 'تعذّر الاتصال بالخادم — تحقق من الشبكة');
   }
+  if (res.status === 402) {
+    // انتهى اشتراك المستشفى: حدّث المستخدم ليُحوَّل إلى صفحة الدفع
+    window.dispatchEvent(new Event('hmsi:subscription-expired'));
+  }
   if (res.status === 401 && !path.startsWith('/auth/') && !path.startsWith('/public/')) {
     // انتهت الجلسة: أبلغ AuthProvider لإعادة التوجيه لصفحة الدخول
     window.dispatchEvent(new Event('hmsi:unauthorized'));
@@ -361,6 +365,28 @@ export const liveApi: Api = {
       }),
     }),
   deleteFluid: (admissionId, fluidId) => request(`/patients/${admissionId}/fluids/${fluidId}`, { method: 'DELETE' }),
+  signup: (input) =>
+    request('/public/signup', {
+      method: 'POST',
+      body: JSON.stringify({
+        hospital_name_ar: input.hospitalNameAr,
+        hospital_name_en: input.hospitalNameEn || null,
+        city: input.city || null,
+        contact_phone: input.contactPhone,
+        full_name_ar: input.fullNameAr,
+        email: input.email || null,
+        username: input.username,
+        password: input.password,
+      }),
+    }),
+  publicPaymentInfo: () => request('/public/payment-info'),
+  billing: () => request('/billing'),
+  submitPaymentNotice: (input) => request('/billing/notices', { method: 'POST', body: JSON.stringify(input) }),
+  listPaymentNotices: (status) => request(`/billing/notices${status ? `?status=${status}` : ''}`),
+  rejectPaymentNotice: (id, note) => request(`/billing/notices/${id}/reject`, { method: 'POST', body: JSON.stringify({ review_note: note }) }),
+  updateSubscription: (hospitalId, input) =>
+    request(`/hospitals/${hospitalId}/subscription`, { method: 'POST', body: JSON.stringify({ months: input.months, until: input.until, notice_id: input.noticeId }) }),
+  updatePaymentInfo: (info) => request('/billing/payment-info', { method: 'PUT', body: JSON.stringify(info) }),
   listTrash: (restored) => request(`/trash${restored ? '?restored=1' : ''}`),
   requestRestore: (trashId, note) => request(`/trash/${trashId}/request`, { method: 'POST', body: JSON.stringify({ note }) }),
   restoreTrash: (trashId) => request(`/trash/${trashId}/restore`, { method: 'POST' }),

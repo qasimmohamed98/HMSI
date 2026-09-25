@@ -12,6 +12,7 @@ import {
   Network,
   ScrollText,
   Trash2,
+  CreditCard,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -53,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/users', key: 'users', icon: ShieldCheck, permission: 'users.manage' },
       { to: '/audit', key: 'audit', icon: ScrollText, permission: 'audit.view' },
       { to: '/trash', key: 'trash', icon: Trash2 },
+      { to: '/billing', key: 'billing', icon: CreditCard, permission: 'settings.manage' },
       { to: '/settings', key: 'settings', icon: Settings },
     ],
   },

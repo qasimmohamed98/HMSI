@@ -73,6 +73,7 @@ function client(s: Sess | null) {
     get: (p: string) => call('GET', p),
     post: (p: string, b: unknown = {}) => call('POST', p, b),
     patch: (p: string, b: unknown) => call('PATCH', p, b),
+    put: (p: string, b: unknown) => call('PUT', p, b),
     del: (p: string) => call('DELETE', p),
   };
 }
@@ -376,6 +377,39 @@ console.log('\n— شعار المستشفى');
   check('صورة مزوّرة مرفوضة (415)', (await up(new TextEncoder().encode('<svg onload=alert(1)>'), 'x.png', 'image/png')).status === 415);
   check('الطبيب لا يغيّر الشعار (403)', (await doctor.del('/hospitals/me/logo')).status === 403);
   check('الشعار في بيانات المستخدم', typeof (await manager.get('/auth/me')).json.hospital_logo_url === 'string');
+}
+
+console.log('\n— التسجيل الذاتي والفترة التجريبية والدفع');
+{
+  const { db } = await import('../db/index.js');
+  check('المستشفيات القائمة بلا حد زمني', (await manager.get('/auth/me')).json.subscription.status === 'unlimited');
+  check('المدير العام يضبط معلومات الدفع', (await superA.put('/billing/payment-info', { price: '100,000 د.ع شهرياً', bank_name: 'مصرف الرافدين', account_name: 'HMSI', account_number: '123456', phone: '07700000000', notes: '' })).status === 200);
+  check('مدير المستشفى لا يضبط معلومات الدفع (403)', (await manager.put('/billing/payment-info', { price: 'x' })).status === 403);
+  const info = await anon.get('/public/payment-info');
+  check('معلومات الدفع عامة مع مدة التجربة', info.status === 200 && info.json.bank_name === 'مصرف الرافدين' && info.json.trial_days === 14);
+  const signupBody = { hospital_name_ar: 'مستشفى التسجيل الذاتي', contact_phone: '07701234567', full_name_ar: 'مدير جديد', username: 'selfadmin', password: 'Trial2026x', city: 'بغداد' };
+  check('كلمة مرور ضعيفة عند التسجيل (422)', (await anon.post('/public/signup', { ...signupBody, password: 'abcdefgh' })).status === 422);
+  check('اسم مستخدم مكرر عند التسجيل (409)', (await anon.post('/public/signup', { ...signupBody, username: 'doctor' })).status === 409);
+  const reg = await api.request(`${BASE}/public/signup`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.9.9.9' }, body: JSON.stringify(signupBody) });
+  const regUser = (await reg.json()) as any;
+  check('تسجيل مستشفى جديد بفترة تجريبية 14 يوماً', reg.status === 201 && regUser.role === 'admin' && regUser.subscription.status === 'trial' && regUser.subscription.days_left === 14, regUser);
+  const self = client(await login('selfadmin', 'Trial2026x'));
+  check('المستشفى الجديد يعمل أثناء التجربة', (await self.get('/patients')).status === 200);
+  await db.execute({ sql: `UPDATE hospitals SET trial_ends_at = ? WHERE id = ?`, args: [new Date(Date.now() - 1000).toISOString(), regUser.hospital_id] });
+  const blocked = await self.get('/patients');
+  check('بعد انتهاء التجربة: البيانات محجوبة (402)', blocked.status === 402 && blocked.json.code === 'subscription_expired');
+  const bill = await self.get('/billing');
+  check('صفحة الدفع متاحة بعد الانتهاء', bill.status === 200 && bill.json.subscription.status === 'expired' && bill.json.payment_info.account_number === '123456' && bill.json.can_submit === true);
+  const notice = await self.post('/billing/notices', { amount: '100000', method: 'تحويل مصرفي', reference: 'TRX-778' });
+  check('مدير المستشفى يرسل إشعار دفع', notice.status === 201 && notice.json.status === 'pending');
+  const list = await superA.get('/billing/notices?status=pending');
+  check('الإشعار يظهر للمدير العام', list.json.some((n: any) => n.id === notice.json.id && n.hospital_name_ar === 'مستشفى التسجيل الذاتي'));
+  check('مدير مستشفى آخر لا يرى الإشعارات (403)', (await manager.get('/billing/notices')).status === 403);
+  const act = await superA.post(`/hospitals/${regUser.hospital_id}/subscription`, { months: 1, notice_id: notice.json.id });
+  check('المدير العام يفعّل الاشتراك شهراً', act.status === 200 && act.json.subscription.status === 'active' && act.json.subscription.days_left >= 28, act.json.subscription);
+  check('الإشعار صار معتمداً', (await self.get('/billing')).json.notices[0].status === 'approved');
+  check('الوصول عاد بعد التفعيل', (await self.get('/patients')).status === 200);
+  check('المدير العام غير مقيّد بالاشتراك', (await superA.get('/hospitals')).status === 200);
 }
 
 console.log('\n— كلمات المرور');

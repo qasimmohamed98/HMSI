@@ -5,7 +5,7 @@ import { hashPassword } from '../lib/password.js';
 
 export async function listUsers(hospitalId: string): Promise<User[]> {
   const rows = await db.execute({
-    sql: `SELECT u.*, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en
+    sql: `SELECT u.*, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.logo_updated_at AS hospital_logo_updated_at, h.trial_ends_at AS hospital_trial_ends_at, h.subscription_ends_at AS hospital_subscription_ends_at
           FROM users u JOIN hospitals h ON h.id = u.hospital_id
           WHERE u.hospital_id = ?
           ORDER BY CASE u.role WHEN 'super_admin' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, u.full_name_ar`,
@@ -42,7 +42,7 @@ export async function createUser(input: {
 
 export async function getUserById(id: string): Promise<User | null> {
   const rows = await db.execute({
-    sql: `SELECT u.*, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en
+    sql: `SELECT u.*, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.logo_updated_at AS hospital_logo_updated_at, h.trial_ends_at AS hospital_trial_ends_at, h.subscription_ends_at AS hospital_subscription_ends_at
           FROM users u JOIN hospitals h ON h.id = u.hospital_id
           WHERE u.id = ? LIMIT 1`,
     args: [id],

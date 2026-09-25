@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,9 @@ export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
+  const location = useLocation();
+  // انتهى الاشتراك: صفحة الدفع فقط (المدير العام غير مقيّد)
+  const expired = user?.role !== 'super_admin' && user?.subscription?.status === 'expired';
 
   return (
     <div className="flex min-h-dvh bg-surface text-ink">
@@ -86,11 +89,32 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onMenu={() => setDrawerOpen(true)} />
         <main className={cn('flex-1', 'pb-20 lg:pb-6 print:p-0')}>
-          <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-6 sm:py-6">{<Outlet />}</div>
+          <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-6 sm:py-6">
+            <TrialBanner />
+            {expired && location.pathname !== '/billing' ? <Navigate to="/billing" replace /> : <Outlet />}
+          </div>
         </main>
       </div>
 
       <BottomNav />
+    </div>
+  );
+}
+
+/** تنبيه الفترة التجريبية أو قرب انتهاء الاشتراك (7 أيام) */
+function TrialBanner() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const sub = user?.subscription;
+  if (!sub || user?.role === 'super_admin') return null;
+  const show = sub.status === 'trial' || (sub.status === 'active' && (sub.days_left ?? 99) <= 7);
+  if (!show) return null;
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-warning-300 bg-warning-50 px-4 py-2.5 text-sm text-warning-900 print:hidden dark:border-warning-900/60 dark:bg-warning-900/20 dark:text-warning-100">
+      <span className="font-bold">{sub.status === 'trial' ? t('billing.trialBanner', { count: sub.days_left ?? 0 }) : t('billing.renewBanner', { count: sub.days_left ?? 0 })}</span>
+      <Link to="/billing" className="ms-auto rounded-lg bg-warning-600 px-3 py-1 text-xs font-bold text-white hover:bg-warning-700">
+        {t('billing.payNow')}
+      </Link>
     </div>
   );
 }

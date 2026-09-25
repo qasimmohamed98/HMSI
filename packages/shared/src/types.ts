@@ -157,6 +157,48 @@ export interface User {
   home_hospital_id?: string;
   /** رابط شعار المستشفى النشط (null = لا شعار) */
   hospital_logo_url?: string | null;
+  /** حالة اشتراك المستشفى النشط */
+  subscription?: Subscription;
+}
+
+/**
+ * اشتراك المستشفى: unlimited = مستشفى أنشأه المدير العام بلا حد زمني؛ trial = فترة تجريبية؛
+ * active = اشتراك مدفوع؛ expired = انتهى — لا يُسمح إلا بصفحة الدفع.
+ */
+export type SubscriptionStatus = 'unlimited' | 'trial' | 'active' | 'expired';
+export interface Subscription {
+  status: SubscriptionStatus;
+  ends_at: string | null;
+  days_left: number | null;
+}
+
+/** معلومات الدفع التي يضبطها المدير العام وتظهر للمستشفيات */
+export interface PaymentInfo {
+  price: string;
+  bank_name: string;
+  account_name: string;
+  account_number: string;
+  phone: string;
+  notes: string;
+}
+
+export const PAYMENT_NOTICE_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type PaymentNoticeStatus = (typeof PAYMENT_NOTICE_STATUSES)[number];
+export interface PaymentNotice {
+  id: string;
+  hospital_id: string;
+  hospital_name_ar?: string;
+  hospital_name_en?: string;
+  amount: string;
+  method: string;
+  reference: string | null;
+  note: string | null;
+  submitted_by: string;
+  submitted_at: string;
+  status: PaymentNoticeStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
 }
 
 export interface PublicUser {
@@ -484,6 +526,14 @@ export interface Hospital {
   is_active: boolean;
   created_at: string;
   logo_url?: string | null;
+  subscription?: Subscription;
+  trial_ends_at?: string | null;
+  subscription_ends_at?: string | null;
+  signup_source?: 'admin' | 'self';
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  city?: string | null;
 }
 
 export interface Department {
@@ -556,6 +606,7 @@ export interface HospitalListItem extends Hospital {
   beds_count: number;
   active_admissions: number;
   admins: HospitalAdminInfo[];
+  pending_payments: number;
 }
 
 export interface ReportOverview {

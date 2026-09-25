@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil, KeyRound, ImagePlus, Trash2 } from 'lucide-react';
+import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil, KeyRound, ImagePlus, Trash2, CreditCard } from 'lucide-react';
+import type { PaymentInfo } from '@hmsi/shared';
+import { Textarea } from '@/components/ui';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Dialog, Input, Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useTheme } from '@/lib/theme';
@@ -85,6 +87,8 @@ export default function SettingsPage() {
       </Card>
 
       <ChangePasswordCard />
+
+      {user?.role === 'super_admin' && <PaymentInfoCard />}
 
       {/* Hospital */}
       <Card>
@@ -298,5 +302,63 @@ function LogoCard({ logoUrl, canEdit }: { logoUrl: string | null; canEdit: boole
         </div>
       )}
     </div>
+  );
+}
+
+/** المدير العام: معلومات الدفع التي تظهر للمستشفيات في صفحة التسجيل والدفع */
+function PaymentInfoCard() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ['publicPaymentInfo'], queryFn: API.publicPaymentInfo });
+  const [form, setForm] = useState<PaymentInfo | null>(null);
+  const v = form ?? data ?? null;
+  const set = (k: keyof PaymentInfo) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...(v as PaymentInfo), [k]: e.target.value });
+  const save = useMutation({
+    mutationFn: () => API.updatePaymentInfo({ price: v!.price, bank_name: v!.bank_name, account_name: v!.account_name, account_number: v!.account_number, phone: v!.phone, notes: v!.notes }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['publicPaymentInfo'] });
+      void qc.invalidateQueries({ queryKey: ['billing'] });
+      setForm(null);
+      toast.success(t('common.done'));
+    },
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CreditCard className="h-5 w-5 text-brand-600" />
+          {t('billing.infoTitle')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!v ? (
+          <Skeleton className="h-40 w-full rounded-xl" />
+        ) : (
+          <form
+            className="grid gap-4 sm:grid-cols-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save.mutate();
+            }}
+          >
+            <p className="text-sm text-ink/60 sm:col-span-2">{t('billing.infoHint')}</p>
+            <Input label={t('billing.fields.price')} value={v.price} onChange={set('price')} placeholder={t('billing.pricePlaceholder')} />
+            <Input label={t('billing.fields.bank_name')} value={v.bank_name} onChange={set('bank_name')} />
+            <Input label={t('billing.fields.account_name')} value={v.account_name} onChange={set('account_name')} />
+            <Input label={t('billing.fields.account_number')} value={v.account_number} onChange={set('account_number')} dir="ltr" />
+            <Input label={t('billing.fields.phone')} value={v.phone} onChange={set('phone')} dir="ltr" />
+            <div className="sm:col-span-2">
+              <Textarea label={t('billing.fields.notes')} value={v.notes} onChange={set('notes')} rows={3} />
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit" loading={save.isPending} disabled={!form}>
+                {t('common.save')}
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
   );
 }

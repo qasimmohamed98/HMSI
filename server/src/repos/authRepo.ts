@@ -1,6 +1,7 @@
 import type { User } from '@hmsi/shared';
 import { db } from '../../db/index.js';
 import { logoUrl } from '../lib/logo.js';
+import { computeSubscription } from '../lib/subscription.js';
 
 export function toUser(r: Record<string, unknown>): User {
   return {
@@ -17,6 +18,7 @@ export function toUser(r: Record<string, unknown>): User {
     is_active: Boolean(r.is_active),
     created_at: String(r.created_at),
     hospital_logo_url: logoUrl(r.hospital_id, r.hospital_logo_updated_at),
+    subscription: computeSubscription(r.hospital_trial_ends_at, r.hospital_subscription_ends_at),
   };
 }
 
@@ -34,7 +36,7 @@ export async function findUserByUsername(username: string): Promise<{ hash: stri
 
 export async function getUserById(id: string): Promise<User | null> {
   const rows = await db.execute({
-    sql: `SELECT u.*, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.logo_updated_at AS hospital_logo_updated_at
+    sql: `SELECT u.*, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.logo_updated_at AS hospital_logo_updated_at, h.trial_ends_at AS hospital_trial_ends_at, h.subscription_ends_at AS hospital_subscription_ends_at
           FROM users u JOIN hospitals h ON h.id = u.hospital_id
           WHERE u.id = ? AND u.is_active = 1 LIMIT 1`,
     args: [id],

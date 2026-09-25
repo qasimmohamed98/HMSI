@@ -41,9 +41,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus('guest');
     };
     window.addEventListener('hmsi:unauthorized', onUnauthorized);
+    // انتهاء الاشتراك أثناء الاستخدام: إعادة تحميل المستخدم لتظهر صفحة الدفع
+    const onExpired = () => {
+      void API.me().then((u) => u && setUser(u)).catch(() => undefined);
+    };
+    window.addEventListener('hmsi:subscription-expired', onExpired);
     return () => {
       alive = false;
       window.removeEventListener('hmsi:unauthorized', onUnauthorized);
+      window.removeEventListener('hmsi:subscription-expired', onExpired);
     };
   }, [qc]);
 

@@ -31,6 +31,9 @@ import type {
   AdministrationStatus,
   MedicationAdministration,
   FamilyShare,
+  PaymentInfo,
+  PaymentNotice,
+  Subscription,
 } from '@hmsi/shared';
 import { demoApi } from './api-demo';
 import { liveApi } from './api-live';
@@ -303,6 +306,24 @@ export interface TrashItem {
   restored_at: string | null;
 }
 
+export interface SignupInput {
+  hospitalNameAr: string;
+  hospitalNameEn?: string | null;
+  city?: string | null;
+  contactPhone: string;
+  fullNameAr: string;
+  email?: string | null;
+  username: string;
+  password: string;
+}
+
+export interface BillingOverview {
+  subscription: Subscription | undefined;
+  payment_info: PaymentInfo;
+  notices: PaymentNotice[];
+  can_submit: boolean;
+}
+
 export interface Api {
   mode: 'demo' | 'live';
   login(username: string, password: string): Promise<User>;
@@ -392,6 +413,15 @@ export interface Api {
   updateHospitalById(id: string, input: { nameAr?: string; nameEn?: string; isActive?: boolean }): Promise<Hospital>;
   addHospitalAdmin(hospitalId: string, input: HospitalAdminInput): Promise<HospitalAdminInfo>;
   switchHospital(hospitalId: string): Promise<Hospital>;
+  // التسجيل الذاتي والاشتراك
+  signup(input: SignupInput): Promise<User>;
+  publicPaymentInfo(): Promise<PaymentInfo & { trial_days: number }>;
+  billing(): Promise<BillingOverview>;
+  submitPaymentNotice(input: { amount: string; method: string; reference?: string | null; note?: string | null }): Promise<PaymentNotice>;
+  listPaymentNotices(status?: 'pending'): Promise<PaymentNotice[]>;
+  rejectPaymentNotice(id: string, note: string | null): Promise<void>;
+  updateSubscription(hospitalId: string, input: { months?: number; until?: string; noticeId?: string }): Promise<Hospital>;
+  updatePaymentInfo(info: PaymentInfo): Promise<PaymentInfo>;
   // صفحة ذوي المريض (عامة)
   publicTrack(code: string): Promise<PublicTrackInfo>;
   familyTrack(code: string, pin: string): Promise<PublicTrackFamily>;

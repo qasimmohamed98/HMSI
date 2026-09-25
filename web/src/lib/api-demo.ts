@@ -727,8 +727,10 @@ export const demoApi: Api = {
     const adminsOf = (hid: string): HospitalAdminInfo[] =>
       store.users.filter((u) => u.hospital_id === hid && u.role === 'admin').map((u) => ({ id: u.id, username: u.username, full_name_ar: u.full_name_ar, is_active: u.is_active }));
     return [
-      { ...store.hospital, users_count: store.users.filter((u) => u.hospital_id === store.hospital.id).length, beds_count: store.wards.reduce((n, w) => n + w.beds.length, 0), active_admissions: active, admins: adminsOf(store.hospital.id) },
-      ...extraHospitals.map((h) => ({ ...h, users_count: store.users.filter((u) => u.hospital_id === h.id).length, beds_count: 0, active_admissions: 0, admins: adminsOf(h.id) })),
+      { ...store.hospital, users_count: store.users.filter((u) => u.hospital_id === store.hospital.id).length, beds_count: store.wards.reduce((n, w) => n + w.beds.length, 0), pending_payments: 0,
+      active_admissions: active, admins: adminsOf(store.hospital.id) },
+      ...extraHospitals.map((h) => ({ ...h, users_count: store.users.filter((u) => u.hospital_id === h.id).length, beds_count: 0, pending_payments: 0,
+      active_admissions: 0, admins: adminsOf(h.id) })),
     ];
   },
 
@@ -1032,6 +1034,30 @@ export const demoApi: Api = {
   async deleteFluid(admissionId: string, fluidId: string): Promise<void> {
     const record = findRecord(admissionId);
     record.fluids = (record.fluids ?? []).filter((x) => x.id !== fluidId);
+  },
+
+  // وضع العرض: التسجيل والدفع يعملان في النسخة الفعلية فقط
+  async signup(): Promise<User> {
+    throw new Error('تسجيل المستشفيات متاح في النسخة الفعلية فقط');
+  },
+  async publicPaymentInfo() {
+    return { ...{ price: '', bank_name: '', account_name: '', account_number: '', phone: '', notes: '' }, trial_days: 14 };
+  },
+  async billing() {
+    return { subscription: { status: 'unlimited' as const, ends_at: null, days_left: null }, payment_info: { price: '', bank_name: '', account_name: '', account_number: '', phone: '', notes: '' }, notices: [], can_submit: false };
+  },
+  async submitPaymentNotice(): Promise<never> {
+    throw new Error('غير متاح في وضع العرض');
+  },
+  async listPaymentNotices() {
+    return [];
+  },
+  async rejectPaymentNotice() {},
+  async updateSubscription(): Promise<never> {
+    throw new Error('غير متاح في وضع العرض');
+  },
+  async updatePaymentInfo(info) {
+    return info;
   },
 
   // وضع العرض: الحذف فيه مؤقت في الذاكرة، فالسلة فارغة دائماً

@@ -310,6 +310,46 @@ export const ChangePasswordSchema = z
 
 export const ResetPasswordSchema = z.object({ password: newPassword });
 
+/** تسجيل مستشفى جديد من صفحة الدخول (فترة تجريبية 14 يوماً) */
+export const SignupSchema = z.object({
+  hospital_name_ar: z.string().trim().min(3, 'اسم المستشفى قصير').max(160),
+  hospital_name_en: z.string().trim().max(160).optional().nullable(),
+  city: z.string().trim().max(80).optional().nullable(),
+  contact_phone: z.string().trim().min(7, 'رقم الهاتف غير صحيح').max(20).regex(/^[+\d\s-]+$/, 'رقم الهاتف غير صحيح'),
+  full_name_ar: z.string().trim().min(3, 'الاسم قصير').max(100),
+  email: z.string().trim().email('البريد الإلكتروني غير صحيح').optional().nullable().or(z.literal('')),
+  username: z.string().trim().min(3).max(64).regex(/^[a-zA-Z0-9_.-]+$/, 'اسم المستخدم: أحرف إنجليزية وأرقام فقط'),
+  password: newPassword,
+});
+
+export const PaymentInfoSchema = z.object({
+  price: z.string().max(200).default(''),
+  bank_name: z.string().max(200).default(''),
+  account_name: z.string().max(200).default(''),
+  account_number: z.string().max(100).default(''),
+  phone: z.string().max(60).default(''),
+  notes: z.string().max(2000).default(''),
+});
+
+export const PaymentNoticeSchema = z.object({
+  amount: z.string().trim().min(1, 'المبلغ مطلوب').max(60),
+  method: z.string().trim().min(2, 'طريقة الدفع مطلوبة').max(80),
+  reference: z.string().trim().max(120).optional().nullable(),
+  note: z.string().trim().max(500).optional().nullable(),
+});
+
+/** تفعيل/تمديد اشتراك مستشفى من قبل المدير العام: بعدد الأشهر أو حتى تاريخ */
+export const SubscriptionUpdateSchema = z
+  .object({
+    months: z.number().int().min(1).max(36).optional(),
+    until: isoDate.optional(),
+    notice_id: z.string().max(64).optional(),
+    review_note: z.string().max(300).optional().nullable(),
+  })
+  .refine((v) => v.months !== undefined || v.until !== undefined, { message: 'حدد المدة أو التاريخ' });
+
+export const RejectNoticeSchema = z.object({ review_note: z.string().max(300).optional().nullable() });
+
 export const ReportRangeSchema = z
   .object({ from: isoDate, to: isoDate })
   .refine((v) => v.from <= v.to, { message: 'تاريخ البداية بعد تاريخ النهاية' })
