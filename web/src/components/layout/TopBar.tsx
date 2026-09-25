@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { localName } from '@/lib/format';
 import { useOutboxSync } from '@/lib/offline-queue';
 import { OutboxIndicator } from './OutboxIndicator';
+import { NotificationBell } from './NotificationBell';
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { t } = useTranslation();
@@ -61,6 +62,8 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
         <Languages className="h-4 w-4" />
         <span className="font-bold">{currentLang() === 'ar' ? 'EN' : 'ع'}</span>
       </Button>
+
+      <NotificationBell />
 
       <Button variant="ghost" size="icon" onClick={() => navigate('/guide')} aria-label={t('nav.guide')} title={t('nav.guide')}>
         <CircleHelp className="h-[1.15rem] w-[1.15rem]" />

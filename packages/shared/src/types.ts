@@ -126,6 +126,7 @@ export type Language = (typeof LANGUAGES)[number];
 
 export const AREA_NAMES = [
   'overview',
+  'plan',
   'vitals',
   'diagnosis',
   'doctorNotes',
@@ -159,6 +160,10 @@ export interface User {
   hospital_logo_url?: string | null;
   /** حالة اشتراك المستشفى النشط */
   subscription?: Subscription;
+  /** كلمة مرور مؤقتة أو ضعيفة: يجب تغييرها قبل أي عمل */
+  must_change_password?: boolean;
+  /** التحقق بخطوتين مفعّل */
+  totp_enabled?: boolean;
 }
 
 /**
@@ -237,6 +242,7 @@ export interface AdmissionSummary {
   room: string;
   bed_no: string;
   attending_doctor: string | null;
+  attending_doctor_en?: string | null;
   admitted_at: string;
   discharged_at?: string | null;
   status: AdmissionStatus;
@@ -358,6 +364,8 @@ export interface Medication {
   prescribed_by: string;
   dispensed_by?: string | null;
   dispensed_at?: string | null;
+  /** تجاوز تحذير حساسية: JSON { reason, conflicts, by, at } */
+  allergy_override_json?: string | null;
 }
 
 export interface LabResult {
@@ -576,6 +584,7 @@ export interface PublicTrackFamily extends PublicTrackInfo {
     gender: Gender;
   };
   attending_doctor: string | null;
+  attending_doctor_en?: string | null;
   latest_vitals: {
     recorded_at: string;
     temperature: number | null;

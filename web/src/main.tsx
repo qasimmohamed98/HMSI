@@ -9,6 +9,9 @@ import { ThemeProvider } from '@/lib/theme';
 import { ToastProvider, ConfirmProvider, notifyError } from '@/components/ui';
 import { AuthProvider } from '@/lib/auth';
 import { router } from '@/app/router';
+import { installErrorReporter } from '@/lib/error-reporter';
+
+installErrorReporter();
 
 const queryClient = new QueryClient({
   // أي عملية كتابة تفشل بدون معالج خاص تُظهر رسالة الخادم للمستخدم بدل الفشل الصامت

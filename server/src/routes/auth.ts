@@ -1,13 +1,14 @@
 import { Hono } from 'hono';
 import { LoginSchema, ChangePasswordSchema } from '@hmsi/shared/validate';
-import { findUserByUsername, getUserById, getPasswordHash, setPassword } from '../repos/authRepo.js';
-import { verifyPassword, hashPassword } from '../lib/password.js';
+import { findUserByUsername, getUserById, getPasswordHash, setPassword, flagMustChangePassword } from '../repos/authRepo.js';
+import { verifyPassword, hashPassword, isWeakPassword } from '../lib/password.js';
 import { createSession, destroySession, purgeExpired } from '../lib/session.js';
 import { getSession, requireAuth } from '../middleware/auth.js';
 import { isBruteForced, recordLoginAttempt } from '../middleware/security.js';
 import { writeAudit } from '../lib/audit.js';
 import { parseBody } from '../lib/validate.js';
 import { clientIp } from '../config.js';
+import { createMfaChallenge, isTotpEnabled } from './twofa.js';
 
 export const authRoutes = new Hono();
 
@@ -40,6 +41,12 @@ authRoutes.post('/login', async (c) => {
   }
 
   await recordLoginAttempt(username, ip, true);
+  // كلمة مرور معروفة/ضعيفة (مثل الحسابات التجريبية): تغيير إجباري قبل أي عمل
+  if (isWeakPassword(password, username)) await flagMustChangePassword(user.id);
+  // التحقق بخطوتين: لا جلسة قبل الرمز
+  if (await isTotpEnabled(user.id)) {
+    return c.json({ mfa_required: true, mfa_token: await createMfaChallenge(user.id) }, 200);
+  }
   const full = await getUserById(user.id);
   if (!full) return c.json({ message: 'تعذر تحميل المستخدم' }, 500);
 
@@ -73,6 +80,7 @@ authRoutes.post('/password', requireAuth(), async (c) => {
     await recordLoginAttempt(key, ip, false);
     return c.json({ message: 'كلمة المرور الحالية غير صحيحة' }, 403);
   }
+  if (isWeakPassword(new_password, session.user.username)) return c.json({ message: 'كلمة المرور هذه ضعيفة أو شائعة — اختر كلمة أقوى' }, 422);
   await setPassword(session.user.id, await hashPassword(new_password), session.sessionId);
   await writeAudit({ actorId: session.user.id, action: 'password_changed', resourceType: 'user', resourceId: session.user.id, ip });
   return c.body(null, 204);

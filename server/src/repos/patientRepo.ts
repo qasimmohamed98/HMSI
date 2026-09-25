@@ -1,12 +1,17 @@
 import type { Patient, AdmissionSummary, FamilyShare } from '@hmsi/shared';
 import { FAMILY_SHARE_CATEGORIES } from '@hmsi/shared';
 import { db, uuid, withTx } from '../../db/index.js';
+import { doctorAccessSql } from '../lib/access.js';
 import { isUniqueViolation } from '../lib/errors.js';
 import { recordArchive, type TrashActor } from '../lib/trash.js';
 
 export interface PatientListOptions {
   search?: string;
   admitted?: boolean;
+  /** الطبيب الذي يطلب القائمة (مرضاه فقط) */
+  doctorId?: string;
+  /** الممرض: مرضاه المعيَّنون حالياً */
+  nurseId?: string;
 }
 
 /** أعمدة التنويم الموحّدة — تتطلب aliases: a (admissions)، d (departments)، w (wards) */
@@ -15,7 +20,8 @@ export const ADMISSION_COLUMNS = `a.id AS admission_id, a.patient_id, a.departme
        a.family_share, a.family_message, a.family_message_by, a.family_message_at,
        d.name_ar AS department_name_ar, d.name_en AS department_name_en,
        w.name_ar AS ward_name_ar, w.name_en AS ward_name_en,
-       (SELECT full_name_ar FROM users u WHERE u.id = a.attending_doctor_id) AS attending_doctor`;
+       (SELECT full_name_ar FROM users u WHERE u.id = a.attending_doctor_id) AS attending_doctor,
+       (SELECT full_name_en FROM users u WHERE u.id = a.attending_doctor_id) AS attending_doctor_en`;
 
 const str = (v: unknown): string | null => (v === null || v === undefined || v === '' ? null : String(v));
 
@@ -41,6 +47,7 @@ export function mapAdmission(r: Record<string, unknown>): AdmissionSummary | nul
     room: String(r.room ?? ''),
     bed_no: String(r.bed_no ?? ''),
     attending_doctor: str(r.attending_doctor),
+    attending_doctor_en: str(r.attending_doctor_en),
     admitted_at: String(r.admitted_at ?? ''),
     discharged_at: str(r.discharged_at),
     status: String(r.status ?? 'active') as AdmissionSummary['status'],
@@ -83,6 +90,16 @@ function likePattern(q: string): string {
 export async function listPatients(hospitalId: string, opts: PatientListOptions = {}): Promise<Patient[]> {
   const where: string[] = [`p.hospital_id = ?`, `p.archived_at IS NULL`];
   const args: (string | number)[] = [hospitalId];
+  // الطبيب: مرضاه فقط؛ الممرض: مرضاه المعيَّنون عند طلب mine
+  if (opts.doctorId) {
+    const acc = doctorAccessSql('p', opts.doctorId);
+    where.push(acc.sql);
+    args.push(...acc.args);
+  }
+  if (opts.nurseId) {
+    where.push(`EXISTS (SELECT 1 FROM care_team ct JOIN admissions an ON an.id = ct.admission_id WHERE an.patient_id = p.id AND ct.user_id = ? AND ct.role = 'nurse' AND ct.ended_at IS NULL)`);
+    args.push(opts.nurseId);
+  }
   const search = opts.search?.trim();
   if (search) {
     where.push(`(p.full_name_ar LIKE ? ESCAPE '\\' OR p.full_name_en LIKE ? ESCAPE '\\' OR p.file_number LIKE ? ESCAPE '\\' OR p.national_id LIKE ? ESCAPE '\\' OR p.phone LIKE ? ESCAPE '\\')`);

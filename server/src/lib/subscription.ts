@@ -26,7 +26,8 @@ export function trialEnd(now = Date.now()): string {
 }
 
 /** المسارات المسموحة لمستشفى انتهى اشتراكه: الدخول/الخروج، صفحة الدفع، والصفحات العامة */
-const ALLOWED_WHEN_EXPIRED = ['/api/auth/', '/api/billing', '/api/public/'];
+// تصدير بيانات المستشفى متاح دائماً: البيانات ملك المستشفى
+const ALLOWED_WHEN_EXPIRED = ['/api/auth/', '/api/billing', '/api/public/', '/api/system/export', '/api/system/client-errors', '/api/health'];
 
 /**
  * مستشفى انتهت تجربته أو اشتراكه: يدخل مستخدموه لكن لا يصلون لأي بيانات حتى يُجدَّد الاشتراك.

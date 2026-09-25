@@ -2,7 +2,7 @@ import { localName } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil, KeyRound, ImagePlus, Trash2, CreditCard } from 'lucide-react';
+import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil, KeyRound, ImagePlus, Trash2, CreditCard, Download } from 'lucide-react';
 import type { PaymentInfo } from '@hmsi/shared';
 import { Textarea } from '@/components/ui';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Dialog, Input, Skeleton } from '@/components/ui';
@@ -14,6 +14,8 @@ import { API, type HospitalProfileInput, type AboutContent } from '@/lib/api';
 import { ROLE_PERMISSIONS } from '@hmsi/shared';
 import { useToast } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { TwoFactorCard } from '@/features/security/TwoFactorCard';
+import { AlertSettingsCard } from '@/features/alerts/AlertSettingsCard';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -87,7 +89,9 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      <AlertSettingsCard />
       <ChangePasswordCard />
+      <TwoFactorCard />
 
       {user?.role === 'super_admin' && <PaymentInfoCard />}
       {user?.role === 'super_admin' && <AboutEditorCard />}
@@ -128,6 +132,29 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* تصدير بيانات المستشفى */}
+      {canEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5 text-brand-600" />
+              {t('health.exportTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-ink/60">{t('health.exportHint')}</p>
+            <a
+              href={API.hospitalExportUrl()}
+              download
+              className="inline-flex items-center gap-2 rounded-lg border border-ink/12 px-4 py-2 text-sm font-semibold text-ink hover:bg-ink/5 dark:border-white/15 dark:hover:bg-white/5"
+            >
+              <Download className="h-4 w-4" />
+              {t('health.exportButton')}
+            </a>
+          </CardContent>
+        </Card>
+      )}
 
       {hospital && editOpen && (
         <HospitalDialog

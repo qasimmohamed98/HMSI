@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { getSession, requireAuth, requirePermission, sessionHas } from '../middleware/auth.js';
 import { listTrash, requestRestore, restoreFromTrash } from '../lib/trash.js';
+import { notify } from '../lib/notify.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit, addTimeline } from '../lib/audit.js';
 import { HttpError } from '../lib/errors.js';
@@ -36,6 +37,16 @@ trashRoutes.post('/:id/request', requireAuth(), async (c) => {
     if (own.rows.length === 0) throw new HttpError('العنصر غير موجود في المحذوفات', 404);
   }
   await requestRestore(id, s.user.hospital_id, { id: s.user.id, name: s.user.full_name_ar }, note?.trim() || null);
+  await notify({
+    hospitalId: s.user.hospital_id,
+    roles: ['admin'],
+    kind: 'restore_requested',
+    titleAr: `طلب استعادة من ${s.user.full_name_ar}`,
+    titleEn: `Restore request from ${s.user.full_name_en || s.user.full_name_ar}`,
+    bodyAr: note?.trim() || null,
+    link: '/trash',
+    createdById: s.user.id,
+  });
   await writeAudit({ actorId: s.user.id, action: 'restore_requested', resourceType: 'trash', resourceId: id, ip: clientIp(c) });
   return c.body(null, 204);
 });

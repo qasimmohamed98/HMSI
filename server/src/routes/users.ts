@@ -64,7 +64,8 @@ userRoutes.post('/:id/password', requireAuth(), requirePermission('users.manage'
   const rows = await db.execute({ sql: `SELECT role FROM users WHERE id = ? AND hospital_id = ? LIMIT 1`, args: [id, session.user.hospital_id] });
   if (rows.rows.length === 0) return c.json({ message: 'المستخدم غير موجود' }, 404);
   if (String((rows.rows[0] as Record<string, unknown>).role) === 'super_admin') return c.json({ message: 'لا يمكن تعديل حساب المدير العام' }, 403);
-  await setPassword(id, await hashPassword(password));
+  // كلمة مؤقتة: يغيّرها الموظف عند أول دخول
+  await setPassword(id, await hashPassword(password), null, true);
   await writeAudit({ actorId: session.user.id, action: 'password_reset', resourceType: 'user', resourceId: id, ip: clientIp(c) });
   return c.body(null, 204);
 });

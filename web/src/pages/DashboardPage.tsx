@@ -16,12 +16,17 @@ import { API } from '@/lib/api';
 import { fmtDate, fmtDateTime, localName } from '@/lib/format';
 import { currentLang } from '@/i18n';
 import { useMediaQuery } from '@/lib/use-media';
+import { useAuth } from '@/lib/auth';
+import { ROLE_PERMISSIONS } from '@hmsi/shared';
+import { DueDosesCard } from '@/features/dashboard/DueDosesCard';
 
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['dashboard'], queryFn: API.dashboard });
   const isMobile = useMediaQuery('(max-width: 639px)');
   const isLarge = useMediaQuery('(min-width: 1440px)');
+  const { user } = useAuth();
+  const canAdminister = user ? ROLE_PERMISSIONS[user.role].includes('medications.administer') : false;
 
   const date = fmtDate(new Date().toISOString(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -82,6 +87,8 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {canAdminister && <DueDosesCard />}
 
       {/* إنذار مبكر: مرضى تدهورت علاماتهم الحيوية (آخر قراءة خلال 24 ساعة) */}
       {data.mewsAlerts && data.mewsAlerts.length > 0 && (

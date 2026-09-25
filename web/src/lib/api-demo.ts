@@ -68,6 +68,10 @@ import type {
   AboutContent,
   FluidInput,
   AdministrationInput,
+  SystemHealth,
+  ErrorEvent,
+  StoredBackup,
+  HandoverNote,
 } from './api';
 import { createDemoStore, jsonParse, DEMO_DEPARTMENTS, type DemoStore, type AdmissionRecord } from './demo-data';
 
@@ -394,6 +398,7 @@ export const demoApi: Api = {
       end_at: input.endAt ?? null,
       status: 'active',
       prescribed_by: actorName(u),
+      allergy_override_json: input.allergyOverrideReason ? JSON.stringify({ reason: input.allergyOverrideReason, by: actorName(u), at: new Date().toISOString() }) : null,
     };
     record.medications.unshift(med);
     pushTimeline(record, actorName(u), 'medication', `وصف دواء: ${med.name_ar}`, `Medication: ${med.name_ar}`, new Date().toISOString());
@@ -1053,6 +1058,27 @@ export const demoApi: Api = {
   async signup(): Promise<User> {
     throw new Error('تسجيل المستشفيات متاح في النسخة الفعلية فقط');
   },
+  // التحقق بخطوتين متاح في النسخة الفعلية فقط
+  async loginMfa(): Promise<User> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async twofaStatus() {
+    return { enabled: false, recovery_codes_left: 0 };
+  },
+  async twofaSetup(): Promise<{ secret: string; otpauth_url: string }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async twofaEnable(): Promise<{ recovery_codes: string[] }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async twofaDisable(): Promise<void> {},
+  async twofaRecoveryCodes(): Promise<{ recovery_codes: string[] }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async resetUserTwofa(): Promise<void> {},
+  async signupToken() {
+    return { token: 'demo' };
+  },
   async publicPaymentInfo() {
     return { ...{ price: '', bank_name: '', account_name: '', account_number: '', phone: '', notes: '' }, trial_days: 14 };
   },
@@ -1137,6 +1163,97 @@ export const demoApi: Api = {
     const record = findRecordContaining('procedures', procedureId);
     record.procedures = record.procedures.filter((x) => x.id !== procedureId);
   },
+
+  // صحة النظام في وضع العرض: قيم توضيحية فقط
+  async systemHealth(): Promise<SystemHealth> {
+    return {
+      db: { ok: true, ms: 3, migrations_applied: 15, migrations_known: 15 },
+      counts: { hospitals: 1, users: store.users.length, patients: Object.keys(store.patients).length, active_admissions: Object.values(store.patients).filter((p) => p.record).length, online_sessions: 1 },
+      errors: { last_24h: 0, groups: 0 },
+      backup: { latest: null, count: 0, retention: 30, encrypted: false, error: null },
+      runtime: { node: 'demo', netlify: false, time: new Date().toISOString() },
+    };
+  },
+  async listErrors(): Promise<ErrorEvent[]> {
+    return [];
+  },
+  async clearErrors(): Promise<void> {},
+  async listBackups() {
+    return { backups: [], retention: 30, encrypted: false };
+  },
+  async createBackup(): Promise<StoredBackup & { encrypted: boolean; ms: number }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  backupUrl() {
+    return '#';
+  },
+  hospitalExportUrl() {
+    return '#';
+  },
+  async reportClientError(): Promise<void> {},
+  async medicationRounds() {
+    return [];
+  },
+  // فريق الرعاية والتسليم والخطة: النسخة الفعلية فقط
+  async vitalsRounds() {
+    return [];
+  },
+  async careTeam() {
+    return { members: [], pending_handover: null };
+  },
+  async careStaff() {
+    return [];
+  },
+  async addCareMember(): Promise<{ members: [] }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async endCareMember(): Promise<{ members: [] }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async nurseHandovers() {
+    return { incoming: [], outgoing: [], recent: [] };
+  },
+  async sendNurseHandover(): Promise<{ id: string }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async acceptNurseHandover(): Promise<{ moved: number }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async rejectNurseHandover(): Promise<void> {},
+  async cancelNurseHandover(): Promise<void> {},
+  async carePlan() {
+    return null;
+  },
+  async saveCarePlan(): Promise<never> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async demoStatus() {
+    return { present: false, hospitals: [] };
+  },
+  async purgeDemo(): Promise<never> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async purgeHospital(): Promise<never> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async emergencyAccess(): Promise<never> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async handover() {
+    return [];
+  },
+  async writeHandover(): Promise<HandoverNote> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  // الإشعارات في وضع العرض: فارغة
+  async listNotifications() {
+    return [];
+  },
+  async notificationCount() {
+    return { unread: 0, top: 'info' as const };
+  },
+  async readNotification(): Promise<void> {},
+  async readAllNotifications(): Promise<void> {},
 
   async createUser(input: NewUserInput): Promise<User> {
     const u = requireUser();

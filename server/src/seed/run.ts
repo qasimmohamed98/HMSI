@@ -2,7 +2,8 @@ import { hash } from '@node-rs/argon2';
 import { db, uuid, generateFamilyPin } from '../../db/index.js';
 import { generateBedCode } from '../repos/orgRepo.js';
 
-const PASSWORD = 'password123';
+// كلمة مرور بيانات التجربة المحلية فقط — ليست ضمن قائمة الكلمات الضعيفة حتى لا يُفرض تغييرها في الاختبارات
+const PASSWORD = 'HmsiDemo2026';
 const H = 'h-1';
 const H2 = 'h-2';
 
@@ -38,7 +39,7 @@ export async function runSeed(): Promise<{ users: number; patients: number }> {
 
   const clearOrder = [
     'timeline_events', 'procedures', 'consultations', 'radiology_reports', 'lab_results',
-    'trash', 'payment_notices', 'system_settings', 'medication_administrations', 'fluid_entries', 'medications', 'diagnoses', 'medical_notes', 'vitals', 'attachments', 'audit_logs',
+    'access_grants', 'care_plans', 'nurse_handover_items', 'nurse_handovers', 'care_team', 'handover_notes', 'notification_reads', 'notifications', 'error_events', 'mfa_challenges', 'trash', 'payment_notices', 'system_settings', 'medication_administrations', 'fluid_entries', 'medications', 'diagnoses', 'medical_notes', 'vitals', 'attachments', 'audit_logs',
     'sessions', 'login_attempts', 'admissions', 'patients', 'beds', 'wards', 'departments',
     'users', 'settings', 'hospitals',
   ];
@@ -130,6 +131,51 @@ export async function runSeed(): Promise<{ users: number; patients: number }> {
   }
   await insert('patients', patients);
   await insert('admissions', admissions);
+
+  // فريق الرعاية: الطبيب المعالج رئيسي، وطبيب ثانٍ بتخصص آخر لمريضة، وممرض واحد لكل مريض
+  const careTeam: DBRows = admissions
+    .filter((a) => a.attending_doctor_id)
+    .map((a) => ({
+      id: `ct-${a.id}`,
+      admission_id: a.id,
+      user_id: a.attending_doctor_id,
+      role: 'doctor',
+      is_primary: 1,
+      assigned_at: a.admitted_at,
+      ended_at: a.status === 'discharged' ? a.discharged_at : null,
+      end_reason: a.status === 'discharged' ? 'discharge' : null,
+    }));
+  careTeam.push({ id: 'ct-adm4-chest', admission_id: 'adm4', user_id: 'u_doctor2', role: 'doctor', specialty: 'أمراض صدرية', is_primary: 0, assigned_at: daysAgo(1, 10) });
+  const nurseOf: Record<string, string> = { adm1: 'u_nurse', adm4: 'u_nurse', adm8: 'u_nurse', adm2: 'u_nurse2', adm3: 'u_nurse2', adm7: 'u_nurse2' };
+  for (const [adm, user] of Object.entries(nurseOf)) careTeam.push({ id: `ct-${adm}-n`, admission_id: adm, user_id: user, role: 'nurse', is_primary: 0, assigned_at: daysAgo(0, 7) });
+  await insert('care_team', careTeam);
+  await insert('care_plans', [
+    {
+      admission_id: 'adm1',
+      goals: 'استقرار العلامات الحيوية واستبعاد متلازمة الشريان التاجي الحادة',
+      diet: 'قليل الملح',
+      activity: 'راحة في السرير أول 24 ساعة',
+      monitoring: 'تخطيط قلب كل 12 ساعة، تروبونين كل 6 ساعات',
+      nursing_instructions: 'إبلاغ الطبيب فوراً عند ألم صدري أو ضغط انقباضي أقل من 90',
+      vitals_interval_hours: 2,
+      review_at: daysAgo(-1, 9).slice(0, 10),
+      updated_by: 'أحمد المنصور',
+      updated_by_id: 'u_doctor',
+      updated_at: daysAgo(0, 8),
+    },
+    {
+      admission_id: 'adm4',
+      goals: 'علاج الالتهاب الرئوي وتحسن التشبع فوق 94%',
+      diet: 'عادي مع سوائل كافية',
+      activity: 'المشي بمساعدة',
+      monitoring: 'تشبع الأكسجين المستمر',
+      nursing_instructions: 'تمارين التنفس كل ساعتين أثناء الاستيقاظ',
+      vitals_interval_hours: 4,
+      updated_by: 'أحمد المنصور',
+      updated_by_id: 'u_doctor',
+      updated_at: daysAgo(1, 9),
+    },
+  ]);
   await db.execute({
     sql: `UPDATE beds SET status = 'occupied' WHERE id IN (SELECT bed_id FROM admissions WHERE status = 'active' AND bed_id IS NOT NULL)`,
     args: [],

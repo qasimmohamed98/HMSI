@@ -20,7 +20,7 @@ const FEATURES = [
 
 export default function LoginPage() {
   const { t } = useTranslation();
-  const { login } = useAuth();
+  const { login, completeMfa } = useAuth();
   const { toggle, resolved } = useTheme();
   const navigate = useNavigate();
 
@@ -28,22 +28,40 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [code, setCode] = useState('');
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
+    if (mfaToken ? code.trim().length < 6 : !username || !password) {
       setError(t('errors.required'));
       return;
     }
     setBusy(true);
     setError('');
     try {
-      await login(username, password);
+      if (mfaToken) {
+        await completeMfa(mfaToken, code.trim());
+      } else {
+        const r = await login(username, password);
+        if (r) {
+          setMfaToken(r.mfaToken);
+          return;
+        }
+      }
       navigate('/', { replace: true });
     } catch (err) {
       // «بيانات غير صحيحة» فقط عند 401 — أعطال الخادم أو الشبكة أو حد المحاولات تُعرض كما هي
       const status = (err as { status?: number })?.status;
-      if (status === undefined || status === 401) setError(t('auth.invalid'));
+      if (mfaToken && status === 401) {
+        // رمز خاطئ، أو انتهت التذكرة (5 محاولات / 5 دقائق) → العودة لكلمة المرور
+        const msg = err instanceof Error ? err.message : '';
+        if (/انتهت|expired/i.test(msg)) {
+          setMfaToken(null);
+          setCode('');
+          setError(t('twofa.expired'));
+        } else setError(t('twofa.wrongCode'));
+      } else if (status === undefined || status === 401) setError(t('auth.invalid'));
       else if (status === 429) setError(t('auth.tooMany'));
       else if (status === 0) setError(t('auth.network'));
       else setError(currentLang() === 'ar' && err instanceof Error && err.message ? err.message : t('auth.serverError'));
@@ -120,6 +138,30 @@ export default function LoginPage() {
             <form onSubmit={submit} className="mt-8 space-y-5">
               {error && <Alert variant="danger">{error}</Alert>}
 
+              {mfaToken ? (
+                <div className="space-y-3">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-ink/70">
+                    <ShieldCheck className="h-5 w-5 text-brand-600" />
+                    {t('twofa.loginPrompt')}
+                  </p>
+                  <Input
+                    label={t('twofa.codeLabel')}
+                    hint={t('twofa.codeHint')}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    autoComplete="one-time-code"
+                    inputMode="text"
+                    dir="ltr"
+                    className="text-center font-mono text-lg tracking-[0.3em]"
+                    maxLength={11}
+                    autoFocus
+                  />
+                  <button type="button" className="text-xs font-semibold text-ink/50 hover:underline" onClick={() => { setMfaToken(null); setCode(''); setError(''); }}>
+                    {t('twofa.back')}
+                  </button>
+                </div>
+              ) : (
+              <>
               <Input
                 label={t('auth.username')}
                 value={username}
@@ -136,6 +178,8 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 icon={<Lock className="h-4 w-4" />}
               />
+              </>
+              )}
 
               <Button type="submit" size="lg" className="w-full" loading={busy} icon={<LogIn className="h-5 w-5" />}>
                 {t('auth.signIn')}

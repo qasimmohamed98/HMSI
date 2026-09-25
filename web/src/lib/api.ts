@@ -43,6 +43,8 @@ export type { ChartData, ReportOverview };
 export interface PatientListParams {
   search?: string;
   admitted?: boolean;
+  /** للممرض: مرضاه المعيَّنون فقط */
+  mine?: boolean;
 }
 
 export interface NewVitalsInput {
@@ -103,6 +105,8 @@ export interface MedicationInput {
   frequency: string;
   startAt: string;
   endAt?: string | null;
+  /** سبب تجاوز تحذير الحساسية */
+  allergyOverrideReason?: string | null;
 }
 
 export interface LabInput {
@@ -176,6 +180,7 @@ export interface MedicationStatusInput {
   route?: string;
   frequency?: string;
   startAt?: string;
+  allergyOverrideReason?: string | null;
 }
 
 export interface NoteUpdateInput {
@@ -315,6 +320,8 @@ export interface SignupInput {
   email?: string | null;
   username: string;
   password: string;
+  formToken?: string;
+  website?: string;
 }
 
 export interface BillingOverview {
@@ -362,9 +369,227 @@ export interface DetailedReport {
   summary: { key: string; value: number | string }[];
 }
 
+export interface StoredBackup {
+  key: string;
+  size: number;
+  created_at: string;
+}
+
+export interface SystemHealth {
+  db: { ok: boolean; ms: number; migrations_applied: number; migrations_known: number };
+  counts: { hospitals: number; users: number; patients: number; active_admissions: number; online_sessions: number };
+  errors: { last_24h: number; groups: number };
+  backup: { latest: StoredBackup | null; count: number; retention: number; encrypted: boolean; error: string | null };
+  runtime: { node: string; netlify: boolean; time: string };
+}
+
+export interface ErrorEvent {
+  id: string;
+  source: 'server' | 'client' | 'job';
+  message: string;
+  detail: string | null;
+  path: string | null;
+  hospital_name_ar: string | null;
+  hospital_name_en: string | null;
+  user_agent: string | null;
+  count: number;
+  created_at: string;
+  last_seen_at: string;
+}
+
+export interface CareMember {
+  id: string;
+  admission_id: string;
+  user_id: string;
+  role: 'doctor' | 'nurse';
+  specialty: string | null;
+  is_primary: boolean;
+  assigned_at: string;
+  full_name_ar: string;
+  full_name_en: string | null;
+}
+
+export interface CareTeamInfo {
+  members: CareMember[];
+  pending_handover: { id: string; to_user_id: string; to_name_ar: string; to_name_en: string | null } | null;
+}
+
+export interface StaffMember {
+  id: string;
+  full_name_ar: string;
+  full_name_en: string | null;
+  patients: number;
+}
+
+export interface NurseHandoverItem {
+  admission_id: string;
+  patient_id: string;
+  full_name_ar: string;
+  full_name_en: string | null;
+  room: string;
+  bed_no: string;
+  ward_name_ar: string | null;
+  ward_name_en: string | null;
+}
+
+export interface NurseHandover {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+  note: string | null;
+  response_note: string | null;
+  created_at: string;
+  responded_at: string | null;
+  from_name_ar: string;
+  from_name_en: string | null;
+  to_name_ar: string;
+  to_name_en: string | null;
+  items: NurseHandoverItem[];
+}
+
+export interface CarePlan {
+  admission_id: string;
+  goals: string | null;
+  diet: string | null;
+  activity: string | null;
+  monitoring: string | null;
+  nursing_instructions: string | null;
+  vitals_interval_hours: number | null;
+  review_at: string | null;
+  updated_by: string;
+  updated_at: string;
+}
+
+export type CarePlanInput = Partial<Omit<CarePlan, 'admission_id' | 'updated_by' | 'updated_at'>>;
+
+export interface VitalsRoundRow {
+  admission_id: string;
+  admitted_at: string;
+  room: string;
+  bed_no: string;
+  ward_id: string;
+  ward_name_ar: string | null;
+  ward_name_en: string | null;
+  patient_id: string;
+  full_name_ar: string;
+  full_name_en: string | null;
+  file_number: string;
+  interval_hours: number | null;
+  last_at: string | null;
+  mews: { score: number; level: 'low' | 'medium' | 'high' } | null;
+  nurse_id: string | null;
+  nurse_name_ar: string | null;
+  nurse_name_en: string | null;
+}
+
+export interface HandoverNote {
+  id: string;
+  situation: string;
+  background: string | null;
+  assessment: string | null;
+  recommendation: string | null;
+  author: string;
+  created_at: string;
+}
+
+export interface HandoverPatient {
+  admission_id: string;
+  admitted_at: string;
+  reason: string | null;
+  room: string;
+  bed_no: string;
+  ward_id: string;
+  ward_name_ar: string | null;
+  ward_name_en: string | null;
+  patient_id: string;
+  full_name_ar: string;
+  full_name_en: string | null;
+  file_number: string;
+  birth_date: string | null;
+  gender: 'male' | 'female';
+  allergies: string[];
+  alerts: string[];
+  doctor_ar: string | null;
+  doctor_en: string | null;
+  nurse_ar: string | null;
+  nurse_en: string | null;
+  nurse_id: string | null;
+  nursing_instructions: string | null;
+  vitals_interval_hours: number | null;
+  diagnoses_ar: string | null;
+  diagnoses_en: string | null;
+  vitals: {
+    recorded_at: string;
+    temperature: number | null;
+    pulse: number | null;
+    respiratory_rate: number | null;
+    bp_systolic: number | null;
+    bp_diastolic: number | null;
+    spo2: number | null;
+    pain_score: number | null;
+    consciousness: string | null;
+  } | null;
+  mews: { score: number; level: 'low' | 'medium' | 'high' } | null;
+  pending_labs: number;
+  abnormal_labs_24h: number;
+  pending_radiology: number;
+  active_meds: number;
+  last_nursing_note: string | null;
+  handover: HandoverNote | null;
+}
+
+export interface RoundMedication {
+  id: string;
+  admission_id: string;
+  name_ar: string;
+  name_en: string | null;
+  dose: string | null;
+  route: string | null;
+  frequency: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  created_at: string | null;
+  dispensed_at: string | null;
+  allergy_override: boolean;
+  patient_id: string;
+  full_name_ar: string;
+  full_name_en: string | null;
+  file_number: string;
+  ward_id: string;
+  ward_name_ar: string | null;
+  ward_name_en: string | null;
+  room: string;
+  bed_no: string;
+  last_at: string | null;
+  last_status: 'given' | 'held' | 'refused' | null;
+  last_by: string | null;
+}
+
+export interface AppNotification {
+  id: string;
+  kind: string;
+  severity: 'info' | 'warning' | 'critical';
+  title_ar: string;
+  title_en: string | null;
+  body_ar: string | null;
+  body_en: string | null;
+  link: string | null;
+  created_at: string;
+  is_read: boolean;
+}
+
 export interface Api {
   mode: 'demo' | 'live';
-  login(username: string, password: string): Promise<User>;
+  /** يعيد المستخدم، أو تذكرة خطوة ثانية إن كان التحقق بخطوتين مفعّلاً */
+  login(username: string, password: string): Promise<User | { mfa_required: true; mfa_token: string }>;
+  loginMfa(mfaToken: string, code: string): Promise<User>;
+  twofaStatus(): Promise<{ enabled: boolean; recovery_codes_left: number }>;
+  twofaSetup(): Promise<{ secret: string; otpauth_url: string }>;
+  twofaEnable(code: string): Promise<{ recovery_codes: string[] }>;
+  twofaDisable(password: string): Promise<void>;
+  twofaRecoveryCodes(password: string): Promise<{ recovery_codes: string[] }>;
+  resetUserTwofa(userId: string): Promise<void>;
   logout(): Promise<void>;
   me(): Promise<User | null>;
   dashboard(): Promise<DashboardStats>;
@@ -454,6 +679,7 @@ export interface Api {
   switchHospital(hospitalId: string): Promise<Hospital>;
   // التسجيل الذاتي والاشتراك
   signup(input: SignupInput): Promise<User>;
+  signupToken(): Promise<{ token: string }>;
   publicPaymentInfo(): Promise<PaymentInfo & { trial_days: number }>;
   billing(): Promise<BillingOverview>;
   submitPaymentNotice(input: { amount: string; method: string; reference?: string | null; note?: string | null }): Promise<PaymentNotice>;
@@ -465,6 +691,41 @@ export interface Api {
   updateAbout(content: AboutContent): Promise<AboutContent>;
   // صفحة ذوي المريض (عامة)
   publicTrack(code: string): Promise<PublicTrackInfo>;
+  // صحة النظام والنسخ الاحتياطي (المدير العام) وتصدير بيانات المستشفى
+  systemHealth(): Promise<SystemHealth>;
+  listErrors(): Promise<ErrorEvent[]>;
+  clearErrors(): Promise<void>;
+  listBackups(): Promise<{ backups: StoredBackup[]; retention: number; encrypted: boolean }>;
+  createBackup(): Promise<StoredBackup & { encrypted: boolean; ms: number }>;
+  backupUrl(key: string): string;
+  hospitalExportUrl(): string;
+  reportClientError(e: { message: string; detail?: string | null; path?: string | null }): Promise<void>;
+  medicationRounds(ward?: string, mine?: boolean): Promise<RoundMedication[]>;
+  vitalsRounds(ward?: string, mine?: boolean): Promise<VitalsRoundRow[]>;
+  handover(ward?: string, mine?: boolean): Promise<HandoverPatient[]>;
+  // فريق الرعاية والتسليم والاستلام والخطة العلاجية
+  careTeam(admissionId: string): Promise<CareTeamInfo>;
+  careStaff(role: 'doctor' | 'nurse'): Promise<StaffMember[]>;
+  addCareMember(admissionId: string, input: { userId: string; role: 'doctor' | 'nurse'; specialty?: string | null; primary?: boolean }): Promise<{ members: CareMember[] }>;
+  endCareMember(admissionId: string, memberId: string): Promise<{ members: CareMember[] }>;
+  nurseHandovers(): Promise<{ incoming: NurseHandover[]; outgoing: NurseHandover[]; recent: NurseHandover[] }>;
+  sendNurseHandover(input: { toUserId: string; admissionIds: string[]; note?: string | null }): Promise<{ id: string }>;
+  acceptNurseHandover(id: string): Promise<{ moved: number }>;
+  rejectNurseHandover(id: string, reason: string): Promise<void>;
+  cancelNurseHandover(id: string): Promise<void>;
+  carePlan(admissionId: string): Promise<CarePlan | null>;
+  saveCarePlan(admissionId: string, input: CarePlanInput): Promise<CarePlan>;
+  emergencyAccess(patientId: string, reason: string): Promise<{ expires_at: string }>;
+  // حذف بيانات التجربة والمستشفيات (المدير العام)
+  demoStatus(): Promise<{ present: boolean; hospitals: { id: string; name_ar: string; name_en: string; patients: number; users: number }[] }>;
+  purgeDemo(confirm: string): Promise<{ backup: string; hospitals: string[] }>;
+  purgeHospital(id: string, confirmCode: string): Promise<{ backup: string }>;
+  writeHandover(admissionId: string, input: { situation: string; background?: string; assessment?: string; recommendation?: string }): Promise<HandoverNote>;
+  // الإشعارات
+  listNotifications(): Promise<AppNotification[]>;
+  notificationCount(): Promise<{ unread: number; top: 'info' | 'warning' | 'critical' }>;
+  readNotification(id: string): Promise<void>;
+  readAllNotifications(): Promise<void>;
   familyTrack(code: string, pin: string): Promise<PublicTrackFamily>;
 }
 

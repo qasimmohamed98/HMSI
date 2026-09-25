@@ -6,9 +6,12 @@ const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api
 
 class HttpError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** رمز خطأ الخادم إن وُجد (مثل not_your_patient) */
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -38,22 +41,36 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // انتهى اشتراك المستشفى: حدّث المستخدم ليُحوَّل إلى صفحة الدفع
     window.dispatchEvent(new Event('hmsi:subscription-expired'));
   }
+  if (res.status === 403 && res.headers.get('X-Hmsi-Reason') === 'password_change_required') {
+    // كلمة مرور مؤقتة/ضعيفة: حدّث المستخدم لتظهر شاشة التغيير الإجباري
+    window.dispatchEvent(new Event('hmsi:subscription-expired'));
+  }
   if (res.status === 401 && !path.startsWith('/auth/') && !path.startsWith('/public/')) {
     // انتهت الجلسة: أبلغ AuthProvider لإعادة التوجيه لصفحة الدخول
     window.dispatchEvent(new Event('hmsi:unauthorized'));
   }
   if (!res.ok) {
     let message = i18n.t('errors.generic');
+    let code: string | undefined;
     try {
       const body = await res.json();
       message = localizeServerMessage(body?.message) || message;
+      code = typeof body?.code === 'string' ? body.code : undefined;
     } catch {
       /* ignore */
     }
-    throw new HttpError(res.status, message);
+    throw new HttpError(res.status, message, code);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/** بناء query string من القيم المعرّفة فقط */
+function qs(params: Record<string, string | undefined>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) p.set(k, v);
+  const s = p.toString();
+  return s ? `?${s}` : '';
 }
 
 function mapNewVitals(v: NewVitalsInput) {
@@ -79,12 +96,20 @@ export const liveApi: Api = {
 
   login: (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  loginMfa: (mfaToken, code) => request('/auth/2fa/login', { method: 'POST', body: JSON.stringify({ mfa_token: mfaToken, code }) }),
+  twofaStatus: () => request('/auth/2fa/status'),
+  twofaSetup: () => request('/auth/2fa/setup', { method: 'POST', body: '{}' }),
+  twofaEnable: (code) => request('/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) }),
+  twofaDisable: (password) => request('/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ password }) }),
+  twofaRecoveryCodes: (password) => request('/auth/2fa/recovery-codes', { method: 'POST', body: JSON.stringify({ password }) }),
+  resetUserTwofa: (userId) => request(`/users/${userId}/2fa/reset`, { method: 'POST', body: '{}' }),
   me: () => request('/auth/me'),
   dashboard: () => request('/dashboard/stats'),
   listPatients: (params) => {
     const qs = new URLSearchParams();
     if (params?.search) qs.set('search', params.search);
     if (params?.admitted) qs.set('admitted', '1');
+    if (params?.mine) qs.set('mine', '1');
     return request(`/patients${qs.toString() ? `?${qs}` : ''}`);
   },
   createPatient: (input) =>
@@ -217,6 +242,7 @@ export const liveApi: Api = {
         frequency: input.frequency,
         start_at: input.startAt,
         end_at: input.endAt ?? null,
+        allergy_override_reason: input.allergyOverrideReason || undefined,
       }),
     }),
   addLabResult: (input) =>
@@ -335,6 +361,7 @@ export const liveApi: Api = {
         route: input.route,
         frequency: input.frequency,
         start_at: input.startAt,
+        allergy_override_reason: input.allergyOverrideReason || undefined,
       }),
     }),
   updateNote: (admissionId, noteId, input) =>
@@ -385,8 +412,11 @@ export const liveApi: Api = {
         email: input.email || null,
         username: input.username,
         password: input.password,
+        form_token: input.formToken,
+        website: input.website || undefined,
       }),
     }),
+  signupToken: () => request('/public/signup-token'),
   publicPaymentInfo: () => request('/public/payment-info'),
   getAbout: () => request('/public/about'),
   updateAbout: (content) => request('/site/about', { method: 'PUT', body: JSON.stringify(content) }),
@@ -412,6 +442,38 @@ export const liveApi: Api = {
   deleteRadiology: (admissionId, radiologyId) => request(`/patients/${admissionId}/radiology/${radiologyId}`, { method: 'DELETE' }),
   deleteConsultation: (admissionId, consultationId) => request(`/patients/${admissionId}/consultations/${consultationId}`, { method: 'DELETE' }),
   deleteProcedure: (admissionId, procedureId) => request(`/patients/${admissionId}/procedures/${procedureId}`, { method: 'DELETE' }),
+  systemHealth: () => request('/system/health'),
+  listErrors: () => request('/system/errors'),
+  clearErrors: () => request('/system/errors', { method: 'DELETE' }),
+  listBackups: () => request('/system/backups'),
+  createBackup: () => request('/system/backups', { method: 'POST', body: '{}' }),
+  backupUrl: (key) => `${BASE}/system/backups/${encodeURIComponent(key)}`,
+  hospitalExportUrl: () => `${BASE}/system/export`,
+  reportClientError: (e) => request('/system/client-errors', { method: 'POST', body: JSON.stringify(e) }),
+  medicationRounds: (ward, mine) => request(`/medication-rounds${qs({ ward, mine: mine ? '1' : undefined })}`),
+  vitalsRounds: (ward, mine) => request(`/medication-rounds/vitals${qs({ ward, mine: mine ? '1' : undefined })}`),
+  careTeam: (admissionId) => request(`/care-team/admissions/${admissionId}`),
+  careStaff: (role) => request(`/care-team/staff?role=${role}`),
+  addCareMember: (admissionId, input) =>
+    request(`/care-team/admissions/${admissionId}`, { method: 'POST', body: JSON.stringify({ user_id: input.userId, role: input.role, specialty: input.specialty || null, primary: input.primary ?? false }) }),
+  endCareMember: (admissionId, memberId) => request(`/care-team/admissions/${admissionId}/members/${memberId}/end`, { method: 'POST', body: '{}' }),
+  nurseHandovers: () => request('/care-team/handovers'),
+  sendNurseHandover: (input) => request('/care-team/handovers', { method: 'POST', body: JSON.stringify({ to_user_id: input.toUserId, admission_ids: input.admissionIds, note: input.note || null }) }),
+  acceptNurseHandover: (id) => request(`/care-team/handovers/${id}/accept`, { method: 'POST', body: '{}' }),
+  rejectNurseHandover: (id, reason) => request(`/care-team/handovers/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  cancelNurseHandover: (id) => request(`/care-team/handovers/${id}/cancel`, { method: 'POST', body: '{}' }),
+  carePlan: (admissionId) => request(`/care-team/plans/${admissionId}`),
+  saveCarePlan: (admissionId, input) => request(`/care-team/plans/${admissionId}`, { method: 'PUT', body: JSON.stringify(input) }),
+  demoStatus: () => request('/system/demo-status'),
+  purgeDemo: (confirm) => request('/system/purge-demo', { method: 'POST', body: JSON.stringify({ confirm }) }),
+  purgeHospital: (id, confirmCode) => request(`/hospitals/${id}/purge`, { method: 'POST', body: JSON.stringify({ confirm_code: confirmCode }) }),
+  emergencyAccess: (patientId, reason) => request(`/patients/${patientId}/emergency-access`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  handover: (ward, mine) => request(`/handover${qs({ ward, mine: mine ? '1' : undefined })}`),
+  writeHandover: (admissionId, input) => request(`/handover/${admissionId}`, { method: 'POST', body: JSON.stringify(input) }),
+  listNotifications: () => request('/notifications'),
+  notificationCount: () => request('/notifications/count'),
+  readNotification: (id) => request(`/notifications/${id}/read`, { method: 'POST', body: '{}' }),
+  readAllNotifications: () => request('/notifications/read-all', { method: 'POST', body: '{}' }),
 };
 
 export { HttpError, csrfToken };

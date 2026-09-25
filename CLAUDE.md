@@ -14,3 +14,7 @@
 - الهوية: اسم المنتج المعروض **Q VIREXA**؛ ارسم الرمز دائماً من `web/src/components/brand/q-geometry.ts` (أو مكوّني `QMark`/`QLockup`) ولا تعِد رسمه يدوياً.
 - رسالة خطأ عربية جديدة في الخادم = أضف ترجمتها في `web/src/i18n/server-messages.ts`. اعرض أسماء البيانات بـ `localName(obj, 'name')` لا بـ `name_ar` مباشرة.
 - شعار المستشفى (يرفعه المستشفى) منفصل عن شعار النظام Q VIREXA: لا تضع أحدهما مكان الآخر.
+- CSP صارمة في `netlify.toml`: لا سكربت inline ولا `onclick` ولا مصادر خارجية (نوافذ الطباعة تُدار من الصفحة الأم).
+- كلمة مرور البيانات التجريبية `HmsiDemo2026`؛ الكلمات الشائعة تُفرض عليها تغيير إجباري.
+- الطبيب يرى مرضاه فقط (`server/src/lib/access.ts`): أي مسار جديد لبيانات مريض يمر عبر `getAdmissionScope` أو `assertPatientAccess`، وأي قائمة مرضى تستخدم `doctorAccessSql`. ممرض واحد فعّال لكل مريض (`care_team`).
+- سكربت صور الدليل: `node scripts/capture-guide.mjs` (عربي) و`--en` (إنجليزي) على قاعدة `visual.db` بعد seed.

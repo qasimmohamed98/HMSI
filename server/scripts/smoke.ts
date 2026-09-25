@@ -37,7 +37,7 @@ interface Sess {
   csrf: string;
 }
 
-async function login(username: string, password = 'password123'): Promise<Sess> {
+async function login(username: string, password = 'HmsiDemo2026'): Promise<Sess> {
   const res = await api.request(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-forwarded-for': `10.0.0.${username.length}` },
@@ -90,6 +90,8 @@ const lab = client(await login('lab'));
 const reception = client(await login('reception'));
 const viewer = client(await login('viewer'));
 const admin2 = client(await login('admin2'));
+// الطبيب يرى مرضاه فقط: نضيفه لفريق رعاية مريض adm2 (طبيبه المعالج doctor2) كما يفعل الاستقبال أو الإدارة
+await client(await login('manager')).post('/care-team/admissions/adm2', { user_id: 'u_doctor', role: 'doctor', specialty: 'باطنية' });
 check('اسم المستخدم غير حساس لحالة الأحرف', (await login('DOCTOR').then(() => true).catch(() => false)));
 
 console.log('\n— CSRF');
@@ -118,7 +120,7 @@ check('لا يمكن تغيير دورك بنفسك (400)', (await manager.patch
 console.log('\n— عزل المستشفيات');
 check('مدير مستشفى آخر لا يرى ملف مريض (404)', (await admin2.get('/patients/p1/chart')).status === 404);
 check('مدير مستشفى آخر لا يرى قائمة مرضى مستشفى 1', ((await admin2.get('/patients')).json as unknown[]).length === 0);
-check('مدير مستشفى آخر لا يصدر رمز عائلة لتنويم خارجي (409)', (await admin2.post('/admissions/adm1/family-pin')).status === 409);
+check('مدير مستشفى آخر لا يصدر رمز عائلة لتنويم خارجي (404)', (await admin2.post('/admissions/adm1/family-pin')).status === 404);
 check('مدير مستشفى آخر لا يحذف مرفقات تنويم خارجي (404)', (await admin2.del('/patients/adm1/attachments/x')).status === 404);
 check('مدير مستشفى آخر لا ينقل مريضاً خارجياً (409/404)', [404, 409].includes((await admin2.post('/admissions/adm1/transfer', { bed_id: 'bed-17' })).status));
 
@@ -149,7 +151,7 @@ const wards = (await reception.get('/wards')).json as { department_id: string; b
 check('كل الأسرّة لها كود QR', wards.every((w) => w.beds.every((b) => /^b[a-z0-9]{6,}$/.test(b.code))));
 const h1Wards = wards.filter((w) => w.department_id !== 'd-h2-1');
 const free = h1Wards.flatMap((w) => w.beds.filter((b) => b.status === 'free').map((b) => ({ bed: b, dept: w.department_id })));
-const admit = await reception.post('/admissions', { patient_id: p1.json.id, bed_id: free[0].bed.id, department_id: free[0].dept, reason: 'ألم بطن' });
+const admit = await reception.post('/admissions', { patient_id: p1.json.id, bed_id: free[0].bed.id, department_id: free[0].dept, attending_doctor_id: 'u_doctor', reason: 'ألم بطن' });
 check('الاستقبال ينوّم مريضاً ويحصل على رمز عائلة', admit.status === 201 && /^\d{6}$/.test(admit.json.family_pin), admit.json);
 check('حجز نفس السرير مرة أخرى = 409', (await reception.post('/admissions', { patient_id: p2.json.id, bed_id: free[0].bed.id, department_id: free[0].dept })).status === 409);
 const chartViewer = await viewer.get(`/patients/${p1.json.id}/chart`);
@@ -238,7 +240,7 @@ console.log('\n— المدير العام');
 const hosp = await superA.post('/hospitals', { name_ar: 'مستشفى الاختبار', name_en: 'Test Hospital' });
 check('إنشاء مستشفى', hosp.status === 201 && hosp.json.is_active === true, hosp.json);
 check('manager لا ينشئ مستشفى (403)', (await manager.post('/hospitals', { name_ar: 'x y', name_en: 'x y' })).status === 403);
-const hadmin = await superA.post(`/hospitals/${hosp.json.id}/admins`, { username: 'TestAdmin', password: 'password123', full_name_ar: 'مدير الاختبار' });
+const hadmin = await superA.post(`/hospitals/${hosp.json.id}/admins`, { username: 'TestAdmin', password: 'HmsiDemo2026', full_name_ar: 'مدير الاختبار' });
 check('إنشاء مدير للمستشفى', hadmin.status === 201);
 const tAdmin = client(await login('testadmin'));
 check('مدير المستشفى الجديد يدخل ويرى مستشفاه', (await tAdmin.get('/auth/me')).json.hospital_id === hosp.json.id);
@@ -260,7 +262,9 @@ console.log('\n— الصيدلية والخروج والتدقيق');
   check('الصيدلي يصرف الدواء', d1.status === 200 && Boolean(d1.json.dispensed_at), d1.json);
   check('لا صرف مكرر (409)', (await pharm.post(`/patients/adm2/medications/${m.json.id}/dispense`)).status === 409);
   check('الطبيب لا يصرف (403)', (await doctor.post(`/patients/adm2/medications/${m.json.id}/dispense`)).status === 403);
-  check('الطبيب يعتمد الخروج', (await doctor.post('/admissions/adm5/discharge', { discharge_type: 'home', summary: 'تحسن' })).status === 204);
+  const notMine = await doctor.post('/admissions/adm5/discharge', { discharge_type: 'home', summary: 'تحسن' });
+  check('طبيب من خارج الفريق لا يعتمد الخروج (403 not_your_patient)', notMine.status === 403 && notMine.json.code === 'not_your_patient');
+  check('الطبيب المعالج يعتمد الخروج', (await client(await login('doctor3')).post('/admissions/adm5/discharge', { discharge_type: 'home', summary: 'تحسن' })).status === 204);
   const audit = await manager.get('/audit');
   check('سجل التدقيق لمدير المستشفى', audit.status === 200 && audit.json.length > 0 && audit.json.some((e: any) => e.action === 'medication_dispensed'));
   check('سجل التدقيق معزول عن المستشفيات الأخرى', ((await admin2.get('/audit')).json as any[]).every((e) => e.actor_id !== 'u_doctor'));
@@ -387,7 +391,16 @@ console.log('\n— التسجيل الذاتي والفترة التجريبية
   check('مدير المستشفى لا يضبط معلومات الدفع (403)', (await manager.put('/billing/payment-info', { price: 'x' })).status === 403);
   const info = await anon.get('/public/payment-info');
   check('معلومات الدفع عامة مع مدة التجربة', info.status === 200 && info.json.bank_name === 'مصرف الرافدين' && info.json.trial_days === 14);
-  const signupBody = { hospital_name_ar: 'مستشفى التسجيل الذاتي', contact_phone: '07701234567', full_name_ar: 'مدير جديد', username: 'selfadmin', password: 'Trial2026x', city: 'بغداد' };
+  process.env.SIGNUP_MIN_MS = '0';
+  const formToken = (await anon.get('/public/signup-token')).json.token as string;
+  const signupBody = { hospital_name_ar: 'مستشفى التسجيل الذاتي', contact_phone: '07701234567', full_name_ar: 'مدير جديد', username: 'selfadmin', password: 'Trial2026x', city: 'بغداد', form_token: formToken };
+  check('التسجيل بلا رمز نموذج مرفوض', (await anon.post('/public/signup', { ...signupBody, form_token: undefined })).json?.code === 'form_expired');
+  check('رمز نموذج مزوّر مرفوض', (await anon.post('/public/signup', { ...signupBody, form_token: `${Date.now() - 60_000}.forged` })).status === 422);
+  check('الحقل المخفي (فخ البرامج الآلية) يرفض التسجيل', (await anon.post('/public/signup', { ...signupBody, website: 'http://spam.example' })).status === 422);
+  process.env.SIGNUP_MIN_MS = '3000';
+  check('إرسال النموذج فوراً بعد فتحه مرفوض', (await anon.post('/public/signup', { ...signupBody, form_token: (await anon.get('/public/signup-token')).json.token })).status === 422);
+  process.env.SIGNUP_MIN_MS = '0';
+  check('كلمة مرور شائعة عند التسجيل مرفوضة', (await anon.post('/public/signup', { ...signupBody, password: 'Password123' })).status === 422);
   check('كلمة مرور ضعيفة عند التسجيل (422)', (await anon.post('/public/signup', { ...signupBody, password: 'abcdefgh' })).status === 422);
   check('اسم مستخدم مكرر عند التسجيل (409)', (await anon.post('/public/signup', { ...signupBody, username: 'doctor' })).status === 409);
   const reg = await api.request(`${BASE}/public/signup`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.9.9.9' }, body: JSON.stringify(signupBody) });
@@ -436,20 +449,406 @@ console.log('\n— التقارير التفصيلية');
   check('المشاهد لا يرى التقارير (403)', (await viewer.get(`/reports/detail/admissions?${range}`)).status === 403);
 }
 
+console.log('\n— تحذير الحساسية عند الوصف');
+{
+  // adm1: المريض p1 لديه حساسية بنسلين
+  const base = { admission_id: 'adm1', dose: '1g', route: 'IV', frequency: 'q8h', start_at: '2026-09-24' };
+  const blocked = await doctor.post('/patients/adm1/medications', { ...base, name_ar: 'أوجمنتين' });
+  check('وصف بنسلين لمريض حساس يُرفض بلا سبب (409)', blocked.status === 409 && blocked.json.code === 'allergy_conflict' && blocked.json.conflicts?.[0]?.kind === 'class');
+  const cross = await doctor.post('/patients/adm1/medications', { ...base, name_ar: 'سيفترياكسون', name_en: 'Ceftriaxone' });
+  check('التفاعل المتصالب (سيفالوسبورين) يُنبَّه عليه', cross.status === 409 && cross.json.conflicts?.[0]?.kind === 'cross');
+  check('سبب قصير غير مقبول', (await doctor.post('/patients/adm1/medications', { ...base, name_ar: 'أوجمنتين', allergy_override_reason: 'ok' })).status === 422);
+  const ok = await doctor.post('/patients/adm1/medications', { ...base, name_ar: 'أوجمنتين', allergy_override_reason: 'تحمّله سابقاً دون تفاعل — مراقبة لصيقة' });
+  const ov = JSON.parse(ok.json.allergy_override_json ?? 'null');
+  check('التجاوز بسبب مكتوب يُحفظ مع الدواء', ok.status === 201 && ov?.reason?.includes('تحمّله') && ov?.conflicts?.length === 1);
+  const { db } = await import('../db/index.js');
+  const aud = await db.execute({ sql: `SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'allergy_override' AND resource_id = ?`, args: [ok.json.id] });
+  check('التجاوز مسجّل في سجل التدقيق', Number(aud.rows[0]!.n) === 1);
+  const safe = await doctor.post('/patients/adm1/medications', { ...base, name_ar: 'باراسيتامول', name_en: 'Paracetamol' });
+  check('دواء آمن يوصف مباشرة', safe.status === 201 && !safe.json.allergy_override_json);
+  const rename = await doctor.patch(`/patients/adm1/medications/${safe.json.id}`, { name_ar: 'أموكسيسيلين' });
+  check('تغيير اسم الدواء يعيد فحص الحساسية', rename.status === 409);
+}
+
+console.log('\n— النسخ الاحتياطي والتصدير والمراقبة');
+{
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  process.env.BACKUP_DIR = await mkdtemp(join(tmpdir(), 'hmsi-bk-'));
+  process.env.BACKUP_KEY = 'smoke-test-backup-key';
+  const { decodeBackup } = await import('../src/lib/backup.js');
+
+  const health = await anon.get('/health');
+  check('فحص الصحة العام يعمل بلا تسجيل دخول', health.status === 200 && health.json.ok === true && !('counts' in health.json));
+  check('صحة النظام التفصيلية للمدير العام فقط', (await manager.get('/system/health')).status === 403);
+  check('مدير المستشفى لا ينشئ نسخة احتياطية (403)', (await manager.post('/system/backups')).status === 403);
+
+  const made = await superA.post('/system/backups');
+  check('المدير العام ينشئ نسخة احتياطية مشفّرة', made.status === 201 && made.json.encrypted === true && made.json.counts.patients > 0 && !('sessions' in made.json.counts));
+  const list = await superA.get('/system/backups');
+  check('قائمة النسخ تعرضها', list.json.backups?.[0]?.key === made.json.key);
+  check('مفتاح نسخة غير صالح مرفوض', (await superA.get('/system/backups/..%2F..%2Fetc')).status === 404);
+  const dl = await api.request(`${BASE}/system/backups/${made.json.key}`, { headers: { cookie: (await login('admin')).cookie } });
+  const bytes = Buffer.from(await dl.arrayBuffer());
+  const decoded = decodeBackup(bytes);
+  check('النسخة المنزّلة تُفك بالمفتاح وتطابق الأعداد', dl.status === 200 && decoded.counts.patients === made.json.counts.patients && decoded.tables.users.length > 0);
+  let wrongKey = false;
+  try {
+    decodeBackup(bytes, 'wrong-key');
+  } catch {
+    wrongKey = true;
+  }
+  check('لا تُفك النسخة بمفتاح خاطئ', wrongKey);
+  check('ملف النسخة لا يحوي نصاً مقروءاً', !bytes.includes(Buffer.from('password_hash')));
+
+  // تمرين الاستعادة على ملف محلي
+  const bakFile = join(process.env.BACKUP_DIR, made.json.key);
+  const { execFileSync } = await import('node:child_process');
+  let drill = '';
+  try {
+    drill = execFileSync(process.execPath, ['--import', 'tsx', 'scripts/restore-drill.ts', bakFile, `file:${join(process.env.BACKUP_DIR, 'drill.db')}`], { encoding: 'utf8', env: { ...process.env, LOCAL_DB_URL: `file:${join(process.env.BACKUP_DIR, 'drill-src.db')}` } });
+  } catch (e) {
+    drill = String((e as { stdout?: string }).stdout ?? e);
+  }
+  check('تمرين الاستعادة ينجح ويطابق كل الجداول', drill.includes('✓ الاستعادة سليمة'));
+
+  const exp = await manager.get('/system/export');
+  const expUsers: Record<string, unknown>[] = exp.json?.tables?.users ?? [];
+  check('مدير المستشفى يصدّر بيانات مستشفاه', exp.status === 200 && exp.json.scope === 'hospital' && exp.json.tables.patients.length > 0);
+  check('التصدير بلا كلمات مرور أو أسرار', expUsers.length > 0 && expUsers.every((u) => !('password_hash' in u) && !('totp_secret' in u)));
+  check('التصدير لا يتضمن مستشفى آخر', exp.json.tables.patients.every((p: { hospital_id: string }) => p.hospital_id === exp.json.hospital_id) && exp.json.tables.hospitals.length === 1);
+  check('الطبيب لا يصدّر (403)', (await doctor.get('/system/export')).status === 403);
+
+  check('تسجيل خطأ من الواجهة', (await doctor.post('/system/client-errors', { message: 'TypeError: x is undefined 1012312341', path: '/patients/p1' })).status === 204);
+  await doctor.post('/system/client-errors', { message: 'TypeError: x is undefined 1012312341', path: '/patients/p2' });
+  const errs = await superA.get('/system/errors');
+  const e = errs.json.find((x: { source: string }) => x.source === 'client');
+  check('الأخطاء المتكررة تُجمع والأرقام الطويلة تُحجب', e?.count === 2 && !String(e.message).includes('1012312341'));
+  check('صحة النظام تعرض النسخ والأخطاء', (await superA.get('/system/health')).json.backup.count === 1);
+  delete process.env.BACKUP_KEY;
+}
+
+console.log('\n— كلمات المرور الضعيفة والمؤقتة والخمول');
+{
+  const { db } = await import('../db/index.js');
+  const { hashPassword } = await import('../src/lib/password.js');
+  // حساب تجريبي قديم بكلمة password123 (مثل ما قد يوجد في قاعدة الإنتاج)
+  await db.execute({ sql: `UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = 'u_viewer'`, args: [await hashPassword('password123')] });
+  const weak = client(await login('viewer', 'password123'));
+  const meWeak = await weak.get('/auth/me');
+  check('الدخول بكلمة ضعيفة يفرض تغييرها', meWeak.json.must_change_password === true);
+  const blockedWeak = await weak.get('/patients');
+  check('لا وصول للبيانات قبل التغيير (403)', blockedWeak.status === 403 && blockedWeak.json.code === 'password_change_required');
+  check('كلمة جديدة شائعة مرفوضة (422)', (await weak.post('/auth/password', { current_password: 'password123', new_password: 'Password1' })).status === 422);
+  check('تغيير كلمة المرور يرفع القيد', (await weak.post('/auth/password', { current_password: 'password123', new_password: 'Obs#2026xq7' })).status === 204);
+  check('الوصول بعد التغيير', (await weak.get('/patients')).status === 200 && (await weak.get('/auth/me')).json.must_change_password === false);
+
+  // كلمة مؤقتة يضعها المدير
+  check('المدير يعيد تعيين كلمة موظف', (await manager.post('/users/u_lab/password', { password: 'Temp2026lab' })).status === 204);
+  const temp = client(await login('lab', 'Temp2026lab'));
+  check('الكلمة المؤقتة تفرض التغيير', (await temp.get('/auth/me')).json.must_change_password === true && (await temp.get('/patients')).status === 403);
+  await temp.post('/auth/password', { current_password: 'Temp2026lab', new_password: 'Specimen#2026' });
+
+  // الخمول: جلسة بلا نشاط 31 دقيقة تنتهي
+  const idle = await login('reception');
+  await db.execute({ sql: `UPDATE sessions SET last_seen_at = ? WHERE user_id = 'u_reception'`, args: [new Date(Date.now() - 31 * 60_000).toISOString()] });
+  const r = await api.request(`${BASE}/auth/me`, { headers: { cookie: idle.cookie } });
+  check('الجلسة تنتهي بعد 30 دقيقة خمول', (await r.json()) === null);
+}
+
 console.log('\n— كلمات المرور');
 {
   const nurse2 = client(await login('nurse2'));
-  check('كلمة مرور ضعيفة مرفوضة (422)', (await nurse2.post('/auth/password', { current_password: 'password123', new_password: 'abcdefgh' })).status === 422);
+  check('كلمة مرور ضعيفة مرفوضة (422)', (await nurse2.post('/auth/password', { current_password: 'HmsiDemo2026', new_password: 'abcdefgh' })).status === 422);
   check('كلمة مرور حالية خاطئة (403)', (await nurse2.post('/auth/password', { current_password: 'wrongpass1', new_password: 'newPass2026' })).status === 403);
-  check('تغيير كلمة المرور', (await nurse2.post('/auth/password', { current_password: 'password123', new_password: 'newPass2026' })).status === 204);
+  check('تغيير كلمة المرور', (await nurse2.post('/auth/password', { current_password: 'HmsiDemo2026', new_password: 'newPass2026' })).status === 204);
   check('الدخول بكلمة المرور الجديدة', await login('nurse2', 'newPass2026').then(() => true).catch(() => false));
   check('المدير يعيد تعيين كلمة مرور موظف', (await manager.post('/users/u_nurse2/password', { password: 'reset2026x' })).status === 204);
   check('الجلسة القديمة تنتهي بعد إعادة التعيين', (await nurse2.get('/auth/me')).json === null);
   check('المدير لا يعيد تعيين كلمة مرور المدير العام (403)', (await manager.post('/users/u_admin/password', { password: 'reset2026x' })).status === 403);
 }
 
+console.log('\n— التحقق بخطوتين');
+{
+  const { totpAt, currentStep } = await import('../src/lib/totp.js');
+  const rawLogin = (username: string, password = 'HmsiDemo2026') =>
+    api.request(`${BASE}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.7.7.7' }, body: JSON.stringify({ username, password }) });
+  const cookiesOf = (res: Response) => {
+    const jar: Record<string, string> = {};
+    for (const line of res.headers.getSetCookie()) {
+      const [pair] = line.split(';');
+      const i = pair!.indexOf('=');
+      jar[pair!.slice(0, i)] = pair!.slice(i + 1);
+    }
+    return jar;
+  };
+  const rad = client(await login('radiology'));
+  check('الحالة الابتدائية: غير مفعّل', (await rad.get('/auth/2fa/status')).json.enabled === false);
+  const setup = await rad.post('/auth/2fa/setup');
+  check('الإعداد يعيد سراً ورابط QR', setup.status === 200 && /^[A-Z2-7]{32}$/.test(setup.json.secret) && setup.json.otpauth_url.startsWith('otpauth://totp/'));
+  const secret = setup.json.secret as string;
+  check('رمز خاطئ لا يفعّل', (await rad.post('/auth/2fa/enable', { code: '000000' })).status === 422);
+  const en = await rad.post('/auth/2fa/enable', { code: totpAt(secret, currentStep()) });
+  check('التفعيل برمز صحيح يعيد 8 رموز استرداد', en.status === 200 && en.json.recovery_codes.length === 8);
+  const recovery = en.json.recovery_codes as string[];
+  const { db } = await import('../db/index.js');
+  const stored = await db.execute(`SELECT totp_secret, totp_recovery_json FROM users WHERE id = 'u_radiology'`);
+  check('السر مخزّن مشفّراً ورموز الاسترداد مجزّأة', !String(stored.rows[0]!.totp_secret).includes(secret) && !String(stored.rows[0]!.totp_recovery_json).includes(recovery[0]!));
+
+  const step1 = await rawLogin('radiology');
+  const s1 = (await step1.json()) as { mfa_required?: boolean; mfa_token?: string };
+  check('كلمة المرور وحدها لا تنشئ جلسة', s1.mfa_required === true && !!s1.mfa_token && !cookiesOf(step1).hmsi_session);
+  const bad = await anon.post('/auth/2fa/login', { mfa_token: s1.mfa_token, code: '123456' });
+  check('رمز خاطئ في الخطوة الثانية = 401', bad.status === 401);
+  // الرمز المستخدم في التفعيل لا يُقبل ثانية (منع إعادة الاستخدام) — نستخدم رمز الخطوة التالية
+  const good = await api.request(`${BASE}/auth/2fa/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mfa_token: s1.mfa_token, code: totpAt(secret, currentStep() + 1) }) });
+  check('الرمز الصحيح ينشئ الجلسة', good.status === 200 && !!cookiesOf(good).hmsi_session);
+  const replay = await rawLogin('radiology');
+  const t2 = ((await replay.json()) as { mfa_token: string }).mfa_token;
+  check('نفس الرمز لا يُستخدم مرتين', (await anon.post('/auth/2fa/login', { mfa_token: t2, code: totpAt(secret, currentStep() + 1) })).status === 401);
+  const rec = await anon.post('/auth/2fa/login', { mfa_token: t2, code: recovery[0] });
+  check('رمز الاسترداد يعمل', rec.status === 200 && rec.json.username === 'radiology');
+  const t3 = ((await (await rawLogin('radiology')).json()) as { mfa_token: string }).mfa_token;
+  check('رمز الاسترداد لا يُستخدم مرتين', (await anon.post('/auth/2fa/login', { mfa_token: t3, code: recovery[0] })).status === 401);
+  for (let i = 0; i < 4; i++) await anon.post('/auth/2fa/login', { mfa_token: t3, code: '111111' });
+  check('التذكرة تُقفل بعد 5 محاولات', (await anon.post('/auth/2fa/login', { mfa_token: t3, code: recovery[1] })).json?.code === 'mfa_expired');
+  check('تذكرة مزوّرة مرفوضة', (await anon.post('/auth/2fa/login', { mfa_token: 'x'.repeat(40), code: '123456' })).status === 401);
+
+  check('الإيقاف يتطلب كلمة المرور', (await rad.post('/auth/2fa/disable', { password: 'wrong' })).status === 403);
+  check('الطبيب لا يعيد ضبط التحقق لغيره (403)', (await doctor.post('/users/u_radiology/2fa/reset')).status === 403);
+  check('مدير مستشفى آخر لا يعيد الضبط (404)', (await admin2.post('/users/u_radiology/2fa/reset')).status === 404);
+  check('مدير المستشفى يعيد ضبط التحقق لموظف فقد هاتفه', (await manager.post('/users/u_radiology/2fa/reset')).status === 204);
+  const after = await rawLogin('radiology');
+  check('بعد إعادة الضبط: الدخول بكلمة المرور فقط', after.status === 200 && !!cookiesOf(after).hmsi_session);
+}
+
+console.log('\n— الإشعارات');
+{
+  const labUser = client(await login('lab', 'Specimen#2026'));
+  const pharm = client(await login('pharmacist'));
+  const nurseN = client(await login('nurse'));
+  const doc2 = client(await login('doctor2'));
+  await doctor.post('/notifications/read-all');
+  await labUser.post('/notifications/read-all');
+  await pharm.post('/notifications/read-all');
+  await nurseN.post('/notifications/read-all');
+
+  // طلب فحص من الطبيب → فني المختبر
+  const order = await doctor.post('/patients/adm1/labs', { admission_id: 'adm1', test_name_ar: 'صوديوم', test_name_en: 'Sodium' });
+  const labN = await labUser.get('/notifications');
+  check('طلب الفحص يصل لفني المختبر', labN.json.some((n: any) => n.kind === 'lab_ordered' && n.title_ar.includes('صوديوم') && !n.is_read));
+  check('الطبيب لا يُشعَر بما فعله بنفسه', !(await doctor.get('/notifications')).json.some((n: any) => n.kind === 'lab_ordered'));
+  // نتيجة غير طبيعية → الطبيب المعالج فقط (u_doctor لـ adm1)
+  await labUser.patch(`/patients/adm1/labs/${order.json.id}`, { result: '121', unit: 'mmol/L', abnormal: true });
+  const dn = await doctor.get('/notifications');
+  const abn = dn.json.find((n: any) => n.kind === 'lab_abnormal');
+  check('النتيجة غير الطبيعية تصل للطبيب المعالج', abn?.severity === 'warning' && abn.link === '/patients/p1' && abn.body_ar.includes('121'));
+  check('طبيب آخر لا يرى إشعار مريض غيره', !(await doc2.get('/notifications')).json.some((n: any) => n.id === abn.id));
+  const cnt = await doctor.get('/notifications/count');
+  check('عدّاد غير المقروء يعمل مع أعلى خطورة', cnt.json.unread >= 1 && ['warning', 'critical'].includes(cnt.json.top));
+  check('قراءة إشعار', (await doctor.post(`/notifications/${abn.id}/read`)).status === 204 && (await doctor.get('/notifications')).json.find((n: any) => n.id === abn.id).is_read === true);
+  check('لا يمكن قراءة إشعار غيرك (404)', (await doc2.post(`/notifications/${abn.id}/read`)).status === 404);
+  check('مستشفى آخر لا يرى الإشعار', !(await admin2.get('/notifications')).json.some((n: any) => n.id === abn.id));
+
+  // وصف دواء → الصيدلي
+  await doctor.post('/patients/adm1/medications', { admission_id: 'adm1', name_ar: 'أوميبرازول', dose: '40mg', route: 'IV', frequency: 'OD', start_at: '2026-09-24' });
+  check('وصف الدواء يصل للصيدلي', (await pharm.get('/notifications')).json.some((n: any) => n.kind === 'medication_prescribed' && n.title_ar.includes('أوميبرازول')));
+
+  // MEWS مرتفع → الطبيب المعالج والتمريض (من ممرض آخر)
+  const nurse2c = client(await login('nurse2', 'reset2026x'));
+  await nurse2c.post('/auth/password', { current_password: 'reset2026x', new_password: 'Ward#Night77' });
+  const vr = await nurse2c.post('/vitals', { admission_id: 'adm1', temperature: 39.4, pulse: 135, respiratory_rate: 32, bp_systolic: 78, consciousness: 'voice' });
+  const mews = (await doctor.get('/notifications')).json.find((n: any) => n.kind === 'mews_high');
+  check('MEWS المرتفع ينبّه الطبيب بخطورة حرجة', mews?.severity === 'critical');
+  check('و ينبّه طاقم التمريض', (await nurseN.get('/notifications')).json.some((n: any) => n.kind === 'mews_high'));
+  check('تسجيل العلامات الحيوية', vr.status === 201, vr.json);
+  await nurse2c.post('/vitals', { admission_id: 'adm1', temperature: 36.8, pulse: 78, respiratory_rate: 16, bp_systolic: 120, consciousness: 'alert' });
+  check('العلامات الطبيعية لا تنبّه', (await doctor.get('/notifications')).json.filter((n: any) => n.kind === 'mews_high').length === 1);
+
+  check('قراءة الكل تصفّر العدّاد', (await doctor.post('/notifications/read-all')).status === 204 && (await doctor.get('/notifications/count')).json.unread === 0);
+}
+
+console.log('\n— جولة الأدوية وجدولة الجرعات');
+{
+  const { parseFrequency, doseStatus } = await import('@hmsi/shared');
+  check('فهم التكرار العربي والإنجليزي', parseFrequency('كل 8 ساعات').hours === 8 && parseFrequency('مرتين يومياً').hours === 12 && parseFrequency('TID').hours === 8 && parseFrequency('يومياً').hours === 24 && parseFrequency('عند الحاجة').kind === 'prn' && parseFrequency('صباحاً').times?.[0] === 8);
+  check('تكرار غير مفهوم لا يُخمَّن', parseFrequency('حسب الوضع').kind === 'unknown');
+  const now = new Date('2026-09-25T12:00:00Z');
+  const med = { frequency: 'q8h', start_at: '2026-09-20', created_at: '2026-09-20T06:00:00Z' };
+  check('جرعة متأخرة', doseStatus(med, '2026-09-25T02:00:00Z', now).state === 'overdue');
+  check('جرعة مستحقة الآن', doseStatus(med, '2026-09-25T04:30:00Z', now).state === 'due');
+  check('جرعة قريبة', doseStatus(med, '2026-09-25T06:00:00Z', now).state === 'upcoming');
+  check('جرعة لاحقة', doseStatus(med, '2026-09-25T11:30:00Z', now).state === 'later');
+  check('دواء لمرة واحدة أُعطي = منتهٍ', doseStatus({ ...med, frequency: 'STAT' }, '2026-09-25T11:30:00Z', now).state === 'done');
+
+  const nurseR = client(await login('nurse'));
+  const r = await nurseR.get('/medication-rounds');
+  check('الممرض يرى جولة الأدوية لمرضى مستشفاه', r.status === 200 && r.json.length > 0 && r.json.every((m: any) => m.full_name_ar && 'last_at' in m));
+  const m0 = r.json[0];
+  await nurseR.post(`/patients/${m0.admission_id}/medications/${m0.id}/administrations`, { status: 'given' });
+  const r2 = await nurseR.get('/medication-rounds');
+  check('آخر جرعة مسجّلة تظهر', r2.json.find((m: any) => m.id === m0.id)?.last_status === 'given');
+  const ward = r.json[0].ward_id;
+  check('تصفية حسب الردهة', (await nurseR.get(`/medication-rounds?ward=${ward}`)).json.every((m: any) => m.ward_id === ward));
+  check('الاستقبال لا يرى جولة الأدوية (403)', (await client(await login('reception')).get('/medication-rounds')).status === 403);
+  check('مستشفى آخر لا يرى أدوية هذا المستشفى', !(await admin2.get('/medication-rounds')).json.some((m: any) => r.json.some((x: any) => x.id === m.id)));
+}
+
+console.log('\n— تسليم المناوبة');
+{
+  const nurseH = client(await login('nurse'));
+  const list = await nurseH.get('/handover');
+  const p1 = list.json.find((x: any) => x.admission_id === 'adm1');
+  check('ملخص التسليم لكل المرضى المنوّمين', list.status === 200 && list.json.length > 0 && !!p1);
+  check('الملخص يتضمن الحساسية والعلامات الحيوية وMEWS', p1.allergies.length > 0 && p1.vitals && typeof p1.mews?.score === 'number');
+  check('الملخص يتضمن الأعداد المعلقة', typeof p1.pending_labs === 'number' && typeof p1.active_meds === 'number');
+  check('ملاحظة بلا وضع حالي مرفوضة', (await nurseH.post('/handover/adm1', { situation: '' })).status === 422);
+  const w = await nurseH.post('/handover/adm1', { situation: 'مستقر، حرارة 38.2 ليلاً', background: 'التهاب رئوي', assessment: 'MEWS 3', recommendation: 'متابعة الحرارة كل 4 ساعات، نتيجة زرع الدم معلقة' });
+  check('الممرض يكتب ملاحظة تسليم SBAR', w.status === 201);
+  const after = (await nurseH.get('/handover')).json.find((x: any) => x.admission_id === 'adm1');
+  check('آخر ملاحظة تسليم تظهر في الملخص', after.handover?.recommendation?.includes('زرع الدم') && after.handover.author);
+  check('الاستقبال لا يكتب ملاحظة تسليم (403)', (await client(await login('reception')).post('/handover/adm1', { situation: 'x x' })).status === 403);
+  check('مستشفى آخر لا يكتب على مريض هذا المستشفى (404)', (await admin2.post('/handover/adm1', { situation: 'تجربة' })).status === 404);
+  check('مستشفى آخر لا يرى هذا المستشفى في التسليم', !(await admin2.get('/handover')).json.some((x: any) => x.admission_id === 'adm1'));
+}
+
+console.log('\n— فريق الرعاية: الطبيب يرى مرضاه فقط، ممرض واحد لكل مريض، التسليم والاستلام، الخطة العلاجية');
+{
+  const doc3 = client(await login('doctor3'));
+  const nurseA = client(await login('nurse'));
+  const nurseB = client(await login('nurse2', 'Ward#Night77'));
+  const mgr = client(await login('manager'));
+  const recep = client(await login('reception'));
+
+  // قائمة المرضى
+  const l1 = await doctor.get('/patients');
+  const l3 = await doc3.get('/patients');
+  check('الطبيب يرى مرضاه فقط في القائمة', l1.json.some((p: any) => p.id === 'p1') && !l3.json.some((p: any) => p.id === 'p1') && l3.json.some((p: any) => p.id === 'p3'));
+  check('الاستقبال يرى كل المرضى', (await recep.get('/patients')).json.some((p: any) => p.id === 'p1') && (await recep.get('/patients')).json.some((p: any) => p.id === 'p3'));
+  const denied = await doc3.get('/patients/p1/chart');
+  check('ملف مريض ليس من مرضاه = 403 not_your_patient', denied.status === 403 && denied.json.code === 'not_your_patient');
+  check('ولا سجلاته الطبية', (await doc3.post('/patients/adm1/notes', { admission_id: 'adm1', kind: 'doctor', content: 'محاولة' })).status === 403);
+  check('ولا في جولة الأدوية', !(await doc3.get('/medication-rounds')).json.some((m: any) => m.patient_id === 'p1'));
+  check('ولا في الإنذار المبكر بلوحة التحكم', !((await doc3.get('/dashboard/stats')).json.mewsAlerts ?? []).some((m: any) => m.patient_id === 'p1'));
+
+  // الوصول الطارئ
+  check('الوصول الطارئ يتطلب سبباً', (await doc3.post('/patients/p1/emergency-access', { reason: '' })).status === 422);
+  const em = await doc3.post('/patients/p1/emergency-access', { reason: 'استدعاء طارئ — الطبيب المعالج غير متاح' });
+  check('وصول طارئ بسبب مكتوب لمدة محدودة', em.status === 201 && Date.parse(em.json.expires_at) > Date.now());
+  check('بعده يفتح الملف', (await doc3.get('/patients/p1/chart')).status === 200);
+  check('المدير يُبلَّغ بالوصول الطارئ', (await mgr.get('/notifications')).json.some((n: any) => n.kind === 'emergency_access'));
+
+  // أكثر من طبيب
+  const add = await mgr.post('/care-team/admissions/adm3', { user_id: 'u_doctor2', role: 'doctor', specialty: 'قلبية' });
+  const team3 = (await mgr.get('/care-team/admissions/adm3')).json.members;
+  check('أكثر من طبيب على المريض (تخصصات)', add.status === 201 && team3.filter((m: any) => m.role === 'doctor').length === 2 && team3.some((m: any) => m.specialty === 'قلبية'));
+  check('الطبيب المضاف يصل للمريض', (await client(await login('doctor2')).get('/patients/p3/chart')).status === 200);
+  check('المشاهد لا يضيف أطباء (403)', (await client(await login('viewer', 'Obs#2026xq7')).post('/care-team/admissions/adm3', { user_id: 'u_doctor', role: 'doctor' })).status === 403);
+  check('لا يُضاف مستخدم غير طبيب كطبيب (404)', (await mgr.post('/care-team/admissions/adm3', { user_id: 'u_nurse', role: 'doctor' })).status === 404);
+
+  // ممرض واحد لكل مريض
+  const r1 = await recep.post('/patients', { full_name_ar: 'مريض التعيين', gender: 'male', birth_date: '1990-01-01', phone: '0770000123', national_id: '99887766' });
+  const free = (await mgr.get('/wards')).json.flatMap((w: any) => w.beds.filter((b: any) => b.status === 'free').map((b: any) => ({ bed: b.id, dept: w.department_id })));
+  const adm = (await recep.post('/admissions', { patient_id: r1.json.id, bed_id: free[0].bed, department_id: free[0].dept, attending_doctor_id: 'u_doctor' })).json.admission_id;
+  check('ممرض يستلم مريضاً غير معيَّن', (await nurseB.post(`/care-team/admissions/${adm}`, { user_id: 'u_nurse2', role: 'nurse' })).status === 201);
+  const second = await nurseA.post(`/care-team/admissions/${adm}`, { user_id: 'u_nurse', role: 'nurse' });
+  check('لا يُعيَّن ممرضان على نفس المريض (409)', second.status === 409);
+  check('ولا حتى بواسطة المدير (409)', (await mgr.post(`/care-team/admissions/${adm}`, { user_id: 'u_nurse', role: 'nurse' })).status === 409);
+  const { db } = await import('../db/index.js');
+  let dbBlocked = false;
+  try {
+    await db.execute({ sql: `INSERT INTO care_team (id, admission_id, user_id, role, assigned_at) VALUES ('x-dup', ?, 'u_nurse', 'nurse', ?)`, args: [adm, new Date().toISOString()] });
+  } catch {
+    dbBlocked = true;
+  }
+  check('قاعدة البيانات نفسها تمنع ممرضين فعّالين', dbBlocked);
+  const nurseMember = (await mgr.get(`/care-team/admissions/${adm}`)).json.members.find((m: any) => m.role === 'nurse');
+  check('الممرض لا يترك مريضه دون تسليم (403)', (await nurseB.post(`/care-team/admissions/${adm}/members/${nurseMember.id}/end`, {})).status === 403);
+  check('الاستقبال لا يعيّن ممرضاً (403)', (await recep.post(`/care-team/admissions/${adm}`, { user_id: 'u_nurse', role: 'nurse' })).status === 403);
+
+  // التسليم والاستلام
+  check('لا يُسلَّم مريض ليس لك (403)', (await nurseA.post('/care-team/handovers', { to_user_id: 'u_nurse2', admission_ids: [adm] })).status === 403);
+  const ho = await nurseA.post('/care-team/handovers', { to_user_id: 'u_nurse2', admission_ids: ['adm1', 'adm4'], note: 'نهاية المناوبة الصباحية' });
+  check('الممرض يسلّم مرضاه لزميل', ho.status === 201);
+  check('لا تسليم مزدوج لنفس المريض (409)', (await nurseA.post('/care-team/handovers', { to_user_id: 'u_nurse2', admission_ids: ['adm1'] })).status === 409);
+  const inbox = (await nurseB.get('/care-team/handovers')).json;
+  check('المستلم يرى طلب الاستلام مع المرضى', inbox.incoming.some((h: any) => h.id === ho.json.id && h.items.length === 2));
+  check('المستلم يُبلَّغ بطلب الاستلام', (await nurseB.get('/notifications')).json.some((n: any) => n.kind === 'handover_request'));
+  check('قبل القبول تبقى المسؤولية على المسلِّم', (await mgr.get('/care-team/admissions/adm1')).json.members.find((m: any) => m.role === 'nurse').user_id === 'u_nurse');
+  check('المسلِّم لا يقبل عن المستلم (403)', (await nurseA.post(`/care-team/handovers/${ho.json.id}/accept`)).status === 403);
+  const acc = await nurseB.post(`/care-team/handovers/${ho.json.id}/accept`);
+  check('الاستلام ينقل المرضى للمستلم', acc.status === 200 && acc.json.moved === 2 && (await mgr.get('/care-team/admissions/adm1')).json.members.find((m: any) => m.role === 'nurse').user_id === 'u_nurse2');
+  check('لا قبول مرتين (409)', (await nurseB.post(`/care-team/handovers/${ho.json.id}/accept`)).status === 409);
+  check('المسلِّم يُبلَّغ بالاستلام', (await nurseA.get('/notifications')).json.some((n: any) => n.kind === 'handover_accepted'));
+  const back = await nurseB.post('/care-team/handovers', { to_user_id: 'u_nurse', admission_ids: ['adm1'] });
+  check('الرفض يتطلب سبباً', (await nurseA.post(`/care-team/handovers/${back.json.id}/reject`, { reason: '' })).status === 422);
+  await nurseA.post(`/care-team/handovers/${back.json.id}/reject`, { reason: 'لدي 6 مرضى بالفعل' });
+  check('بعد الرفض يبقى المريض مع المسلِّم', (await mgr.get('/care-team/admissions/adm1')).json.members.find((m: any) => m.role === 'nurse').user_id === 'u_nurse2');
+  const mine = (await nurseB.get('/medication-rounds/vitals?mine=1')).json;
+  check('«مرضاي» للممرض بعد الاستلام', mine.some((x: any) => x.admission_id === 'adm1') && !mine.some((x: any) => x.admission_id === 'adm8'));
+
+  // الخطة العلاجية
+  const plan = await doctor.put('/care-team/plans/adm1', { goals: 'ضبط الضغط', vitals_interval_hours: 1, nursing_instructions: 'قياس السكر قبل الوجبات' });
+  check('الطبيب يضع الخطة العلاجية', plan.status === 200 && plan.json.vitals_interval_hours === 1);
+  check('الممرض المعيَّن يُبلَّغ بتحديث الخطة', (await nurseB.get('/notifications')).json.some((n: any) => n.kind === 'care_plan_updated'));
+  const np = await nurseB.put('/care-team/plans/adm1', { goals: 'تغيير من الممرض', vitals_interval_hours: 2 });
+  check('الممرض يعدّل تكرار القياس فقط', np.status === 200 && np.json.vitals_interval_hours === 2 && np.json.goals === 'ضبط الضغط');
+  check('الاستقبال لا يعدّل الخطة (403)', (await recep.put('/care-team/plans/adm1', { goals: 'x' })).status === 403);
+  check('طبيب من خارج الفريق لا يعدّل الخطة (403)', (await client(await login('doctor2')).put('/care-team/plans/adm1', { goals: 'x' })).status === 403);
+  const vit = (await nurseB.get('/medication-rounds/vitals?mine=1')).json.find((x: any) => x.admission_id === 'adm1');
+  check('مواعيد العلامات الحيوية تتبع الخطة', vit.interval_hours === 2 && 'last_at' in vit);
+  const { vitalsStatus, vitalsIntervalHours } = await import('@hmsi/shared');
+  check('MEWS مرتفع يقصّر التكرار إلى ساعة', vitalsIntervalHours(4, 'high') === 1 && vitalsIntervalHours(null, 'low') === 4);
+  check('قياس متأخر يُكتشف', vitalsStatus({ admitted_at: '2026-01-01T00:00:00Z', last_at: new Date(Date.now() - 5 * 3_600_000).toISOString(), interval_hours: 4 }).state === 'overdue');
+
+  // الخروج ينهي الفريق ويلغي التسليمات المعلقة
+  const pend = await nurseB.post('/care-team/handovers', { to_user_id: 'u_nurse', admission_ids: [adm] });
+  await doctor.post(`/admissions/${adm}/discharge`, { discharge_type: 'home', summary: 'تحسن' });
+  check('الخروج ينهي فريق الرعاية', (await mgr.get(`/care-team/admissions/${adm}`)).json.members.length === 0);
+  check('ويلغي تسليماته المعلقة', !(await nurseA.get('/care-team/handovers')).json.incoming.some((h: any) => h.id === pend.json.id));
+  check('الطبيب يبقى يرى مريضه السابق (السجل)', (await doctor.get(`/patients/${r1.json.id}/chart`)).status === 200);
+}
+
 console.log('\n— نقاط الصيانة');
 check('seed بتوكن خاطئ = 404', (await api.request(`${BASE}/__staff/seed`, { method: 'POST', headers: { 'x-staff-token': 'wrong' } })).status === 404);
+{
+  const { env } = await import('../src/config.js');
+  env.seedToken = 'staff-token-for-test';
+  const wipe = await api.request(`${BASE}/__staff/seed`, { method: 'POST', headers: { 'x-staff-token': 'staff-token-for-test', 'content-type': 'application/json' }, body: JSON.stringify({ confirm: 'WIPE_ALL_DATA' }) });
+  check('المسح الكامل مرفوض بوجود مستشفيات حقيقية (409)', wipe.status === 409);
+  env.seedToken = '';
+}
+
+console.log('\n— حذف بيانات التجربة والمستشفيات (آخر الاختبارات: يمسح البيانات)');
+{
+  const sa = client(await login('admin'));
+  const mgr = client(await login('manager'));
+  const { db } = await import('../db/index.js');
+  check('مدير المستشفى لا يحذف بيانات التجربة (403)', (await mgr.post('/system/purge-demo', { confirm: 'DELETE DEMO DATA' })).status === 403);
+  const st = await sa.get('/system/demo-status');
+  check('حالة بيانات التجربة: موجودة', st.status === 200 && st.json.present === true);
+  check('عبارة تأكيد خاطئة مرفوضة', (await sa.post('/system/purge-demo', { confirm: 'delete' })).status === 422);
+
+  // حذف مستشفى تجريبي مسجَّل ذاتياً
+  const self = (await sa.get('/hospitals')).json.find((h: any) => h.signup_source === 'self');
+  check('رمز مستشفى خاطئ مرفوض', (await sa.post(`/hospitals/${self.id}/purge`, { confirm_code: 'WRONG' })).status === 422);
+  const ph = await sa.post(`/hospitals/${self.id}/purge`, { confirm_code: self.code });
+  check('حذف مستشفى نهائياً مع نسخة احتياطية أولاً', ph.status === 200 && Boolean(ph.json.backup) && ph.json.counts.hospitals === 1);
+  check('المستشفى المحذوف لم يعد موجوداً', !(await sa.get('/hospitals')).json.some((h: any) => h.id === self.id));
+  check('لا يُحذف مستشفى المدير العام نفسه (409)', (await sa.post('/hospitals/h-1/purge', { confirm_code: 'MSH-001' })).status === 409);
+
+  const pd = await sa.post('/system/purge-demo', { confirm: 'DELETE DEMO DATA' });
+  check('حذف بيانات التجربة مع نسخة احتياطية', pd.status === 200 && Boolean(pd.json.backup) && pd.json.counts.patients > 0);
+  const n = async (sql: string) => Number((await db.execute(sql)).rows[0]!.n);
+  check('لا مرضى ولا تنويمات ولا أسرّة متبقية', (await n(`SELECT COUNT(*) AS n FROM patients`)) === 0 && (await n(`SELECT COUNT(*) AS n FROM admissions`)) === 0 && (await n(`SELECT COUNT(*) AS n FROM beds`)) === 0);
+  check('لم يبق من مستشفيي التجربة إلا المدير العام', (await n(`SELECT COUNT(*) AS n FROM users WHERE role != 'super_admin' AND hospital_id IN ('h-1','h-2')`)) === 0 && (await n(`SELECT COUNT(*) AS n FROM users WHERE role = 'super_admin'`)) >= 1);
+  check('لا مخالفات مفاتيح أجنبية بعد الحذف', (await db.execute('PRAGMA foreign_key_check')).rows.length === 0);
+  const me = await client(await login('admin')).get('/auth/me');
+  check('المدير العام يدخل بعد الحذف في «إدارة النظام»', me.json.role === 'super_admin' && me.json.hospital_name_ar === 'إدارة النظام');
+  check('حالة بيانات التجربة: لا شيء', (await client(await login('admin')).get('/system/demo-status')).json.present === false);
+  check('الحذف مسجّل في التدقيق', (await n(`SELECT COUNT(*) AS n FROM audit_logs WHERE action IN ('demo_purged','hospital_purged')`)) === 2);
+}
 
 console.log(`\n${passed} passed, ${failures} failed`);
 process.exit(failures > 0 ? 1 : 0);

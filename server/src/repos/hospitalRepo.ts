@@ -112,6 +112,7 @@ export async function createHospital(input: {
 export async function createHospitalAdmin(
   hospitalId: string,
   input: { username: string; password: string; full_name_ar: string; full_name_en?: string; email?: string | null },
+  opts: { mustChangePassword?: boolean } = {},
 ): Promise<HospitalAdminInfo> {
   if (!(await getHospital(hospitalId))) throw new HttpError('المستشفى غير موجود', 404);
   const username = input.username.toLowerCase();
@@ -119,9 +120,9 @@ export async function createHospitalAdmin(
   if (existing.rows.length > 0) throw new HttpConflict('اسم المستخدم مستخدم بالفعل');
   const id = uuid('us');
   await db.execute({
-    sql: `INSERT INTO users (id, hospital_id, username, full_name_ar, full_name_en, email, role, password_hash, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, 'admin', ?, 1)`,
-    args: [id, hospitalId, username, input.full_name_ar, input.full_name_en ?? null, input.email ?? null, await hashPassword(input.password)],
+    sql: `INSERT INTO users (id, hospital_id, username, full_name_ar, full_name_en, email, role, password_hash, is_active, must_change_password)
+          VALUES (?, ?, ?, ?, ?, ?, 'admin', ?, 1, ?)`,
+    args: [id, hospitalId, username, input.full_name_ar, input.full_name_en ?? null, input.email ?? null, await hashPassword(input.password), opts.mustChangePassword === false ? 0 : 1],
   });
   return { id, username, full_name_ar: input.full_name_ar, is_active: true };
 }

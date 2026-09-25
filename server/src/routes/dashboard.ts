@@ -6,5 +6,5 @@ export const dashboardRoutes = new Hono();
 
 dashboardRoutes.get('/stats', requireAuth(), async (c) => {
   const session = getSession(c)!;
-  return c.json(await getDashboard(session.user.hospital_id), 200);
+  return c.json(await getDashboard(session.user.hospital_id, session.user.role === 'doctor' ? session.user.id : undefined), 200);
 });

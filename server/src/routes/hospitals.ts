@@ -8,6 +8,9 @@ import { writeAudit } from '../lib/audit.js';
 import { clientIp } from '../config.js';
 import { listHospitals, createHospital, createHospitalAdmin, getHospital, updateHospital, setActiveHospital, setHospitalLogo, clearHospitalLogo, MAX_LOGO_BYTES, setSubscriptionUntil } from '../repos/hospitalRepo.js';
 import { contentMatchesMime } from './attachments.js';
+import { z } from 'zod';
+import { purgeHospital } from '../lib/purge.js';
+import { runBackup } from '../lib/backup.js';
 
 export const hospitalRoutes = new Hono();
 
@@ -132,4 +135,26 @@ hospitalRoutes.post('/:id/switch', requireAuth(), requirePermission('hospitals.m
   await setActiveHospital(session.sessionId, id === session.user.home_hospital_id ? null : id);
   await writeAudit({ actorId: session.user.id, action: 'hospital_switched', resourceType: 'hospital', resourceId: id, ip: clientIp(c) });
   return c.json(hospital, 200);
+});
+
+/**
+ * حذف مستشفى وكل بياناته نهائياً (مثل مستشفيات التجربة أو التسجيلات الوهمية).
+ * يتطلب كتابة رمز المستشفى، ويأخذ نسخة احتياطية أولاً. لا يُحذف مستشفى المدير العام نفسه.
+ */
+const PurgeSchema = z.object({ confirm_code: z.string().min(1).max(40) });
+hospitalRoutes.post('/:id/purge', requireAuth(), requirePermission('hospitals.manage'), async (c) => {
+  const parsed = await parseBody(c, PurgeSchema);
+  if (!parsed.ok) return parsed.json;
+  const s = getSession(c)!;
+  const id = c.req.param('id');
+  const h = await getHospital(id);
+  if (!h) throw new HttpError('المستشفى غير موجود', 404);
+  if (id === (s.user.home_hospital_id ?? s.user.hospital_id)) throw new HttpError('لا يمكن حذف مستشفى حساب المدير العام', 409);
+  if ((parsed.data as { confirm_code: string }).confirm_code.trim().toUpperCase() !== String(h.code).toUpperCase()) {
+    return c.json({ message: 'رمز المستشفى غير مطابق' }, 422);
+  }
+  const backup = await runBackup('manual');
+  const counts = await purgeHospital(id);
+  await writeAudit({ actorId: s.user.id, action: 'hospital_purged', resourceType: 'hospital', resourceId: id, ip: clientIp(c), meta: { name: h.name_ar, code: h.code, backup: backup.key, counts } });
+  return c.json({ counts, backup: backup.key });
 });

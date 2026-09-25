@@ -13,6 +13,7 @@ interface BedContext {
   familyPin: string | null;
   patient: Row | null;
   attendingDoctor: string | null;
+  attendingDoctorEn: string | null;
 }
 
 /** «محمد علي كريم» → «م*** ع***» — يكفي الأهل للتأكد دون كشف الاسم لأي شخص يصوّر الرمز */
@@ -42,6 +43,7 @@ async function loadBedContext(code: string): Promise<BedContext | null> {
     sql: `SELECT a.id, a.admitted_at, a.family_pin, a.family_share, a.family_message, a.family_message_by, a.family_message_at,
                  p.full_name_ar, p.full_name_en, p.gender,
                  (SELECT full_name_ar FROM users u WHERE u.id = a.attending_doctor_id) AS attending_doctor,
+                 (SELECT full_name_en FROM users u WHERE u.id = a.attending_doctor_id) AS attending_doctor_en,
                  (SELECT MAX(t.created_at) FROM timeline_events t WHERE t.admission_id = a.id) AS last_update
           FROM admissions a JOIN patients p ON p.id = a.patient_id
           WHERE a.bed_id = ? AND a.status = 'active'
@@ -73,6 +75,7 @@ async function loadBedContext(code: string): Promise<BedContext | null> {
     familyPin: adm?.family_pin ? String(adm.family_pin) : null,
     patient: adm ?? null,
     attendingDoctor: adm?.attending_doctor ? String(adm.attending_doctor) : null,
+    attendingDoctorEn: adm?.attending_doctor_en ? String(adm.attending_doctor_en) : null,
   };
 }
 
@@ -121,6 +124,7 @@ export async function getFamilyTrack(code: string, pin: string): Promise<FamilyT
         gender: String(ctx.patient.gender) as PublicTrackFamily['patient']['gender'],
       },
       attending_doctor: ctx.attendingDoctor,
+      attending_doctor_en: ctx.attendingDoctorEn,
       latest_vitals: v
         ? {
             recorded_at: String(v.recorded_at),

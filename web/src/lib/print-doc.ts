@@ -54,6 +54,7 @@ const CSS = `
   td.ltr{text-align:end}
   .abn{font-weight:800;color:#b91c1c}
   .muted{color:#666}
+  td.wide{width:24%}
   .box{border:1px solid #ccc;border-radius:6px;padding:8px 10px;white-space:pre-wrap;break-inside:avoid}
   .summary{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
   .summary span{border:1px solid #ccc;border-radius:6px;padding:3px 8px;font-size:9pt}
@@ -87,13 +88,28 @@ ${o.body}
 ${o.signatures?.length ? `<div class="sign">${o.signatures.map((s) => `<div>${esc(s)}</div>`).join('')}</div>` : ''}
 <div class="foot"><span>${esc(o.printedAtLabel)}: ${esc(fmtDateTime(new Date().toISOString()))}</span><span>${esc(o.printedBy)}</span><span class="sysmark" dir="ltr">${qMarkSvg({ colors: Q_COLORS.mono('#888') })}Q VIREXA</span></div>
 </div>
-<script>window.addEventListener('load',function(){var imgs=[].slice.call(document.images);Promise.all(imgs.map(function(i){return i.complete?0:new Promise(function(r){i.onload=i.onerror=r})})).then(function(){setTimeout(function(){window.focus();window.print()},150)})});</script>
 </body></html>`;
   const w = window.open('', '_blank', `width=${o.landscape ? 1100 : 860},height=900`);
   if (!w) return;
   w.document.open();
   w.document.write(html);
   w.document.close();
+  // الطباعة تُدار من النافذة الأم (سياسة CSP تمنع السكربتات داخل نافذة الطباعة):
+  // ننتظر الصور (شعار المستشفى) والخطوط ثم نفتح حوار الطباعة
+  const doc = w.document;
+  const images = Array.from(doc.images).map((i) =>
+    i.complete
+      ? Promise.resolve()
+      : new Promise<void>((r) => {
+          i.onload = i.onerror = () => r();
+        }),
+  );
+  void Promise.all([...images, doc.fonts?.ready.catch(() => undefined)]).then(() =>
+    setTimeout(() => {
+      w.focus();
+      w.print();
+    }, 150),
+  );
 }
 
 /** جدول HTML من صفوف (القيم تُهرَّب) */

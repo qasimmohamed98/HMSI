@@ -4,6 +4,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { env } from '../config.js';
 import { runMigrations } from '../seed/migrate.js';
 import { runSeed } from '../seed/run.js';
+import { db } from '../../db/index.js';
+import { DEMO_HOSPITAL_IDS } from '../lib/purge.js';
 
 /**
  * نقاط صيانة محمية بـ SEED_TOKEN (رأس x-staff-token). تُعيد 404 إن لم يُضبط التوكن أو كان خاطئاً.
@@ -32,6 +34,11 @@ staffRoutes.post('/seed', async (c) => {
     return c.json({ message: 'هذه العملية تمسح كل البيانات — أرسل {"confirm":"WIPE_ALL_DATA"} للتأكيد' }, 400);
   }
   const migrations = await runMigrations();
+  // حماية الإنتاج: لا مسح أبداً إن وُجد أي مستشفى حقيقي (غير مستشفيي التجربة)
+  const real = await db.execute({ sql: `SELECT COUNT(*) AS n FROM hospitals WHERE id NOT IN (?, ?)`, args: [...DEMO_HOSPITAL_IDS] });
+  if (Number((real.rows[0] as unknown as Record<string, unknown>).n) > 0) {
+    return c.json({ message: 'مرفوض: توجد مستشفيات حقيقية في هذه القاعدة — المسح الكامل معطّل نهائياً' }, 409);
+  }
   const { users, patients } = await runSeed();
   return c.json({ ok: true, migrations, users, patients }, 200);
 });

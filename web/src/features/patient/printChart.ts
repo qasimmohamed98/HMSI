@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next';
 import type { User } from '@hmsi/shared';
 import { calcMews } from '@hmsi/shared';
 import type { ChartData } from '@/lib/api';
-import { calcAge, fmtDate, fmtDateTime, localName } from '@/lib/format';
+import { calcAge, doctorName, fmtDate, fmtDateTime, localName } from '@/lib/format';
 import { jsonParse } from '@/lib/demo-data';
 import { esc, htmlTable, openPrintDocument } from '@/lib/print-doc';
 
@@ -23,7 +23,7 @@ function patientMeta(chart: ChartData, t: TFunction): Meta {
     [t('patients.bloodType'), p.blood_type],
     [t('patients.department'), a ? localName(a, 'department_name') : null],
     [t('patients.bed'), a ? `${localName(a, 'ward_name')} · ${a.room}/${a.bed_no}` : null],
-    [t('chart.attendingDoctor'), a?.attending_doctor],
+    [t('chart.attendingDoctor'), doctorName(a) || null],
     [t('chart.admitted'), a ? fmtDate(a.admitted_at) : null],
     [t('chart.allergies'), allergies.length ? allergies.join('، ') : null],
     [t('history.dischargedAt'), a?.discharged_at ? fmtDate(a.discharged_at) : null],

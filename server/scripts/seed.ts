@@ -9,5 +9,5 @@ if (process.env.TURSO_URL && !process.argv.includes('--wipe-remote')) {
 
 await runMigrations();
 const { users, patients } = await runSeed();
-console.log(`seed complete: ${patients} patients, ${users} users (password: password123)`);
+console.log(`seed complete: ${patients} patients, ${users} users (password: HmsiDemo2026)`);
 process.exit(0);

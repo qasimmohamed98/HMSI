@@ -8,7 +8,9 @@ type AuthStatus = 'loading' | 'authed' | 'guest';
 interface AuthCtx {
   status: AuthStatus;
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
+  /** يعيد تذكرة الخطوة الثانية إن كان التحقق بخطوتين مفعّلاً، وإلا null بعد إتمام الدخول */
+  login: (username: string, password: string) => Promise<{ mfaToken: string } | null>;
+  completeMfa: (mfaToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   /** إعادة تحميل بيانات المستخدم (مثلاً بعد تبديل المستشفى) */
   refresh: () => Promise<void>;
@@ -60,8 +62,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const u = await API.login(username, password);
+    const r = await API.login(username, password);
+    if ('mfa_required' in r) return { mfaToken: r.mfa_token };
     qc.clear(); // لا تبقى بيانات مستخدم سابق في الذاكرة
+    setUser(r);
+    setStatus('authed');
+    return null;
+  }, [qc]);
+
+  const completeMfa = useCallback(async (mfaToken: string, code: string) => {
+    const u = await API.loginMfa(mfaToken, code);
+    qc.clear();
     setUser(u);
     setStatus('authed');
   }, [qc]);
@@ -77,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('guest');
   }, [qc]);
 
-  const value = useMemo(() => ({ status, user, login, logout, refresh }), [status, user, login, logout, refresh]);
+  const value = useMemo(() => ({ status, user, login, completeMfa, logout, refresh }), [status, user, login, completeMfa, logout, refresh]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

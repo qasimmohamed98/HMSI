@@ -1,6 +1,8 @@
 # النشر على Netlify: الواجهة (web/dist) + الـ API كـ Netlify Function على /api/*
 # متغيرات البيئة المطلوبة في لوحة Netlify (Site settings → Environment variables):
 #   TURSO_URL, TURSO_AUTH_TOKEN, SESSION_SECRET (إلزامي), SEED_TOKEN (اختياري للصيانة)
+#   BACKUP_KEY (موصى به): يشفّر النسخ الاحتياطية اليومية — احفظ قيمته خارج Netlify، بدونه لا تُفك النسخ
+# الدالة المجدولة netlify/functions/backup-daily.ts تنسخ القاعدة يومياً إلى Netlify Blobs (آخر 30 نسخة)
 
 [build]
   command = "npm run build"
@@ -28,8 +30,11 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains"
-    # لا تضمين للموقع داخل مواقع أخرى، ولا plugins، ولا تغيير لـ <base>
-    Content-Security-Policy = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+    # سياسة صارمة: لا سكربت إلا من ملفات الموقع نفسه (لا inline ولا eval ولا مصادر خارجية)،
+    # والاتصال بالـ API على نفس النطاق فقط. نوافذ الطباعة والملصقات تُدار من الصفحة الأم (بلا سكربت داخلها).
+    # الأنماط inline مسموحة (React style + قوالب الطباعة) — لا تنفّذ كوداً.
+    # اختبرها محلياً على البناء قبل أي تعديل: vite preview + حقن الترويسة (راجع PROJECT_STATUS).
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'self' blob:; media-src 'self' blob:; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
 
 # ملفات البناء تحمل بصمة في اسمها — تُخزَّن سنة
 [[headers]]

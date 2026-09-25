@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellRing, CreditCard, Hospital as HospitalIcon, LogIn, Plus, Power, PowerOff, UserPlus } from 'lucide-react';
+import { BellRing, CreditCard, Hospital as HospitalIcon, LogIn, Plus, Power, PowerOff, Trash2, UserPlus } from 'lucide-react';
 import { SubscriptionDialog } from '@/features/billing/SubscriptionDialog';
 import { fmtDate } from '@/lib/format';
 import type { HospitalListItem } from '@hmsi/shared';
@@ -24,8 +24,14 @@ export default function HospitalsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [adminFor, setAdminFor] = useState<HospitalListItem | null>(null);
   const [toggleTarget, setToggleTarget] = useState<HospitalListItem | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<HospitalListItem | null>(null);
   const [subFor, setSubFor] = useState<HospitalListItem | null>(null);
   const pendingTotal = (data ?? []).reduce((n, h) => n + (h.pending_payments ?? 0), 0);
+  // تسجيلات ذاتية حديثة (7 أيام) — لمتابعة العملاء الجدد وكشف التسجيلات المشبوهة
+  const isNew = (h: HospitalListItem) => h.signup_source === 'self' && Date.now() - Date.parse(h.created_at) < 7 * 86_400_000;
+  const newCount = (data ?? []).filter(isNew).length;
+  const [onlyNew, setOnlyNew] = useState(false);
+  const shown = (data ?? []).filter((h) => !onlyNew || isNew(h));
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['hospitals'] });
 
@@ -84,6 +90,14 @@ export default function HospitalsPage() {
         </div>
       )}
 
+      {newCount > 0 && (
+        <div className="mb-4">
+          <Button size="sm" variant={onlyNew ? 'primary' : 'outline'} onClick={() => setOnlyNew((v) => !v)}>
+            {t('subscriptionAdmin.newSignups', { count: newCount })}
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
           {Array.from({ length: 2 }).map((_, i) => (
@@ -104,7 +118,7 @@ export default function HospitalsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {data.map((h) => {
+          {shown.map((h) => {
             const isCurrent = h.id === user?.hospital_id;
             const isHome = h.id === (user?.home_hospital_id ?? user?.hospital_id);
             return (
@@ -127,9 +141,18 @@ export default function HospitalsPage() {
                         </Badge>
                       )}
                       {h.signup_source === 'self' && <Badge variant="info">{t('subscriptionAdmin.selfSignup')}</Badge>}
+                      {isNew(h) && <Badge variant="brand">{t('subscriptionAdmin.newBadge')}</Badge>}
                       {(h.pending_payments ?? 0) > 0 && <Badge variant="warning">{t('subscriptionAdmin.pending', { count: h.pending_payments })}</Badge>}
                     </div>
                   </div>
+
+                  {h.signup_source === 'self' && (
+                    <p className="text-xs text-ink/55">
+                      {[h.contact_name, h.contact_phone, h.contact_email, h.city].filter(Boolean).join(' · ')}
+                      {' · '}
+                      {t('subscriptionAdmin.registered')} {fmtDate(h.created_at, { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <Stat label={t('hospitals.users')} value={h.users_count} />
@@ -177,6 +200,11 @@ export default function HospitalsPage() {
                         {h.is_active ? t('hospitals.disable') : t('hospitals.enable')}
                       </Button>
                     )}
+                    {!isHome && (
+                      <Button size="sm" variant="ghost" className="text-danger-600" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setPurgeTarget(h)}>
+                        {t('purge.deleteHospital')}
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -195,6 +223,7 @@ export default function HospitalsPage() {
         />
       )}
       {subFor && <SubscriptionDialog hospital={subFor} onClose={() => setSubFor(null)} />}
+      {purgeTarget && <PurgeHospitalDialog hospital={purgeTarget} onClose={() => setPurgeTarget(null)} />}
       <ConfirmDialog
         open={Boolean(toggleTarget)}
         onClose={() => setToggleTarget(null)}
@@ -281,6 +310,45 @@ function AddAdminDialog({ hospitalName, onClose, onSubmit, busy }: { hospitalNam
         <Input label={t('hospitals.fullNameAr')} value={form.fullNameAr} onChange={(e) => set('fullNameAr', e.target.value)} />
         <Input label={t('hospitals.fullNameEn')} value={form.fullNameEn} onChange={(e) => set('fullNameEn', e.target.value)} dir="ltr" />
         <Input label={t('hospitals.email')} type="email" value={form.email} onChange={(e) => set('email', e.target.value)} dir="ltr" />
+      </div>
+    </Dialog>
+  );
+}
+
+/** حذف مستشفى وكل بياناته نهائياً (بعد نسخة احتياطية تلقائية) — يتطلب كتابة رمز المستشفى */
+function PurgeHospitalDialog({ hospital, onClose }: { hospital: HospitalListItem; onClose: () => void }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [code, setCode] = useState('');
+  const purge = useMutation({
+    mutationFn: () => API.purgeHospital(hospital.id, code.trim()),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['hospitals'] });
+      toast.success(t('purge.hospitalDone'));
+      onClose();
+    },
+  });
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={`${t('purge.deleteHospital')} — ${localName(hospital, 'name')}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="danger" loading={purge.isPending} disabled={code.trim().toUpperCase() !== hospital.code.toUpperCase()} onClick={() => purge.mutate()}>
+            {t('purge.deleteHospital')}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-ink/70">{t('purge.hospitalBody')}</p>
+        <Input label={t('purge.typeCode', { code: hospital.code })} value={code} onChange={(e) => setCode(e.target.value)} dir="ltr" />
+        {purge.error && <p className="text-sm text-danger-600">{(purge.error as Error).message}</p>}
       </div>
     </Dialog>
   );

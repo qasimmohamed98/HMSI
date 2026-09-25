@@ -1,5 +1,6 @@
 import { Suspense, lazy, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { RouteError } from './RouteError';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/lib/auth';
 import { Logo } from '@/components/layout/Logo';
@@ -19,6 +20,9 @@ const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const TrackPage = lazy(() => import('@/pages/TrackPage'));
 const HospitalsPage = lazy(() => import('@/pages/HospitalsPage'));
+const SystemHealthPage = lazy(() => import('@/pages/SystemHealthPage'));
+const MedicationRoundsPage = lazy(() => import('@/pages/MedicationRoundsPage'));
+const HandoverPage = lazy(() => import('@/pages/HandoverPage'));
 const AuditPage = lazy(() => import('@/pages/AuditPage'));
 const TrashPage = lazy(() => import('@/pages/TrashPage'));
 const SignupPage = lazy(() => import('@/pages/SignupPage'));
@@ -56,52 +60,61 @@ function withSuspense(node: ReactNode) {
   return <Suspense fallback={<PageLoader />}>{node}</Suspense>;
 }
 
+// أي خطأ عرض غير متوقع في أي صفحة يظهر كرسالة واضحة ويُبلَّغ لسجل الأخطاء
 export const router = createBrowserRouter([
   {
-    path: '/login',
-    element: (
-      <GuestOnly>
-        <LoginPage />
-      </GuestOnly>
-    ),
-  },
-  // صفحات عامة للزوار والمستخدمين
-  { path: '/about', element: withSuspense(<AboutPage />) },
-  { path: '/system', element: withSuspense(<SystemPage />) },
-  { path: '/guide', element: withSuspense(<GuidePage />) },
-  {
-    path: '/signup',
-    element: <GuestOnly>{withSuspense(<SignupPage />)}</GuestOnly>,
-  },
-  {
-    // صفحة عامة لذوي المريض (بدون تسجيل دخول)
-    path: '/track/:code',
-    element: withSuspense(<TrackPage />),
-  },
-  {
-    path: '/',
-    element: (
-      <Protected>
-        <AppShell />
-      </Protected>
-    ),
+    errorElement: <RouteError />,
     children: [
-      { index: true, element: withSuspense(<DashboardPage />) },
-      { path: 'patients', element: withSuspense(<PatientsPage />) },
-      { path: 'patients/:id', element: withSuspense(<PatientChartPage />) },
-      { path: 'wards', element: withSuspense(<WardsPage />) },
-      { path: 'departments', element: withSuspense(<DepartmentsPage />) },
-      { path: 'laboratory', element: withSuspense(<LaboratoryPage />) },
-      { path: 'radiology', element: withSuspense(<RadiologyPage />) },
-      { path: 'pharmacy', element: withSuspense(<PharmacyPage />) },
-      { path: 'reports', element: withSuspense(<ReportsPage />) },
-      { path: 'users', element: withSuspense(<UsersPage />) },
-      { path: 'settings', element: withSuspense(<SettingsPage />) },
-      { path: 'hospitals', element: withSuspense(<HospitalsPage />) },
-      { path: 'audit', element: withSuspense(<AuditPage />) },
-      { path: 'trash', element: withSuspense(<TrashPage />) },
-      { path: 'billing', element: withSuspense(<BillingPage />) },
-      { path: '*', element: withSuspense(<NotFoundPage />) },
+      {
+        path: '/login',
+        element: (
+          <GuestOnly>
+            <LoginPage />
+          </GuestOnly>
+        ),
+      },
+      // صفحات عامة للزوار والمستخدمين
+      { path: '/about', element: withSuspense(<AboutPage />) },
+      { path: '/system', element: withSuspense(<SystemPage />) },
+      { path: '/guide', element: withSuspense(<GuidePage />) },
+      {
+        path: '/signup',
+        element: <GuestOnly>{withSuspense(<SignupPage />)}</GuestOnly>,
+      },
+      {
+        // صفحة عامة لذوي المريض (بدون تسجيل دخول)
+        path: '/track/:code',
+        element: withSuspense(<TrackPage />),
+      },
+      {
+        path: '/',
+        element: (
+          <Protected>
+            <AppShell />
+          </Protected>
+        ),
+        children: [
+          { index: true, element: withSuspense(<DashboardPage />) },
+          { path: 'patients', element: withSuspense(<PatientsPage />) },
+          { path: 'patients/:id', element: withSuspense(<PatientChartPage />) },
+          { path: 'wards', element: withSuspense(<WardsPage />) },
+          { path: 'departments', element: withSuspense(<DepartmentsPage />) },
+          { path: 'laboratory', element: withSuspense(<LaboratoryPage />) },
+          { path: 'radiology', element: withSuspense(<RadiologyPage />) },
+          { path: 'pharmacy', element: withSuspense(<PharmacyPage />) },
+          { path: 'medication-rounds', element: withSuspense(<MedicationRoundsPage />) },
+          { path: 'handover', element: withSuspense(<HandoverPage />) },
+          { path: 'reports', element: withSuspense(<ReportsPage />) },
+          { path: 'users', element: withSuspense(<UsersPage />) },
+          { path: 'settings', element: withSuspense(<SettingsPage />) },
+          { path: 'hospitals', element: withSuspense(<HospitalsPage />) },
+          { path: 'system-health', element: withSuspense(<SystemHealthPage />) },
+          { path: 'audit', element: withSuspense(<AuditPage />) },
+          { path: 'trash', element: withSuspense(<TrashPage />) },
+          { path: 'billing', element: withSuspense(<BillingPage />) },
+          { path: '*', element: withSuspense(<NotFoundPage />) },
+        ],
+      },
     ],
   },
 ]);

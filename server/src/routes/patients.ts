@@ -8,6 +8,9 @@ import { getChart } from '../repos/chartRepo.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit } from '../lib/audit.js';
 import { clientIp } from '../config.js';
+import { assertPatientAccess, grantEmergencyAccess, isRestricted, EMERGENCY_ACCESS_HOURS } from '../lib/access.js';
+import { notify } from '../lib/notify.js';
+import { z } from 'zod';
 
 export const patientRoutes = new Hono();
 
@@ -21,7 +24,13 @@ patientRoutes.get('/', requireAuth(), requirePermission('patients.view'), async 
   const search = c.req.query('search')?.slice(0, 100) || undefined;
   const admitted = c.req.query('admitted') === '1';
   const session = getSession(c)!;
-  const list = await listPatients(session.user.hospital_id, { search, admitted });
+  const mine = c.req.query('mine') === '1';
+  const list = await listPatients(session.user.hospital_id, {
+    search,
+    admitted,
+    doctorId: isRestricted(session.user) ? session.user.id : undefined,
+    nurseId: mine && session.user.role === 'nurse' ? session.user.id : undefined,
+  });
   return c.json(list.map((p) => ({ ...p, activeAdmission: hidePin(c, p.activeAdmission) })), 200);
 });
 
@@ -56,7 +65,38 @@ patientRoutes.get('/:id', requireAuth(), requirePermission('patients.view'), asy
   const session = getSession(c)!;
   const patient = await getPatientById(c.req.param('id'), session.user.hospital_id);
   if (!patient) return c.json({ message: 'المريض غير موجود' }, 404);
+  await assertPatientAccess(patient.id);
   return c.json({ ...patient, activeAdmission: hidePin(c, patient.activeAdmission) }, 200);
+});
+
+/**
+ * الوصول الطارئ: طبيب يحتاج ملف مريض ليس من مرضاه (طوارئ، تغطية زميل).
+ * يُمنح لمدة محدودة بسبب مكتوب، ويُسجَّل في التدقيق ويُبلَّغ مدير المستشفى.
+ */
+const EmergencySchema = z.object({ reason: z.string().trim().min(5).max(300) });
+patientRoutes.post('/:id/emergency-access', requireAuth(), requirePermission('chart.view'), async (c) => {
+  const parsed = await parseBody(c, EmergencySchema);
+  if (!parsed.ok) return parsed.json;
+  const { reason } = parsed.data as z.infer<typeof EmergencySchema>;
+  const session = getSession(c)!;
+  const id = c.req.param('id');
+  const patient = await getPatientById(id, session.user.hospital_id);
+  if (!patient) return c.json({ message: 'المريض غير موجود' }, 404);
+  const expires = await grantEmergencyAccess(session.user, id, reason);
+  await writeAudit({ actorId: session.user.id, action: 'emergency_access', resourceType: 'patient', resourceId: id, meta: { reason, hours: EMERGENCY_ACCESS_HOURS }, ip: clientIp(c) });
+  await notify({
+    hospitalId: session.user.hospital_id,
+    roles: ['admin'],
+    kind: 'emergency_access',
+    severity: 'warning',
+    titleAr: `وصول طارئ: ${session.user.full_name_ar}`,
+    titleEn: `Emergency access: ${session.user.full_name_en || session.user.full_name_ar}`,
+    bodyAr: `${patient.full_name_ar} · ${reason}`,
+    bodyEn: `${patient.full_name_en || patient.full_name_ar} · ${reason}`,
+    link: '/audit',
+    createdById: session.user.id,
+  });
+  return c.json({ expires_at: expires }, 201);
 });
 
 patientRoutes.patch('/:id', requireAuth(), requirePermission('patients.update'), async (c) => {
@@ -65,6 +105,7 @@ patientRoutes.patch('/:id', requireAuth(), requirePermission('patients.update'),
   const input = parsed.data as (typeof UpdatePatientSchema)['_output'];
   const id = c.req.param('id');
   const session = getSession(c)!;
+  await assertPatientAccess(id);
   const updated = await updatePatient(id, session.user.hospital_id, input);
   if (!updated) return c.json({ message: 'المريض غير موجود' }, 404);
   await writeAudit({ actorId: session.user.id, action: 'patient_updated', resourceType: 'patient', resourceId: id, meta: { fields: Object.keys(input) }, ip: clientIp(c) });

@@ -33,8 +33,9 @@ export async function createUser(input: {
   const passwordHash = await hashPassword(input.password);
   const id = uuid('us');
   await db.execute({
-    sql: `INSERT INTO users (id, hospital_id, username, full_name_ar, full_name_en, email, role, password_hash)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    // حساب ينشئه المدير بكلمة مؤقتة: تغييرها إجباري عند أول دخول
+    sql: `INSERT INTO users (id, hospital_id, username, full_name_ar, full_name_en, email, role, password_hash, must_change_password)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
     args: [id, hospitalId, username, input.full_name_ar, input.full_name_en ?? null, input.email ?? null, input.role, passwordHash],
   });
   return (await getUserById(id))!;

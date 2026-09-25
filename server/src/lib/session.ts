@@ -34,6 +34,9 @@ function cookieOptions(c: Context, maxAgeSeconds: number) {
   } as const;
 }
 
+/** الجلسة تنتهي بعد 30 دقيقة بلا نشاط (أجهزة المستشفى مشتركة) */
+export const IDLE_TIMEOUT_MS = 30 * 60_000;
+
 export async function createSession(ctx: Context, userId: string, ip: string | null, userAgent: string | null): Promise<{ token: string; csrf: string }> {
   const token = generateSessionToken();
   const csrf = generateCsrf();
@@ -41,6 +44,10 @@ export async function createSession(ctx: Context, userId: string, ip: string | n
     sql: `INSERT INTO sessions (id, user_id, token_hash, csrf_token, expires_at, ip, user_agent)
           VALUES (?, ?, ?, ?, datetime('now', '+12 hours'), ?, ?)`,
     args: [randomUUID(), userId, sha256(token), csrf, ip, userAgent?.slice(0, 300) ?? null],
+  });
+  await db.execute({
+    sql: `UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?`,
+    args: [new Date().toISOString(), sha256(token)],
   });
   setCookie(ctx, COOKIE_SESSION, token, cookieOptions(ctx, SESSION_TTL_MS / 1000));
   setCookie(ctx, COOKIE_CSRF, csrf, { ...cookieOptions(ctx, SESSION_TTL_MS / 1000), httpOnly: false, sameSite: 'Strict' });
@@ -79,17 +86,24 @@ export async function currentSession(ctx: Context): Promise<SessionUser | null> 
   // hospital_id الفعّال = المستشفى الذي اختاره المدير العام (active_hospital_id) أو مستشفى المستخدم الأصلي
   const rows = await db.execute({
     sql: `SELECT s.id AS session_id, s.csrf_token,
+                 s.last_seen_at, u.must_change_password, u.totp_enabled,
                  u.id, u.hospital_id AS home_hospital_id, u.username, u.full_name_ar, u.full_name_en, u.email, u.role, u.is_active, u.created_at,
                  h.id AS hospital_id, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.is_active AS hospital_active, h.logo_updated_at AS hospital_logo_updated_at,
                  h.trial_ends_at AS hospital_trial_ends_at, h.subscription_ends_at AS hospital_subscription_ends_at
           FROM sessions s
           JOIN users u ON u.id = s.user_id
           JOIN hospitals h ON h.id = COALESCE(s.active_hospital_id, u.hospital_id)
-          WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND u.is_active = 1`,
-    args: [sha256(token)],
+          WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND u.is_active = 1
+            AND (s.last_seen_at IS NULL OR s.last_seen_at > ?)`,
+    args: [sha256(token), new Date(Date.now() - IDLE_TIMEOUT_MS).toISOString()],
   });
   if (rows.rows.length === 0) return null;
   const r = rows.rows[0] as unknown as Record<string, unknown>;
+  // تحديث آخر نشاط مرة كل دقيقة على الأكثر (لا كتابة مع كل طلب)
+  const seen = r.last_seen_at ? Date.parse(String(r.last_seen_at)) : 0;
+  if (Date.now() - seen > 60_000) {
+    await db.execute({ sql: `UPDATE sessions SET last_seen_at = ? WHERE id = ?`, args: [new Date().toISOString(), String(r.session_id)] });
+  }
   const role = String(r.role) as User['role'];
   // مستشفى معطّل: لا يدخله إلا المدير العام
   if (!Number(r.hospital_active) && role !== 'super_admin') return null;
@@ -111,6 +125,8 @@ export async function currentSession(ctx: Context): Promise<SessionUser | null> 
       created_at: String(r.created_at),
       hospital_logo_url: logoUrl(r.hospital_id, r.hospital_logo_updated_at),
       subscription: computeSubscription(r.hospital_trial_ends_at, r.hospital_subscription_ends_at),
+      must_change_password: Boolean(Number(r.must_change_password ?? 0)),
+      totp_enabled: Boolean(Number(r.totp_enabled ?? 0)),
     },
   };
 }

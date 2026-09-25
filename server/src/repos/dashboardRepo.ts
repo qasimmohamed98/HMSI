@@ -1,8 +1,13 @@
 import type { Consciousness, DashboardStats, MewsAlert, TimelineEvent } from '@hmsi/shared';
 import { calcMews } from '@hmsi/shared';
 import { db } from '../../db/index.js';
+import { doctorAccessSql } from '../lib/access.js';
 
-export async function getDashboard(hospitalId: string): Promise<DashboardStats> {
+export async function getDashboard(hospitalId: string, doctorId?: string): Promise<DashboardStats> {
+  // الطبيب: الإنذار المبكر والنشاط الأخير لمرضاه فقط
+  const acc = doctorId ? doctorAccessSql('p', doctorId) : null;
+  const accSql = acc ? ` AND ${acc.sql}` : '';
+  const accArgs = acc ? acc.args : [];
   const [totalPatients, activeAdmissions, critical, pendingLabs] = await Promise.all([
     db.execute({ sql: `SELECT COUNT(*) AS n FROM patients WHERE hospital_id = ?`, args: [hospitalId] }),
     db.execute({ sql: `SELECT COUNT(*) AS n FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = ? AND a.status = 'active'`, args: [hospitalId] }),
@@ -59,9 +64,9 @@ export async function getDashboard(hospitalId: string): Promise<DashboardStats> 
     sql: `SELECT t.* FROM timeline_events t
           JOIN admissions a ON a.id = t.admission_id
           JOIN patients p ON p.id = a.patient_id
-          WHERE p.hospital_id = ?
+          WHERE p.hospital_id = ?${accSql}
           ORDER BY t.created_at DESC LIMIT 12`,
-    args: [hospitalId],
+    args: [hospitalId, ...accArgs],
   });
 
   // آخر علامات حيوية لكل تنويم نشط (خلال 24 ساعة) → درجة الإنذار المبكر
@@ -72,8 +77,8 @@ export async function getDashboard(hospitalId: string): Promise<DashboardStats> 
           JOIN patients p ON p.id = a.patient_id
           LEFT JOIN wards w ON w.id = a.ward_id
           JOIN vitals v ON v.id = (SELECT id FROM vitals WHERE admission_id = a.id ORDER BY recorded_at DESC LIMIT 1)
-          WHERE p.hospital_id = ? AND a.status = 'active' AND v.recorded_at >= ?`,
-    args: [hospitalId, new Date(Date.now() - 24 * 3600_000).toISOString()],
+          WHERE p.hospital_id = ? AND a.status = 'active' AND v.recorded_at >= ?${accSql}`,
+    args: [hospitalId, new Date(Date.now() - 24 * 3600_000).toISOString(), ...accArgs],
   });
   const mewsAlerts: MewsAlert[] = [];
   for (const row of latestVitals.rows) {

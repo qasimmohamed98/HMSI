@@ -7,7 +7,7 @@ import type { PublicTrackFamily } from '@hmsi/shared';
 import { Card, CardContent, Badge, Button, Input, Skeleton } from '@/components/ui';
 import { QLockup } from '@/components/brand/QBrand';
 import { API } from '@/lib/api';
-import { fmtDate, fmtDateTime } from '@/lib/format';
+import { doctorName, fmtDate, fmtDateTime } from '@/lib/format';
 import { currentLang, setLanguage } from '@/i18n';
 
 /**
@@ -108,7 +108,7 @@ export default function TrackPage() {
                     <Field icon={<CalendarClock className="h-3.5 w-3.5" />} label={t('track.admittedAt')} value={fmtDate(data.admission.admitted_at, { day: 'numeric', month: 'short', year: 'numeric' })} />
                     <Field label={t('track.days')} value={t('track.daysValue', { count: data.admission.days })} />
                     {data.admission.last_update && <Field label={t('track.lastUpdate')} value={fmtDateTime(data.admission.last_update)} />}
-                    {family && <Field icon={<Stethoscope className="h-3.5 w-3.5" />} label={t('track.doctor')} value={family.attending_doctor ?? '—'} />}
+                    {family && <Field icon={<Stethoscope className="h-3.5 w-3.5" />} label={t('track.doctor')} value={doctorName(family) || '—'} />}
                   </div>
                 )}
               </CardContent>

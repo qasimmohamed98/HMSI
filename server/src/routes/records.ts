@@ -18,7 +18,7 @@ import {
   CreateFluidSchema,
   AdministerMedicationSchema,
 } from '@hmsi/shared/validate';
-import type { AdmissionSummary, Permission } from '@hmsi/shared';
+import { findAllergyConflicts, type AllergyConflict, type AdmissionSummary, type Permission } from '@hmsi/shared';
 import { getSession, requireAuth, requirePermission, sessionHas, type SessionUser } from '../middleware/auth.js';
 import { getAdmissionScope } from '../repos/chartRepo.js';
 import { parseBody } from '../lib/validate.js';
@@ -28,6 +28,7 @@ import { clientIp } from '../config.js';
 import { db, uuid } from '../../db/index.js';
 import { resolveRecordedAt, existingClientRecord } from '../lib/offline.js';
 import { moveToTrash, recordLabel, type TrashableTable } from '../lib/trash.js';
+import { notifyAdmission } from '../lib/notify.js';
 
 export const recordRoutes = new Hono();
 
@@ -183,6 +184,35 @@ recordRoutes.patch('/:admissionId/diagnoses/:id', requireAuth(), requirePermissi
 
 // ---------------------------------------------------------------- الأدوية
 
+/** تعارض الدواء مع حساسيات المريض المسجلة */
+async function allergyConflicts(admissionId: string, names: (string | null | undefined)[]): Promise<AllergyConflict[]> {
+  const r = await db.execute({
+    sql: `SELECT p.allergies_json FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE a.id = ?`,
+    args: [admissionId],
+  });
+  let allergies: string[] = [];
+  try {
+    allergies = JSON.parse(String(r.rows[0]?.allergies_json ?? '[]'));
+  } catch {
+    /* بيانات قديمة غير صالحة */
+  }
+  return findAllergyConflicts(names, Array.isArray(allergies) ? allergies.map(String) : []);
+}
+
+/**
+ * لا يُوصف دواء يتعارض مع حساسية مسجلة إلا بسبب مكتوب (409 وإلا).
+ * يعيد JSON التجاوز للحفظ مع الدواء، أو null إن لم يوجد تعارض.
+ */
+async function allergyGate(c: Context, s: SessionUser, admissionId: string, names: (string | null | undefined)[], reason: string | null | undefined, medId: string): Promise<{ override: string | null } | Response> {
+  const conflicts = await allergyConflicts(admissionId, names);
+  if (conflicts.length === 0) return { override: null };
+  if (!reason) {
+    return c.json({ message: 'الدواء يتعارض مع حساسية مسجلة للمريض — راجع الوصف أو اذكر سبب التجاوز', code: 'allergy_conflict', conflicts }, 409);
+  }
+  await writeAudit({ actorId: s.user.id, action: 'allergy_override', resourceType: 'medication', resourceId: medId, ip: clientIp(c), meta: { reason, conflicts, drug: names.filter(Boolean) } });
+  return { override: JSON.stringify({ reason, conflicts, by: s.user.full_name_ar, by_en: s.user.full_name_en ?? null, at: new Date().toISOString() }) };
+}
+
 recordRoutes.post('/:admissionId/medications', requireAuth(), requirePermission('medications.manage'), async (c) => {
   const parsed = await parseBody(c, CreateMedicationSchema);
   if (!parsed.ok) return parsed.json;
@@ -191,12 +221,25 @@ recordRoutes.post('/:admissionId/medications', requireAuth(), requirePermission(
   requireActive(await loadAdmission(c, input.admission_id));
 
   const id = uuid('md');
+  const gate = await allergyGate(c, s, input.admission_id, [input.name_ar, input.name_en], input.allergy_override_reason, id);
+  if (gate instanceof Response) return gate;
   await db.execute({
-    sql: `INSERT INTO medications (id, admission_id, name_ar, name_en, dose, route, frequency, start_at, end_at, status, prescribed_by, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
-    args: [id, input.admission_id, input.name_ar, input.name_en ?? null, input.dose, input.route, input.frequency, input.start_at, input.end_at ?? null, s.user.full_name_ar, new Date().toISOString()],
+    sql: `INSERT INTO medications (id, admission_id, name_ar, name_en, dose, route, frequency, start_at, end_at, status, prescribed_by, created_at, allergy_override_json)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+    args: [id, input.admission_id, input.name_ar, input.name_en ?? null, input.dose, input.route, input.frequency, input.start_at, input.end_at ?? null, s.user.full_name_ar, new Date().toISOString(), gate.override],
   });
   await track(c, s, input.admission_id, 'medication', `وصف دواء: ${input.name_ar}`, `Medication: ${input.name_en ?? input.name_ar}`, 'medication_prescribed', 'medication', id);
+  await notifyAdmission(input.admission_id, {
+    roles: ['pharmacist'],
+    toNurse: true,
+    kind: 'medication_prescribed',
+    severity: gate.override ? 'warning' : 'info',
+    titleAr: `دواء جديد للصرف: ${input.name_ar}`,
+    titleEn: `New medication to dispense: ${input.name_en ?? input.name_ar}`,
+    bodyAr: gate.override ? 'وُصف رغم تحذير حساسية' : undefined,
+    bodyEn: gate.override ? 'Prescribed despite an allergy warning' : undefined,
+    createdById: s.user.id,
+  });
   return c.json(await fetchRow('medications', id), 201);
 });
 
@@ -207,8 +250,16 @@ recordRoutes.patch('/:admissionId/medications/:id', requireAuth(), requirePermis
   const s = getSession(c)!;
   const a = await loadAdmission(c);
   const id = c.req.param('id');
-  await findRecord('medications', id, a.id);
+  const current = await findRecord('medications', id, a.id);
   const { sets, args } = buildSets(input, ['name_ar', 'name_en', 'dose', 'route', 'frequency', 'start_at', 'status', 'end_at']);
+  // تغيير اسم الدواء يعيد فحص الحساسية
+  if (input.name_ar !== undefined || input.name_en !== undefined) {
+    const names = [(input.name_ar ?? current.name_ar) as string, (input.name_en !== undefined ? input.name_en : current.name_en) as string | null];
+    const gate = await allergyGate(c, s, a.id, names, input.allergy_override_reason as string | null | undefined, id);
+    if (gate instanceof Response) return gate;
+    sets.push('allergy_override_json = ?');
+    args.push(gate.override);
+  }
   if (sets.length === 0) return c.json({ message: 'لا توجد بيانات للتحديث' }, 400);
   await db.execute({ sql: `UPDATE medications SET ${sets.join(', ')} WHERE id = ?`, args: [...args, id] });
   await track(c, s, a.id, 'medication', 'تحديث دواء', 'Medication updated', 'medication_updated', 'medication', id);
@@ -330,6 +381,12 @@ recordRoutes.post('/:admissionId/labs', requireAuth(), requirePermission('lab.or
     ],
   });
   await track(c, s, input.admission_id, 'lab', withResult ? `نتيجة مختبر: ${input.test_name_ar}` : `طلب مختبر: ${input.test_name_ar}`, withResult ? `Lab result: ${input.test_name_en ?? input.test_name_ar}` : `Lab ordered: ${input.test_name_en ?? input.test_name_ar}`, 'lab_ordered', 'lab_result', id);
+  await notifyAdmission(
+    input.admission_id,
+    withResult
+      ? { toAttending: true, kind: 'lab_resulted', titleAr: `نتيجة مختبر: ${input.test_name_ar}`, titleEn: `Lab result: ${input.test_name_en ?? input.test_name_ar}`, createdById: s.user.id }
+      : { roles: ['lab'], kind: 'lab_ordered', titleAr: `طلب فحص جديد: ${input.test_name_ar}`, titleEn: `New lab order: ${input.test_name_en ?? input.test_name_ar}`, createdById: s.user.id },
+  );
   return c.json(await fetchRow('lab_results', id), 201);
 });
 
@@ -340,12 +397,21 @@ recordRoutes.patch('/:admissionId/labs/:id', requireAuth(), requirePermission('l
   const s = getSession(c)!;
   const a = await loadAdmission(c);
   const id = c.req.param('id');
-  await findRecord('lab_results', id, a.id);
+  const lab = await findRecord('lab_results', id, a.id);
   await db.execute({
     sql: `UPDATE lab_results SET result = ?, unit = ?, reference_range = ?, status = ?, resulted_by = ?, resulted_at = ? WHERE id = ?`,
     args: [input.result, input.unit ?? null, input.reference_range ?? null, input.abnormal ? 'abnormal' : 'resulted', s.user.full_name_ar, new Date().toISOString(), id],
   });
   await track(c, s, a.id, 'lab', 'إدخال نتيجة مختبر', 'Lab result entered', 'lab_result_updated', 'lab_result', id);
+  await notifyAdmission(a.id, {
+    toAttending: true,
+    kind: input.abnormal ? 'lab_abnormal' : 'lab_resulted',
+    severity: input.abnormal ? 'warning' : 'info',
+    titleAr: `${input.abnormal ? 'نتيجة غير طبيعية' : 'نتيجة مختبر'}: ${String(lab.test_name_ar)}`,
+    titleEn: `${input.abnormal ? 'Abnormal result' : 'Lab result'}: ${String(lab.test_name_en ?? lab.test_name_ar)}`,
+    bodyAr: `${input.result}${input.unit ? ` ${input.unit}` : ''}`,
+    createdById: s.user.id,
+  });
   return c.json(await fetchRow('lab_results', id), 200);
 });
 
@@ -373,6 +439,12 @@ recordRoutes.post('/:admissionId/radiology', requireAuth(), requirePermission('r
     ],
   });
   await track(c, s, input.admission_id, 'radiology', withReport ? `تقرير أشعة: ${input.study_type_ar}` : `طلب أشعة: ${input.study_type_ar}`, withReport ? `Radiology report: ${input.study_type_en ?? input.study_type_ar}` : `Radiology ordered: ${input.study_type_en ?? input.study_type_ar}`, 'radiology_ordered', 'radiology_report', id);
+  await notifyAdmission(
+    input.admission_id,
+    withReport
+      ? { toAttending: true, kind: 'radiology_reported', titleAr: `تقرير أشعة: ${input.study_type_ar}`, titleEn: `Radiology report: ${input.study_type_en ?? input.study_type_ar}`, createdById: s.user.id }
+      : { roles: ['radiology'], kind: 'radiology_ordered', titleAr: `طلب أشعة جديد: ${input.study_type_ar}`, titleEn: `New imaging order: ${input.study_type_en ?? input.study_type_ar}`, createdById: s.user.id },
+  );
   return c.json(await fetchRow('radiology_reports', id), 201);
 });
 
@@ -383,12 +455,19 @@ recordRoutes.patch('/:admissionId/radiology/:id', requireAuth(), requirePermissi
   const s = getSession(c)!;
   const a = await loadAdmission(c);
   const id = c.req.param('id');
-  await findRecord('radiology_reports', id, a.id);
+  const study = await findRecord('radiology_reports', id, a.id);
   await db.execute({
     sql: `UPDATE radiology_reports SET report = ?, status = 'resulted', performed_by = ?, performed_at = ? WHERE id = ?`,
     args: [input.report, s.user.full_name_ar, new Date().toISOString(), id],
   });
   await track(c, s, a.id, 'radiology', 'إعداد تقرير أشعة', 'Radiology report ready', 'radiology_report_updated', 'radiology_report', id);
+  await notifyAdmission(a.id, {
+    toAttending: true,
+    kind: 'radiology_reported',
+    titleAr: `تقرير أشعة جاهز: ${String(study.study_type_ar ?? study.study_type)}`,
+    titleEn: `Radiology report ready: ${String(study.study_type_en ?? study.study_type_ar ?? study.study_type)}`,
+    createdById: s.user.id,
+  });
   return c.json(await fetchRow('radiology_reports', id), 200);
 });
 

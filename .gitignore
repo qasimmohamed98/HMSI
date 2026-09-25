@@ -47,3 +47,5 @@ web/web_*.txt
 # Local test databases & temp bundles
 server/smoke.db*
 server/.fn-*
+# Local backups (server/backups)
+server/backups/

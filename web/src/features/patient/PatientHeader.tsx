@@ -8,7 +8,7 @@ import { ArrowRight, CalendarClock, Eye, KeyRound, MapPin, RefreshCw, Stethoscop
 import { Badge, Chip, Avatar, Button, useToast } from '@/components/ui';
 import { API } from '@/lib/api';
 import { currentLang } from '@/i18n';
-import { calcAge, fmtDate, localName } from '@/lib/format';
+import { calcAge, doctorName, fmtDate, localName } from '@/lib/format';
 import { jsonParse } from '@/lib/demo-data';
 
 export function PatientHeader({
@@ -82,7 +82,7 @@ export function PatientHeader({
             <Meta icon={<MapPin className="h-4 w-4" />} label={t('patients.department')} value={localName(admission, 'department_name')} />
             <Meta icon={<MapPin className="h-4 w-4" />} label={t('patients.ward')} value={localName(admission, 'ward_name')} />
             <Meta icon={<MapPin className="h-4 w-4" />} label={t('patients.bed')} value={`${admission.room} / ${admission.bed_no}`} mono />
-            <Meta icon={<Stethoscope className="h-4 w-4" />} label={t('chart.attendingDoctor')} value={admission.attending_doctor ?? '—'} />
+            <Meta icon={<Stethoscope className="h-4 w-4" />} label={t('chart.attendingDoctor')} value={doctorName(admission) || '—'} />
             <Meta icon={<CalendarClock className="h-4 w-4" />} label={t('chart.admitted')} value={fmtDate(admission.admitted_at, { day: 'numeric', month: 'short', year: 'numeric' })} mono />
             <div className="col-span-2 flex items-end gap-2 sm:col-span-1">
               <Badge variant={admission.status === 'active' ? 'success' : 'neutral'} dot>

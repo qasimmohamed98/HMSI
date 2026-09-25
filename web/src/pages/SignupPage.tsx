@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -18,6 +18,9 @@ export default function SignupPage() {
   const [form, setForm] = useState({ hospitalNameAr: '', hospitalNameEn: '', city: '', contactPhone: '', fullNameAr: '', email: '', username: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // حماية من البرامج الآلية: رمز نموذج من الخادم + حقل مخفي يبقى فارغاً عند الإنسان
+  const formToken = useQuery({ queryKey: ['signupToken'], queryFn: API.signupToken, staleTime: Infinity, retry: false });
+  const trap = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const trialDays = info?.trial_days ?? 14;
 
@@ -36,11 +39,15 @@ export default function SignupPage() {
         email: form.email.trim() || null,
         username: form.username.trim(),
         password: form.password,
+        formToken: formToken.data?.token,
+        website: trap.current?.value,
       });
       await refresh();
       navigate('/', { replace: true });
     } catch (err) {
       setError((err as Error).message || t('errors.generic'));
+      // رمز جديد لإعادة المحاولة (القديم قد يكون انتهى)
+      void formToken.refetch();
     } finally {
       setBusy(false);
     }
@@ -72,6 +79,12 @@ export default function SignupPage() {
 
               <form onSubmit={submit} className="mt-6 space-y-6">
                 {error && <Alert variant="danger">{error}</Alert>}
+                <div aria-hidden="true" className="absolute -start-[9999px] h-px w-px overflow-hidden">
+                  <label>
+                    Website
+                    <input ref={trap} type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" />
+                  </label>
+                </div>
 
                 <fieldset className="space-y-4">
                   <legend className="mb-2 flex items-center gap-2 text-sm font-extrabold text-ink">

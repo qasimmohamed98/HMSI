@@ -38,6 +38,8 @@ export default defineConfig(({ mode }) => {
           // طلبات الـ API لا تُخدم أبداً من الكاش (بيانات طبية حساسة ومتغيرة)
           navigateFallbackDenylist: [/^\/api\//],
           globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+          // فتح رابط التنبيه عند الضغط على إشعار الجهاز (web/public/sw-notify.js)
+          importScripts: ['/sw-notify.js'],
           /*
            * Background Sync لإدخالات التمريض فقط (علامات حيوية، سوائل، جرعات): إن فشل الإرسال لانقطاع الشبكة
            * يحفظه الـ Service Worker ويعيد إرساله عند عودة الاتصال حتى لو أُغلقت الصفحة (متصفحات Chromium).
@@ -75,6 +77,15 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      proxy: {
+        '/api': {
+          target: apiTarget,
+          changeOrigin: true,
+        },
+      },
+    },
+    // معاينة البناء محلياً (لاختبار سياسة CSP على ملفات الإنتاج)
+    preview: {
       proxy: {
         '/api': {
           target: apiTarget,

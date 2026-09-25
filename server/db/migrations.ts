@@ -458,4 +458,188 @@ CREATE INDEX IF NOT EXISTS idx_payment_notices_status ON payment_notices(status,
 CREATE INDEX IF NOT EXISTS idx_payment_notices_hospital ON payment_notices(hospital_id, submitted_at);
 `,
   },
+  {
+    id: "013_security.sql",
+    sql: `-- 013 — أمان الحسابات والجلسات
+-- تغيير إجباري لكلمة المرور: كلمة مرور مؤقتة (أنشأها/أعادها المدير) أو ضعيفة/معروفة (مثل password123)
+ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0;
+-- التحقق بخطوتين (TOTP): السر مشفّر بمفتاح الخادم، ورموز الاسترداد مجزّأة (hash)
+ALTER TABLE users ADD COLUMN totp_secret TEXT;
+ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN totp_recovery_json TEXT;
+-- الخروج التلقائي عند الخمول: آخر نشاط للجلسة
+ALTER TABLE sessions ADD COLUMN last_seen_at TEXT;
+
+-- الخطوة الثانية من الدخول: تذكرة قصيرة العمر بعد صحة كلمة المرور
+CREATE TABLE IF NOT EXISTS mfa_challenges (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  token_hash  TEXT UNIQUE NOT NULL,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  expires_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`,
+  },
+  {
+    id: "014_allergy_override.sql",
+    sql: `-- 014 — تجاوز تحذير الحساسية عند وصف دواء: السبب والتعارضات ومن تجاوز ومتى (JSON)
+ALTER TABLE medications ADD COLUMN allergy_override_json TEXT;
+`,
+  },
+  {
+    id: "015_monitoring.sql",
+    sql: `-- 015 — مراقبة الأخطاء: أخطاء الخادم والواجهة (منقّحة من الأسرار والأرقام الطويلة)
+-- الخطأ المتكرر يُجمع في صف واحد (fingerprint) مع عدّاد وآخر ظهور
+CREATE TABLE IF NOT EXISTS error_events (
+  id           TEXT PRIMARY KEY,
+  source       TEXT NOT NULL CHECK (source IN ('server','client','job')),
+  fingerprint  TEXT NOT NULL,
+  message      TEXT NOT NULL,
+  detail       TEXT,
+  path         TEXT,
+  hospital_id  TEXT,
+  user_id      TEXT,
+  user_agent   TEXT,
+  count        INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_error_events_fp ON error_events(fingerprint, last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_error_events_seen ON error_events(last_seen_at);
+`,
+  },
+  {
+    id: "016_totp_replay.sql",
+    sql: `-- 016 — التحقق بخطوتين: آخر خطوة زمنية مستخدمة (يمنع إعادة استخدام نفس الرمز خلال نافذته)
+ALTER TABLE users ADD COLUMN totp_last_step INTEGER;
+`,
+  },
+  {
+    id: "017_notifications.sql",
+    sql: `-- 017 — الإشعارات داخل النظام (الجرس): نتائج غير طبيعية، MEWS مرتفع، طلبات جديدة، طلبات استعادة
+-- الهدف: مستخدم محدد (target_user_id) أو أدوار في المستشفى (target_roles: قائمة مفصولة بفواصل)
+CREATE TABLE IF NOT EXISTS notifications (
+  id             TEXT PRIMARY KEY,
+  hospital_id    TEXT NOT NULL REFERENCES hospitals(id),
+  target_user_id TEXT REFERENCES users(id),
+  target_roles   TEXT,
+  kind           TEXT NOT NULL,
+  severity       TEXT NOT NULL DEFAULT 'info' CHECK (severity IN ('info','warning','critical')),
+  title_ar       TEXT NOT NULL,
+  title_en       TEXT,
+  body_ar        TEXT,
+  body_en        TEXT,
+  link           TEXT,
+  admission_id   TEXT,
+  created_by_id  TEXT,
+  created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_hospital ON notifications(hospital_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(target_user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS notification_reads (
+  notification_id TEXT NOT NULL REFERENCES notifications(id),
+  user_id         TEXT NOT NULL REFERENCES users(id),
+  read_at         TEXT NOT NULL,
+  PRIMARY KEY (notification_id, user_id)
+);
+`,
+  },
+  {
+    id: "018_handover.sql",
+    sql: `-- 018 — تسليم المناوبة: ملاحظات SBAR لكل مريض منوّم
+-- (الوضع الحالي، الخلفية، التقييم، التوصيات للمناوبة القادمة)
+CREATE TABLE IF NOT EXISTS handover_notes (
+  id             TEXT PRIMARY KEY,
+  admission_id   TEXT NOT NULL REFERENCES admissions(id),
+  situation      TEXT NOT NULL,
+  background     TEXT,
+  assessment     TEXT,
+  recommendation TEXT,
+  author         TEXT NOT NULL,
+  author_id      TEXT REFERENCES users(id),
+  created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_handover_admission ON handover_notes(admission_id, created_at);
+`,
+  },
+  {
+    id: "019_care_team.sql",
+    sql: `-- 019 — فريق الرعاية، تسليم واستلام التمريض، الخطة العلاجية، الوصول الطارئ
+
+-- فريق رعاية التنويم: أكثر من طبيب (تخصصات متعددة) وممرض واحد فعّال فقط لكل مريض
+CREATE TABLE IF NOT EXISTS care_team (
+  id              TEXT PRIMARY KEY,
+  admission_id    TEXT NOT NULL REFERENCES admissions(id),
+  user_id         TEXT NOT NULL REFERENCES users(id),
+  role            TEXT NOT NULL CHECK (role IN ('doctor','nurse')),
+  specialty       TEXT,
+  is_primary      INTEGER NOT NULL DEFAULT 0,
+  assigned_by_id  TEXT,
+  assigned_at     TEXT NOT NULL,
+  ended_at        TEXT,
+  end_reason      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_care_team_user ON care_team(user_id, ended_at);
+CREATE INDEX IF NOT EXISTS idx_care_team_admission ON care_team(admission_id, ended_at);
+-- لا يُعيَّن ممرضان على نفس المريض في الوقت نفسه
+CREATE UNIQUE INDEX IF NOT EXISTS ux_care_team_one_nurse ON care_team(admission_id) WHERE role = 'nurse' AND ended_at IS NULL;
+-- لا يتكرر نفس الشخص فعّالاً في الفريق
+CREATE UNIQUE INDEX IF NOT EXISTS ux_care_team_member ON care_team(admission_id, user_id) WHERE ended_at IS NULL;
+
+-- الطبيب المعالج الحالي لكل تنويم نشط يصبح الطبيب الرئيسي في الفريق
+INSERT INTO care_team (id, admission_id, user_id, role, is_primary, assigned_at)
+  SELECT 'ct-' || a.id, a.id, a.attending_doctor_id, 'doctor', 1, a.admitted_at
+  FROM admissions a WHERE a.attending_doctor_id IS NOT NULL;
+
+-- تسليم واستلام المرضى بين الممرضين: لا ينتقل المريض حتى يقبل المستلم
+CREATE TABLE IF NOT EXISTS nurse_handovers (
+  id             TEXT PRIMARY KEY,
+  hospital_id    TEXT NOT NULL REFERENCES hospitals(id),
+  from_user_id   TEXT NOT NULL REFERENCES users(id),
+  to_user_id     TEXT NOT NULL REFERENCES users(id),
+  status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','cancelled')),
+  note           TEXT,
+  response_note  TEXT,
+  created_at     TEXT NOT NULL,
+  responded_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_nurse_handovers_to ON nurse_handovers(to_user_id, status);
+CREATE INDEX IF NOT EXISTS idx_nurse_handovers_from ON nurse_handovers(from_user_id, status);
+
+CREATE TABLE IF NOT EXISTS nurse_handover_items (
+  handover_id   TEXT NOT NULL REFERENCES nurse_handovers(id),
+  admission_id  TEXT NOT NULL REFERENCES admissions(id),
+  PRIMARY KEY (handover_id, admission_id)
+);
+
+-- الخطة العلاجية لكل تنويم (نسخة حالية واحدة؛ التغييرات في الخط الزمني والتدقيق)
+CREATE TABLE IF NOT EXISTS care_plans (
+  admission_id          TEXT PRIMARY KEY REFERENCES admissions(id),
+  goals                 TEXT,
+  diet                  TEXT,
+  activity              TEXT,
+  monitoring            TEXT,
+  nursing_instructions  TEXT,
+  vitals_interval_hours INTEGER,
+  review_at             TEXT,
+  updated_by            TEXT NOT NULL,
+  updated_by_id         TEXT,
+  updated_at            TEXT NOT NULL
+);
+
+-- الوصول الطارئ: طبيب يفتح ملف مريض ليس من مرضاه بسبب مكتوب، لمدة محدودة ومع تدقيق
+CREATE TABLE IF NOT EXISTS access_grants (
+  id          TEXT PRIMARY KEY,
+  hospital_id TEXT NOT NULL REFERENCES hospitals(id),
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  patient_id  TEXT NOT NULL REFERENCES patients(id),
+  reason      TEXT NOT NULL,
+  expires_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_access_grants_user ON access_grants(user_id, patient_id, expires_at);
+`,
+  },
 ];

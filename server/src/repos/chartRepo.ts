@@ -16,6 +16,7 @@ import type {
 } from '@hmsi/shared';
 import { db } from '../../db/index.js';
 import { getPatientById, mapAdmission, ADMISSION_COLUMNS } from './patientRepo.js';
+import { assertPatientAccess } from '../lib/access.js';
 
 export type { ChartData };
 
@@ -33,6 +34,8 @@ export async function getAdmissionScope(admissionId: string, hospitalId: string)
   });
   if (rows.rows.length === 0) return null;
   const r = rows.rows[0] as Record<string, unknown>;
+  // الطبيب: مرضاه فقط (403 not_your_patient)
+  await assertPatientAccess(String(r.patient_id));
   return { admission: mapAdmission(r)!, patientId: String(r.patient_id) };
 }
 
@@ -43,6 +46,7 @@ export async function getAdmissionScope(admissionId: string, hospitalId: string)
 export async function getChart(patientId: string, hospitalId: string, admissionId?: string): Promise<ChartData | null> {
   const patient = await getPatientById(patientId, hospitalId);
   if (!patient) return null;
+  await assertPatientAccess(patientId);
 
   const admissionRows = await db.execute({
     sql: `SELECT ${ADMISSION_COLUMNS}

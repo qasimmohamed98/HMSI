@@ -205,6 +205,10 @@ function EditUserDialog({ open, user, onClose, onSuccess }: { open: boolean; use
   const set = <K extends keyof UpdateUserInput>(k: K, v: UpdateUserInput[K]) => setForm((f) => ({ ...f, [k]: v }));
   const toast = useToast();
   const [newPassword, setNewPassword] = useState('');
+  const reset2fa = useMutation({
+    mutationFn: () => API.resetUserTwofa(user.id),
+    onSuccess: () => toast.success(t('twofa.resetDone')),
+  });
   const resetMut = useMutation({
     mutationFn: () => API.resetUserPassword(user.id, newPassword),
     onSuccess: () => {
@@ -263,6 +267,13 @@ function EditUserDialog({ open, user, onClose, onSuccess }: { open: boolean; use
               {t('password.reset')}
             </Button>
           </div>
+        </div>
+        <div className="space-y-2 border-t border-ink/8 pt-4 dark:border-white/10">
+          <p className="text-sm font-bold text-ink">{t('twofa.resetTitle')}</p>
+          <p className="text-xs text-ink/50">{t('twofa.resetHint')}</p>
+          <Button variant="outline" size="sm" loading={reset2fa.isPending} onClick={() => reset2fa.mutate()}>
+            {t('twofa.resetButton')}
+          </Button>
         </div>
       </div>
     </Dialog>

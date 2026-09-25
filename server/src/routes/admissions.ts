@@ -9,6 +9,7 @@ import { admitPatient, transferAdmission, dischargeAdmission, regenerateFamilyPi
 import { parseBody } from '../lib/validate.js';
 import { writeAudit, addTimeline } from '../lib/audit.js';
 import { clientIp } from '../config.js';
+import { addMember, endMembers } from '../lib/careTeam.js';
 
 export const admissionRoutes = new Hono();
 
@@ -21,6 +22,11 @@ admissionRoutes.post('/', requireAuth(), requirePermission('admissions.manage'),
   const input = parsed.data as (typeof AdmitPatientSchema)['_output'];
   const session = getSession(c)!;
   const result = await admitPatient(input, session.user.hospital_id);
+  if (input.attending_doctor_id) await addMember(db, { admissionId: result.admission_id, userId: input.attending_doctor_id, role: 'doctor', primary: true, byId: session.user.id });
+  if (session.user.role === 'doctor' && session.user.id !== input.attending_doctor_id) {
+    await addMember(db, { admissionId: result.admission_id, userId: session.user.id, role: 'doctor', primary: !input.attending_doctor_id, byId: session.user.id });
+  }
+  if (session.user.role === 'nurse') await addMember(db, { admissionId: result.admission_id, userId: session.user.id, role: 'nurse', byId: session.user.id });
   await addTimeline({
     admissionId: result.admission_id,
     actor: session.user.full_name_ar,
@@ -39,6 +45,7 @@ admissionRoutes.post('/:id/transfer', requireAuth(), requirePermission('admissio
   const { bed_id } = parsed.data as (typeof TransferBody)['_output'];
   const admissionId = c.req.param('id');
   const session = getSession(c)!;
+  if (!(await getAdmissionScope(admissionId, session.user.hospital_id))) throw new HttpError('التنويم غير موجود', 404);
   await transferAdmission(admissionId, bed_id, session.user.hospital_id);
   await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'transfer', titleAr: 'نقل المريض إلى سرير آخر', titleEn: 'Patient transferred' });
   await writeAudit({ actorId: session.user.id, action: 'patient_transferred', resourceType: 'admission', resourceId: admissionId, meta: { bed_id }, ip: clientIp(c) });
@@ -51,7 +58,10 @@ admissionRoutes.post('/:id/discharge', requireAuth(), requirePermission('dischar
   const { discharge_type, summary } = parsed.data as (typeof DischargeBody)['_output'];
   const admissionId = c.req.param('id');
   const session = getSession(c)!;
+  if (!(await getAdmissionScope(admissionId, session.user.hospital_id))) throw new HttpError('التنويم غير موجود', 404);
   const { dischargedAt } = await dischargeAdmission(admissionId, session.user.hospital_id, { discharge_type, summary });
+  await endMembers(db, admissionId, 'discharge');
+  await db.execute({ sql: `UPDATE nurse_handovers SET status = 'cancelled', responded_at = ? WHERE status = 'pending' AND id IN (SELECT handover_id FROM nurse_handover_items WHERE admission_id = ?)`, args: [new Date().toISOString(), admissionId] });
   await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'discharge', titleAr: 'تسجيل خروج المريض', titleEn: 'Patient discharged' }, dischargedAt);
   await writeAudit({ actorId: session.user.id, action: 'patient_discharged', resourceType: 'admission', resourceId: admissionId, meta: { discharge_type }, ip: clientIp(c) });
   return c.body(null, 204);
@@ -61,6 +71,7 @@ admissionRoutes.post('/:id/discharge', requireAuth(), requirePermission('dischar
 admissionRoutes.post('/:id/family-pin', requireAuth(), requirePermission('admissions.manage'), async (c) => {
   const admissionId = c.req.param('id');
   const session = getSession(c)!;
+  if (!(await getAdmissionScope(admissionId, session.user.hospital_id))) throw new HttpError('التنويم غير موجود', 404);
   const pin = await regenerateFamilyPin(admissionId, session.user.hospital_id);
   await writeAudit({ actorId: session.user.id, action: 'family_pin_regenerated', resourceType: 'admission', resourceId: admissionId, ip: clientIp(c) });
   return c.json({ family_pin: pin }, 200);

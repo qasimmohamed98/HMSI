@@ -13,6 +13,9 @@ import { useAuth } from '@/lib/auth';
 import { QLockup, QMark } from '@/components/brand/QBrand';
 import { DEVELOPER } from '@/lib/developer';
 import { localName } from '@/lib/format';
+import { ForcePasswordChange } from '@/features/security/ForcePasswordChange';
+import { IdleLogout } from '@/features/security/IdleLogout';
+import { AlertCenter } from '@/features/alerts/AlertCenter';
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -41,6 +44,14 @@ export function AppShell() {
   const location = useLocation();
   // انتهى الاشتراك: صفحة الدفع فقط (المدير العام غير مقيّد)
   const expired = user?.role !== 'super_admin' && user?.subscription?.status === 'expired';
+  // كلمة مرور مؤقتة أو ضعيفة: لا شيء قبل تغييرها
+  if (user?.must_change_password)
+    return (
+      <>
+        <IdleLogout />
+        <ForcePasswordChange />
+      </>
+    );
 
   return (
     <div className="flex min-h-dvh bg-surface text-ink">
@@ -116,17 +127,54 @@ export function AppShell() {
         <main className={cn('flex-1', 'pb-20 lg:pb-6 print:p-0')}>
           <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-6 sm:py-6">
             <TrialBanner />
+            <MfaHint />
             {expired && location.pathname !== '/billing' ? <Navigate to="/billing" replace /> : <Outlet />}
           </div>
         </main>
       </div>
 
       <BottomNav />
+      <IdleLogout />
+      <AlertCenter />
     </div>
   );
 }
 
 /** تنبيه الفترة التجريبية أو قرب انتهاء الاشتراك (7 أيام) */
+/** توصية للمدراء بتفعيل التحقق بخطوتين (يمكن إخفاؤها 30 يوماً) */
+function MfaHint() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const key = `hmsi.mfaHint.${user?.id ?? ''}`;
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return Date.now() < Number(localStorage.getItem(key) ?? 0);
+    } catch {
+      return false;
+    }
+  });
+  if (!user || hidden || user.totp_enabled || (user.role !== 'admin' && user.role !== 'super_admin')) return null;
+  const dismiss = () => {
+    try {
+      localStorage.setItem(key, String(Date.now() + 30 * 86_400_000));
+    } catch {
+      /* */
+    }
+    setHidden(true);
+  };
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-info-300 bg-info-50 px-4 py-2.5 text-sm text-info-900 print:hidden dark:border-info-900/60 dark:bg-info-900/20 dark:text-info-100">
+      <span className="font-semibold">{t('twofa.banner')}</span>
+      <Link to="/settings#security" className="ms-auto rounded-lg bg-info-600 px-3 py-1 text-xs font-bold text-white hover:bg-info-700">
+        {t('twofa.enable')}
+      </Link>
+      <button type="button" onClick={dismiss} className="rounded-lg px-2 py-1 text-xs font-semibold text-info-800/70 hover:bg-info-100 dark:text-info-200/70 dark:hover:bg-info-900/40">
+        {t('twofa.later')}
+      </button>
+    </div>
+  );
+}
+
 function TrialBanner() {
   const { t } = useTranslation();
   const { user } = useAuth();

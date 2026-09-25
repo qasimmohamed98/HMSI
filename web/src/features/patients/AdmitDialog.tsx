@@ -99,7 +99,7 @@ export function AdmitDialog({
             label={t('admit.department')}
             value={departmentId}
             onChange={(e) => chooseDepartment(e.target.value)}
-            options={departments.map((d) => ({ value: d.id, label: d.nameAr }))}
+            options={departments.map((d) => ({ value: d.id, label: localName({ name_ar: d.nameAr, name_en: d.nameEn }, 'name') }))}
             placeholder={t('admit.selectDepartment')}
           />
           {departmentId && (
@@ -110,7 +110,7 @@ export function AdmitDialog({
                 setWardId(e.target.value);
                 setBedId('');
               }}
-              options={(wards ?? []).filter((w) => w.department_id === departmentId).map((w) => ({ value: w.id, label: w.name_ar }))}
+              options={(wards ?? []).filter((w) => w.department_id === departmentId).map((w) => ({ value: w.id, label: localName(w, 'name') }))}
               placeholder={t('admit.selectWard')}
             />
           )}

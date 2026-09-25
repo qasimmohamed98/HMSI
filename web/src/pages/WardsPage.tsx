@@ -371,7 +371,7 @@ function BedDialog({
                 label={t('wards.patient')}
                 value={selected}
                 onChange={(e) => setSelected(e.target.value)}
-                options={(unassigned ?? []).map((u) => ({ value: u.admission_id, label: u.patient_name_ar }))}
+                options={(unassigned ?? []).map((u) => ({ value: u.admission_id, label: localName(u, 'patient_name') }))}
                 placeholder={t('admit.selectBed')}
               />
             </>

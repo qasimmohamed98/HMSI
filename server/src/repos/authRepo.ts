@@ -19,6 +19,8 @@ export function toUser(r: Record<string, unknown>): User {
     created_at: String(r.created_at),
     hospital_logo_url: logoUrl(r.hospital_id, r.hospital_logo_updated_at),
     subscription: computeSubscription(r.hospital_trial_ends_at, r.hospital_subscription_ends_at),
+    must_change_password: Boolean(Number(r.must_change_password ?? 0)),
+    totp_enabled: Boolean(Number(r.totp_enabled ?? 0)),
   };
 }
 
@@ -44,16 +46,23 @@ export async function getUserById(id: string): Promise<User | null> {
   return rows.rows.length > 0 ? toUser(rows.rows[0] as Record<string, unknown>) : null;
 }
 
+export async function flagMustChangePassword(userId: string): Promise<void> {
+  await db.execute({ sql: `UPDATE users SET must_change_password = 1 WHERE id = ?`, args: [userId] });
+}
+
 export async function getPasswordHash(userId: string): Promise<string | null> {
   const rows = await db.execute({ sql: `SELECT password_hash FROM users WHERE id = ? LIMIT 1`, args: [userId] });
   return rows.rows.length > 0 ? String((rows.rows[0] as Record<string, unknown>).password_hash) : null;
 }
 
-/** تحديث كلمة المرور وإنهاء كل جلسات المستخدم (عدا keepSessionId إن وُجد) */
-export async function setPassword(userId: string, passwordHash: string, keepSessionId: string | null = null): Promise<void> {
+/**
+ * تحديث كلمة المرور وإنهاء كل جلسات المستخدم (عدا keepSessionId إن وُجد).
+ * mustChange: كلمة مؤقتة يضعها المدير — يُطلب من صاحبها تغييرها عند الدخول.
+ */
+export async function setPassword(userId: string, passwordHash: string, keepSessionId: string | null = null, mustChange = false): Promise<void> {
   await db.batch(
     [
-      { sql: `UPDATE users SET password_hash = ? WHERE id = ?`, args: [passwordHash, userId] },
+      { sql: `UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?`, args: [passwordHash, mustChange ? 1 : 0, userId] },
       { sql: `DELETE FROM sessions WHERE user_id = ? AND id IS NOT ?`, args: [userId, keepSessionId] },
     ],
     'write',

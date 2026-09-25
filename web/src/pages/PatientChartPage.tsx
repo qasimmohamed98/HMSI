@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { hasPermission, type ChartSection, type Permission } from '@hmsi/shared';
 import { useAuth } from '@/lib/auth';
@@ -24,9 +24,13 @@ import { AttachmentsSection } from '@/features/patient/sections/AttachmentsSecti
 import { TimelineSection } from '@/features/patient/sections/TimelineSection';
 import { DischargeSection } from '@/features/patient/sections/DischargeSection';
 import { cn } from '@/lib/utils';
+import { CarePlanSection } from '@/features/patient/sections/CarePlanSection';
+import { CareTeamCard } from '@/features/careteam/CareTeamCard';
+import { NotYourPatient } from '@/features/careteam/NotYourPatient';
 
 const SECTIONS: { value: ChartSection }[] = [
   { value: 'overview' },
+  { value: 'plan' },
   { value: 'vitals' },
   { value: 'diagnosis' },
   { value: 'doctorNotes' },
@@ -46,7 +50,12 @@ export default function PatientChartPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [section, setSection] = useState<ChartSection>('overview');
+  const [params] = useSearchParams();
+  // ?tab=vitals من جولة التمريض يفتح التبويب مباشرة
+  const [section, setSection] = useState<ChartSection>(() => {
+    const tab = params.get('tab') as ChartSection | null;
+    return tab && SECTIONS.some((s) => s.value === tab) ? tab : 'overview';
+  });
   // التنويم المعروض: undefined = الحالي/الأحدث
   const [admissionId, setAdmissionId] = useState<string | undefined>(undefined);
 
@@ -55,6 +64,8 @@ export default function PatientChartPage() {
     queryKey: ['chart', id, admissionId ?? 'current'],
     queryFn: () => API.getChart(id!, admissionId),
     enabled: Boolean(id),
+    // «ليس من مرضاك» لا يُعاد طلبه
+    retry: (n, e) => (e as { status?: number }).status !== 403 && n < 1,
   });
 
   const sectionKey = (s: ChartSection) => `chart.sections.${s}`;
@@ -75,6 +86,10 @@ export default function PatientChartPage() {
         </Card>
       </div>
     );
+  }
+
+  if ((error as { code?: string } | null)?.code === 'not_your_patient') {
+    return <NotYourPatient patientId={id!} onGranted={() => void refetch()} />;
   }
 
   if (error || !chart || !chart.patient) {
@@ -114,6 +129,12 @@ export default function PatientChartPage() {
     switch (section) {
       case 'overview':
         return <OverviewSection chart={chart} />;
+      case 'plan':
+        return chart.admissionId ? (
+          <CarePlanSection chart={chart} canEdit={active && can('notes.write.doctor')} canEditVitals={active && can('vitals.write')} />
+        ) : (
+          <Alert variant="info">{t('carePlan.noAdmission')}</Alert>
+        );
       case 'vitals':
         return <VitalsSection chart={chart} canWrite={canWrite.vitals} />;
       case 'doctorNotes':
@@ -166,6 +187,7 @@ export default function PatientChartPage() {
         </div>
       )}
       {viewingPast && <Alert variant="info">{t('history.viewingPast')}</Alert>}
+      {chart.admissionId && !viewingPast && active && <CareTeamCard chart={chart} />}
 
       <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
         {chart.patient.admission && (

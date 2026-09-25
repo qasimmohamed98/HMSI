@@ -60,6 +60,12 @@ export function localISODate(d: Date): string {
 }
 
 /** يختار الاسم حسب لغة الواجهة: localName(ward, 'name') → name_ar أو name_en */
+/** اسم الطبيب المعالج حسب اللغة (الحقل العربي بلا لاحقة _ar) */
+export function doctorName(o: { attending_doctor?: string | null; attending_doctor_en?: string | null } | null | undefined): string {
+  if (!o) return '';
+  return (currentLang() === 'en' ? o.attending_doctor_en || o.attending_doctor : o.attending_doctor || o.attending_doctor_en) ?? '';
+}
+
 export function localName<T extends string>(obj: Partial<Record<`${T}_ar` | `${T}_en`, string | null>> | null | undefined, base: T): string {
   if (!obj) return '';
   const ar = (obj as Record<string, string | null | undefined>)[`${base}_ar`] ?? '';

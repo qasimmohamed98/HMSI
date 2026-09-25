@@ -136,6 +136,8 @@ export const CreateMedicationSchema = z.object({
   frequency: z.string().max(60),
   start_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   end_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  /** سبب تجاوز تحذير الحساسية (مطلوب فقط عند وجود تعارض) */
+  allergy_override_reason: z.string().trim().min(5).max(300).optional().nullable(),
 });
 
 /** طلب فحص (طبيب) أو إدخال مباشر مع النتيجة (فني المختبر) */
@@ -198,6 +200,7 @@ export const UpdateMedicationSchema = z.object({
   route: z.string().max(60).optional(),
   frequency: z.string().max(60).optional(),
   start_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  allergy_override_reason: z.string().trim().min(5).max(300).optional().nullable(),
 }).refine((v) => Object.values(v).some((x) => x !== undefined && x !== null), { message: 'لا توجد بيانات للتحديث' });
 
 export const UpdateNoteSchema = z.object({
@@ -320,6 +323,10 @@ export const SignupSchema = z.object({
   email: z.string().trim().email('البريد الإلكتروني غير صحيح').optional().nullable().or(z.literal('')),
   username: z.string().trim().min(3).max(64).regex(/^[a-zA-Z0-9_.-]+$/, 'اسم المستخدم: أحرف إنجليزية وأرقام فقط'),
   password: newPassword,
+  /** رمز النموذج الموقّع من الخادم (يثبت أن النموذج فُتح قبل ثوانٍ) */
+  form_token: z.string().max(200).optional(),
+  /** حقل مخفي (فخ للبرامج الآلية): يجب أن يبقى فارغاً */
+  website: z.string().max(300).optional().nullable(),
 });
 
 export const PaymentInfoSchema = z.object({

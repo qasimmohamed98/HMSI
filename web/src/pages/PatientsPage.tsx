@@ -36,6 +36,8 @@ export default function PatientsPage() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [admittedOnly, setAdmittedOnly] = useState(false);
+  // الممرض: مرضاه المعيَّنون افتراضياً
+  const [mine, setMine] = useState(() => user?.role === 'nurse');
   const [showNew, setShowNew] = useState(false);
   const [admitTarget, setAdmitTarget] = useState<Patient | null>(null);
   // رمز العائلة يُعرض مرة بعد التنويم ليُسلَّم لذوي المريض
@@ -49,12 +51,12 @@ export default function PatientsPage() {
   }, [search]);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['patients', debounced, admittedOnly],
-    queryFn: () => API.listPatients({ search: debounced, admitted: admittedOnly }),
+    queryKey: ['patients', debounced, admittedOnly, mine],
+    queryFn: () => API.listPatients({ search: debounced, admitted: admittedOnly, mine }),
   });
 
   const invalidatePatients = () => {
-    void qc.invalidateQueries({ queryKey: ['patients', debounced, admittedOnly] });
+    void qc.invalidateQueries({ queryKey: ['patients'] });
     void qc.invalidateQueries({ queryKey: ['patients', undefined, false] });
     void qc.invalidateQueries({ queryKey: ['dashboard'] });
     void qc.invalidateQueries({ queryKey: ['wards'] });
@@ -133,7 +135,19 @@ export default function PatientsPage() {
           <BedDouble className="h-4 w-4" />
           {t('patients.admittedToday')}
         </button>
+        {user?.role === 'nurse' && (
+          <button
+            type="button"
+            onClick={() => setMine((v) => !v)}
+            className={`inline-flex items-center gap-1.5 self-start rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:self-auto ${
+              mine ? 'bg-brand-50 text-brand-700 dark:bg-brand-900/50 dark:text-brand-200' : 'text-ink/55 hover:bg-surface-muted dark:text-white/60'
+            }`}
+          >
+            {t('rounds.mine')}
+          </button>
+        )}
       </div>
+      {user?.role === 'doctor' && <p className="-mt-2 mb-3 text-xs text-ink/55">{t('careTeam.doctorListHint')}</p>}
 
       {isLoading ? (
         <div className="space-y-3">

@@ -43,7 +43,7 @@ function openLabelWindow(opts: { title: string; pageSize: string; body: string; 
 <div class="hint">${esc(t('labels.hint'))}</div>
 ${body}
 <div class="tools">
-  <button onclick="window.print()">${esc(t('labels.print'))}</button>
+  <button type="button" id="hmsi-print">${esc(t('labels.print'))}</button>
   ${zplUrl ? `<a href="${esc(zplUrl)}" download>${esc(t('labels.downloadZpl'))}</a>` : ''}
 </div>
 </body></html>`;
@@ -51,6 +51,8 @@ ${body}
   if (!w) return;
   w.document.write(html);
   w.document.close();
+  // لا سكربت داخل النافذة (CSP): زر الطباعة يُربط من هنا
+  w.document.getElementById('hmsi-print')?.addEventListener('click', () => w.print());
   w.focus();
 }
 

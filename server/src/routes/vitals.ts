@@ -8,6 +8,8 @@ import { db, uuid } from '../../db/index.js';
 import { clientIp } from '../config.js';
 import { resolveRecordedAt, existingClientRecord } from '../lib/offline.js';
 import { moveToTrash } from '../lib/trash.js';
+import { calcMews } from '@hmsi/shared';
+import { notifyAdmission } from '../lib/notify.js';
 
 export const vitalsRoutes = new Hono();
 
@@ -47,6 +49,21 @@ vitalsRoutes.post('/', requireAuth(), requirePermission('vitals.write'), async (
   });
   await addTimeline({ admissionId: input.admission_id, actor: session.user.full_name_ar, actorId: session.user.id, type: 'vitals', titleAr: 'تسجيل علامات حيوية', titleEn: 'Vitals recorded' }, recordedAt);
   await writeAudit({ actorId: session.user.id, action: 'vitals_added', resourceType: 'vitals', resourceId: id, ip: clientIp(c) });
+  // MEWS مرتفع: تنبيه الطبيب المعالج وطاقم التمريض
+  const mews = calcMews(input);
+  if (mews?.level === 'high') {
+    await notifyAdmission(input.admission_id, {
+      toAttending: true,
+      toNurse: true,
+      kind: 'mews_high',
+      severity: mews.score >= 7 ? 'critical' : 'warning',
+      titleAr: `إنذار مبكر: MEWS = ${mews.score}`,
+      titleEn: `Early warning: MEWS = ${mews.score}`,
+      bodyAr: 'يحتاج تقييماً عاجلاً',
+      bodyEn: 'Needs urgent review',
+      createdById: session.user.id,
+    });
+  }
   return c.json(await fetchVitals(id), 201);
 });
 
