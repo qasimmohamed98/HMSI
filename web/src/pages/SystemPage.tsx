@@ -50,6 +50,9 @@ export default function SystemPage() {
           <Link to="/signup" className="rounded-xl bg-white px-4 py-2.5 text-sm font-extrabold text-brand-800 hover:bg-brand-50">
             {t('signup.cta')}
           </Link>
+          <Link to="/guide" className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white hover:bg-white/20">
+            {t('nav.guide')}
+          </Link>
         </div>
       </section>
 

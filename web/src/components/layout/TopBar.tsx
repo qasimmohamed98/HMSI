@@ -1,4 +1,4 @@
-import { Menu, Moon, Sun, Languages, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, Moon, Sun, Languages, LogOut, ChevronDown, CircleHelp } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -60,6 +60,10 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       <Button variant="ghost" size="sm" onClick={switchLang} className="hidden xs:inline-flex sm:inline-flex">
         <Languages className="h-4 w-4" />
         <span className="font-bold">{currentLang() === 'ar' ? 'EN' : 'ع'}</span>
+      </Button>
+
+      <Button variant="ghost" size="icon" onClick={() => navigate('/guide')} aria-label={t('nav.guide')} title={t('nav.guide')}>
+        <CircleHelp className="h-[1.15rem] w-[1.15rem]" />
       </Button>
 
       <Button variant="ghost" size="icon" onClick={toggle} aria-label={t('theme.toggle')}>

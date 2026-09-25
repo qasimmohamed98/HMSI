@@ -76,6 +76,7 @@ export default function LoginPage() {
         </div>
         <p className="relative flex flex-wrap gap-3 text-sm text-white/60">
           <span>© 2026 HMSI</span>
+          <Link to="/guide" className="hover:text-white">{t('nav.guide')}</Link>
           <Link to="/system" className="hover:text-white">{t('nav.aboutSystem')}</Link>
           <Link to="/about" className="hover:text-white">{t('nav.about')}</Link>
         </p>
@@ -144,6 +145,7 @@ export default function LoginPage() {
               <p className="mt-2 text-xs text-ink/45">{t('signup.staffHint')}</p>
             </div>
             <p className="mt-4 flex justify-center gap-4 text-xs font-semibold text-ink/50 lg:hidden">
+              <Link to="/guide" className="hover:underline">{t('nav.guide')}</Link>
               <Link to="/system" className="hover:underline">{t('nav.aboutSystem')}</Link>
               <Link to="/about" className="hover:underline">{t('nav.about')}</Link>
             </p>

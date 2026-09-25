@@ -15,6 +15,7 @@ import {
   CreditCard,
   Info,
   Users2,
+  BookOpen,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -63,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     group: 'help',
     items: [
+      { to: '/guide', key: 'guide', icon: BookOpen },
       { to: '/system', key: 'aboutSystem', icon: Info },
       { to: '/about', key: 'about', icon: Users2 },
     ],

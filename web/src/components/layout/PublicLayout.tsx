@@ -13,6 +13,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const authed = status === 'authed';
   const links = [
+    { to: '/guide', label: t('nav.guide') },
     { to: '/system', label: t('nav.aboutSystem') },
     { to: '/about', label: t('nav.about') },
   ];
