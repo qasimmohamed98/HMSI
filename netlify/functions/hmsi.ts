@@ -10,6 +10,15 @@ const configError = (detail: string) =>
     { status: 503, headers: { 'Cache-Control': 'no-store' } },
   );
 
+/** يحذف قيم متغيرات البيئة (الأسرار) من أي نص قبل تسجيله */
+function redact(text: string): string {
+  let out = text;
+  for (const v of Object.values(process.env)) {
+    if (v && v.length >= 8) out = out.split(v).join('***');
+  }
+  return out.replace(/eyJ[\w.-]{20,}/g, '***');
+}
+
 export default async function hmsi(request: Request, context: Context): Promise<Response> {
   // بدون TURSO_URL يحاول الخادم فتح ملف local.db غير الموجود على Netlify —
   // نعيد بدلاً من ذلك رسالة واضحة تشير إلى متغيرات البيئة الناقصة.
@@ -29,7 +38,7 @@ export default async function hmsi(request: Request, context: Context): Promise<
     return await handler(request, { context });
   } catch (err) {
     // أي خطأ غير معالج يعرضه Netlify للزائر كما هو (قد يتضمن أسراراً) — نسجله فقط
-    console.error('[hmsi] fatal', err instanceof Error ? err.name : 'error');
+    console.error('[hmsi] fatal', redact(err instanceof Error ? `${err.name}: ${err.message}\n${(err.stack ?? '').split('\n').slice(1, 8).join('\n')}` : String(err)));
     handler = null;
     return Response.json({ message: 'حدث خطأ غير متوقع في الخادم' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
