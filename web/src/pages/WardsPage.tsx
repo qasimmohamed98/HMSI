@@ -143,7 +143,7 @@ export default function WardsPage() {
                         type="button"
                         disabled={!canWard && !canAdm}
                         onClick={() => setBedDialog({ ward: w, bed: b })}
-                        title={`${w.name_ar} · ${b.room} / ${b.bed_no}`}
+                        title={`${localName(w, 'name')} · ${b.room} / ${b.bed_no}`}
                         className={cn(
                           'flex flex-col items-center gap-1 rounded-lg border px-1 py-2 text-center transition-colors',
                           b.status === 'occupied'
@@ -228,10 +228,10 @@ function WardDialog({
           label={t('wards.department')}
           value={departmentId}
           onChange={(e) => setDepartmentId(e.target.value)}
-          options={departments.map((d) => ({ value: d.id, label: d.name_ar }))}
+          options={departments.map((d) => ({ value: d.id, label: localName(d, 'name') }))}
           placeholder={t('admit.selectDepartment')}
         />
-        <Input label={t('wards.nameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder="ردهة الباطنية الأولى" />
+        <Input label={t('wards.nameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder={t('examples.ward')} />
         <Input label={t('wards.nameEn')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="Internal Medicine Ward 1" dir="ltr" />
         <Select
           label={t('wards.wardType')}
@@ -284,7 +284,7 @@ function BedFormDialog({
     >
       <div className="space-y-4">
         {error && <p className="text-sm font-semibold text-danger-600">{error}</p>}
-        <p className="text-sm text-ink/50">{ward.name_ar}</p>
+        <p className="text-sm text-ink/50">{localName(ward, 'name')}</p>
         <div className="grid grid-cols-2 gap-3">
           <Input label={t('wards.room')} value={room} onChange={(e) => setRoom(e.target.value)} placeholder="1" />
           <Input label={t('wards.bedNumber')} value={bedNo} onChange={(e) => setBedNo(e.target.value)} placeholder="101" />
@@ -342,7 +342,7 @@ function BedDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title={`${ward.name_ar} — ${bed.room} / ${bed.bed_no}`}
+      title={`${localName(ward, 'name')} — ${bed.room} / ${bed.bed_no}`}
       description={bed.status === 'occupied' ? t('status.occupied') : t('status.free')}
       footer={
         <>
@@ -415,7 +415,7 @@ function BedDialog({
           </div>
         )}
 
-        {bed.code && <BedQrCard code={bed.code} title={`${ward.name_ar} — ${bed.room} / ${bed.bed_no}`} />}
+        {bed.code && <BedQrCard code={bed.code} title={`${localName(ward, 'name')} — ${bed.room} / ${bed.bed_no}`} />}
       </div>
     </Dialog>
   );

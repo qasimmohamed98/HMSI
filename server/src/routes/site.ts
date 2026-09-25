@@ -24,6 +24,14 @@ const AboutSchema = z.object({
   email: z.string().max(120).default(''),
   address: z.string().max(300).default(''),
   website: z.string().max(200).default(''),
+  // النسخة الإنجليزية (تُعرض في الواجهة الإنجليزية؛ الفارغ يعود للعربي)
+  name_en: z.string().max(120).default(''),
+  tagline_en: z.string().max(200).default(''),
+  intro_en: z.string().max(3000).default(''),
+  mission_en: z.string().max(1500).default(''),
+  vision_en: z.string().max(1500).default(''),
+  values_en: z.string().max(1500).default(''),
+  address_en: z.string().max(300).default(''),
 });
 export type AboutContent = z.infer<typeof AboutSchema>;
 
@@ -40,6 +48,14 @@ export const DEFAULT_ABOUT: AboutContent = {
   email: 'qasimmohamed14@gmail.com',
   address: 'العراق',
   website: '',
+  name_en: 'Q — developed by Qasim Mohammed',
+  tagline_en: 'We build digital tools that serve hospitals and patients in Iraq',
+  intro_en:
+    'We are a team of developers and health-systems specialists turning hospital paperwork into a secure, easy electronic medical record that works on computers and phones, so medical staff spend less time on forms and more time on patients.',
+  mission_en: 'Enable every hospital, large or small, to manage its patients and their records digitally at a fair cost and without complexity.',
+  vision_en: 'Every patient with a complete, secure digital record, and every family able to follow their patient with confidence.',
+  values_en: 'Patient privacy first\nSimplicity\nAccuracy and reliability\nSupport close to the user',
+  address_en: 'Iraq',
 };
 
 export async function getAbout(): Promise<AboutContent> {

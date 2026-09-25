@@ -102,7 +102,7 @@ export default function DepartmentsPage() {
           open
           onClose={() => setDeleteTarget(null)}
           title={t('departments.delete')}
-          message={t('departments.deleteConfirm', { name: deleteTarget.name_ar })}
+          message={t('departments.deleteConfirm', { name: localName(deleteTarget, 'name') })}
           busy={deleteMut.isPending}
           onConfirm={() => deleteMut.mutate(deleteTarget.id)}
         />
@@ -155,7 +155,7 @@ function DepartmentDialog({
     >
       <div className="space-y-4">
         {error && <p className="text-sm font-semibold text-danger-600">{error}</p>}
-        <Input label={t('departments.nameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder="قسم الباطنية" />
+        <Input label={t('departments.nameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder={t('examples.department')} />
         <Input label={t('departments.nameEn')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="Internal Medicine" dir="ltr" />
       </div>
     </Dialog>

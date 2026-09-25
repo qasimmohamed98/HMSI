@@ -103,7 +103,7 @@ export default function ReportsPage() {
       rangeLabel: def.snapshot ? t('reports.snapshotAt', { date: fmtDate(new Date().toISOString()) }) : t('reports.rangeLabel', { from: fmtDate(from), to: fmtDate(to) }),
       filtersLabel: [
         department && `${t('patients.department')}: ${localName(departments?.find((d) => d.id === department), 'name')}`,
-        doctor && `${t('chart.attendingDoctor')}: ${doctors?.find((d) => d.id === doctor)?.full_name_ar ?? ''}`,
+        doctor && `${t('chart.attendingDoctor')}: ${doctors?.find((d) => d.id === doctor)?.full_name_en || doctors?.find((d) => d.id === doctor)?.full_name_ar || ''}`,
       ]
         .filter(Boolean)
         .join(' · '),
@@ -267,7 +267,7 @@ function DetailedReportView({ report }: { report: DetailedReport }) {
                     <tr key={i} className="hover:bg-surface-muted/60 dark:hover:bg-white/5">
                       <td className="px-3 py-2 text-xs tabular text-ink/40">{i + 1}</td>
                       {report.columns.map((c) => {
-                        const text = cellText(c, r[c.key], t);
+                        const text = cellText(c, r[c.key], t, r);
                         const long = ['report', 'discharge_summary', 'reason', 'note'].includes(c.key);
                         return (
                           <td

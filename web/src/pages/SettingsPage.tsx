@@ -1,3 +1,4 @@
+import { localName } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -106,7 +107,7 @@ export default function SettingsPage() {
             <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-muted/70 p-4 dark:bg-white/5">
               <div className="min-w-0">
-                <p className="truncate font-bold text-ink">{hospital.name_ar}</p>
+                <p className="truncate font-bold text-ink">{localName(hospital, 'name')}</p>
                 <p className="truncate text-sm text-ink/50">{hospital.name_en}</p>
                 <p className="mt-0.5 text-xs tabular text-ink/35" dir="ltr">{hospital.code}</p>
               </div>
@@ -182,7 +183,7 @@ function HospitalDialog({
     >
       <div className="space-y-4">
         {error && <p className="text-sm font-semibold text-danger-600">{error}</p>}
-        <Input label={t('settings.hospitalNameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder="مستشفى المدينة الجامعية" />
+        <Input label={t('settings.hospitalNameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder={t('examples.hospital')} />
         <Input label={t('settings.hospitalNameEn')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="City University Hospital" dir="ltr" />
       </div>
     </Dialog>
@@ -416,6 +417,16 @@ function AboutEditorCard() {
             <Input label={t('aboutPage.email')} value={v.email} onChange={set('email')} dir="ltr" />
             <Input label={t('aboutPage.address')} value={v.address} onChange={set('address')} />
             <Input label={t('aboutPage.website')} value={v.website} onChange={set('website')} dir="ltr" />
+            <p className="border-t border-ink/8 pt-4 text-sm font-bold text-ink sm:col-span-2 dark:border-white/10">{t('aboutPage.englishVersion')}</p>
+            <Input label={t('aboutPage.name')} value={v.name_en ?? ''} onChange={set('name_en')} dir="ltr" />
+            <Input label={t('aboutPage.tagline')} value={v.tagline_en ?? ''} onChange={set('tagline_en')} dir="ltr" />
+            <div className="sm:col-span-2">
+              <Textarea label={t('aboutPage.intro')} value={v.intro_en ?? ''} onChange={set('intro_en')} rows={3} dir="ltr" />
+            </div>
+            <Textarea label={t('aboutPage.mission')} value={v.mission_en ?? ''} onChange={set('mission_en')} rows={3} dir="ltr" />
+            <Textarea label={t('aboutPage.vision')} value={v.vision_en ?? ''} onChange={set('vision_en')} rows={3} dir="ltr" />
+            <Textarea label={t('aboutPage.valuesHint')} value={v.values_en ?? ''} onChange={set('values_en')} rows={3} dir="ltr" />
+            <Input label={t('aboutPage.address')} value={v.address_en ?? ''} onChange={set('address_en')} dir="ltr" />
             <div className="sm:col-span-2">
               <Button type="submit" loading={save.isPending} disabled={!form}>
                 {t('common.save')}

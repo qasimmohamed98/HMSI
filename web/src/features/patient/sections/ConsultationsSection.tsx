@@ -229,7 +229,7 @@ function AddConsultationDialog({
       }
     >
       <div className="space-y-4">
-        <Input label={t('consultations.specialty')} value={specialty} onChange={(e) => setSpecialty(e.target.value)} autoFocus placeholder="طب القلب" />
+        <Input label={t('consultations.specialty')} value={specialty} onChange={(e) => setSpecialty(e.target.value)} autoFocus placeholder={t('examples.specialty')} />
         <Textarea label={t('consultations.reason')} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
     </Dialog>

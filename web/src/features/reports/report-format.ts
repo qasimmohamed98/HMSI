@@ -1,12 +1,18 @@
 import type { TFunction } from 'i18next';
 import type { DetailedReport, ReportColumn } from '@/lib/api';
 import { fmtDate, fmtDateTime } from '@/lib/format';
+import { currentLang } from '@/i18n';
 import { esc, htmlTable, openPrintDocument } from '@/lib/print-doc';
 
 const LTR_KEYS = ['file_number', 'bed', 'icd10', 'unit', 'reference_range'];
 
 /** قيمة خلية معروضة كنص (للجدول والطباعة) */
-export function cellText(c: ReportColumn, v: string | number | null | undefined, t: TFunction): string {
+export function cellText(c: ReportColumn, v: string | number | null | undefined, t: TFunction, row?: Record<string, string | number | null>): string {
+  // الواجهة الإنجليزية: الاسم الإنجليزي للقسم/الفحص/المريض إن وُجد
+  if (row && currentLang() === 'en') {
+    const en = row[`${c.key}_en`];
+    if (en !== null && en !== undefined && en !== '') v = en;
+  }
   if (v === null || v === undefined || v === '') return '';
   switch (c.kind) {
     case 'datetime':
@@ -43,7 +49,7 @@ export function printReport(report: DetailedReport, ctx: ReportContext, t: TFunc
     report.columns.map((c) => t(`reports.cols.${c.key}`)),
     report.rows.map((r) =>
       report.columns.map((c) => {
-        const text = cellText(c, r[c.key], t);
+        const text = cellText(c, r[c.key], t, r);
         return LTR_KEYS.includes(c.key) && text ? { html: `<bdi dir="ltr">${esc(text)}</bdi>` } : text;
       }),
     ),
@@ -86,7 +92,7 @@ export async function exportReportExcel(report: DetailedReport, ctx: ReportConte
         const d = new Date(String(v));
         return Number.isNaN(d.getTime()) ? { value: String(v), type: String } : { value: d, type: Date, format: c.kind === 'date' ? 'yyyy-mm-dd' : 'yyyy-mm-dd hh:mm' };
       }
-      return { value: cellText(c, v, t), type: String };
+      return { value: cellText(c, v, t, r), type: String };
     }),
   );
   const n = report.columns.length;

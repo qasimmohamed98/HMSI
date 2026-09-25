@@ -6,7 +6,7 @@ import { Button, Dialog, Input, Badge, Select } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type MedicationStatusInput, type ChartData } from '@/lib/api';
 import type { Medication } from '@hmsi/shared';
-import { fmtDate, todayISO } from '@/lib/format';
+import { fmtDate, todayISO, localName } from '@/lib/format';
 import { MarStrip } from './MarStrip';
 import { useToast, useConfirm } from '@/components/ui';
 
@@ -82,7 +82,7 @@ export function MedicationsSection({ chart, canWrite, canAdminister = false }: {
                     <Pill className="h-5 w-5" />
                   </span>
                   <div>
-                    <p className="font-bold text-ink">{m.name_ar}</p>
+                    <p className="font-bold text-ink">{localName(m, 'name')}</p>
                     <p className="text-xs text-ink/50">
                       {m.dose} · {m.route} · {m.frequency}
                     </p>
@@ -205,13 +205,13 @@ function AddMedicationDialog({
       }
     >
       <div className="space-y-4">
-        <Input label={t('medications.name')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder="باراسيتامول" />
+        <Input label={t('medications.name')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder={t('examples.medication')} />
         <div className="grid grid-cols-2 gap-3">
-          <Input label={t('medications.dose')} value={dose} onChange={(e) => setDose(e.target.value)} placeholder="500 مغ" />
+          <Input label={t('medications.dose')} value={dose} onChange={(e) => setDose(e.target.value)} placeholder={t('examples.dose')} />
           <Input label={t('medications.route')} value={route} onChange={(e) => setRoute(e.target.value)} placeholder="PO" />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input label={t('medications.frequency')} value={frequency} onChange={(e) => setFrequency(e.target.value)} placeholder="كل 8 ساعات" />
+          <Input label={t('medications.frequency')} value={frequency} onChange={(e) => setFrequency(e.target.value)} placeholder={t('examples.frequency')} />
           <Input label={t('medications.start')} type="date" value={start} onChange={(e) => setStart(e.target.value)} />
         </div>
       </div>

@@ -6,7 +6,7 @@ import { Button, Badge, Skeleton, EmptyState, Card, CardContent } from '@/compon
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API } from '@/lib/api';
 import { useToast } from '@/components/ui';
-import { fmtDate, fmtDateTime } from '@/lib/format';
+import { fmtDate, fmtDateTime, localName } from '@/lib/format';
 import { AdmittedPatientCard, useAdmittedCharts } from '@/features/departments';
 import { cn } from '@/lib/utils';
 
@@ -85,7 +85,7 @@ export default function PharmacyPage() {
                     <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink/8 px-3.5 py-2.5 dark:border-white/10">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold text-ink">{m.name_ar}</p>
+                          <p className="font-bold text-ink">{localName(m, 'name')}</p>
                           <Badge variant={m.status === 'active' ? 'success' : 'neutral'}>{t(`medications.statuses.${m.status}`)}</Badge>
                           {m.dispensed_at ? <Badge variant="info">{t('ui.dispensed')}</Badge> : m.status === 'active' ? <Badge variant="warning">{t('ui.notDispensed')}</Badge> : null}
                         </div>

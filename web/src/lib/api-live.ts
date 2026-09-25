@@ -1,4 +1,6 @@
 import type { Api, NewVitalsInput } from './api';
+import i18n from '@/i18n';
+import { localizeServerMessage } from '@/i18n/server-messages';
 
 const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
 
@@ -30,7 +32,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${BASE}${path}`, { ...init, headers, credentials: 'include' });
   } catch {
-    throw new HttpError(0, 'تعذّر الاتصال بالخادم — تحقق من الشبكة');
+    throw new HttpError(0, i18n.t('errors.network'));
   }
   if (res.status === 402) {
     // انتهى اشتراك المستشفى: حدّث المستخدم ليُحوَّل إلى صفحة الدفع
@@ -41,10 +43,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     window.dispatchEvent(new Event('hmsi:unauthorized'));
   }
   if (!res.ok) {
-    let message = 'حدث خطأ';
+    let message = i18n.t('errors.generic');
     try {
       const body = await res.json();
-      message = body?.message || message;
+      message = localizeServerMessage(body?.message) || message;
     } catch {
       /* ignore */
     }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui';
 import { Logo } from './Logo';
@@ -10,6 +10,7 @@ import { TopBar } from './TopBar';
 import { BottomNav } from './BottomNav';
 import { useMediaQuery } from '@/lib/use-media';
 import { useAuth } from '@/lib/auth';
+import { QLockup, QMark } from '@/components/brand/QBrand';
 import { DEVELOPER } from '@/lib/developer';
 import { localName } from '@/lib/format';
 
@@ -17,7 +18,25 @@ export function AppShell() {
   const { t } = useTranslation();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(() => {
+    try {
+      return localStorage.getItem('hmsi.sidebar') === 'collapsed';
+    } catch {
+      return false;
+    }
+  });
+  const setCollapsed = (fn: (c: boolean) => boolean) =>
+    setCollapsedState((c) => {
+      const next = fn(c);
+      try {
+        localStorage.setItem('hmsi.sidebar', next ? 'collapsed' : 'open');
+      } catch {
+        /* التخزين غير متاح */
+      }
+      return next;
+    });
+  const rtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+  const CollapseIcon = collapsed ? (rtl ? PanelRightOpen : PanelLeftOpen) : rtl ? PanelRightClose : PanelLeftClose;
   const { user } = useAuth();
   const location = useLocation();
   // انتهى الاشتراك: صفحة الدفع فقط (المدير العام غير مقيّد)
@@ -30,39 +49,35 @@ export function AppShell() {
         <aside
           className={cn(
             'sticky top-0 flex h-dvh shrink-0 flex-col print:hidden border-e border-ink/8 bg-surface-raised transition-[width] duration-200 dark:border-white/10 dark:bg-surface-raised',
-            collapsed ? 'w-[76px]' : 'w-[264px]',
+            collapsed ? 'w-[72px]' : 'w-[264px]',
           )}
         >
           <div className={cn('flex h-16 items-center border-b border-ink/8 px-4 dark:border-white/10', collapsed && 'justify-center px-2')}>
-            <Logo compact={collapsed} src={user?.hospital_logo_url} title={localName(user, 'hospital_name')} />
+            <Logo compact={collapsed} src={user?.hospital_logo_url} title={localName(user, 'hospital_name')} subtitle={t('nav.hospital')} />
           </div>
-          <div className="flex-1 overflow-y-auto px-3 py-4">
-            <SidebarNav />
+          <div className={cn('flex-1 overflow-y-auto overflow-x-hidden py-4', collapsed ? 'px-2' : 'px-3')}>
+            <SidebarNav collapsed={collapsed} />
           </div>
-          {!collapsed && (
-            <a href={`mailto:${DEVELOPER.email}`} className="block px-4 pb-2 text-center text-[0.62rem] font-bold tracking-wide text-ink/35 hover:text-brand-700" dir="ltr" title={`${DEVELOPER.email} · ${DEVELOPER.phoneDisplay}`}>
-              DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
-            </a>
-          )}
-          <div className="border-t border-ink/8 p-3 dark:border-white/10">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start"
-              onClick={() => setCollapsed((c) => !c)}
-              aria-label={collapsed ? t('ui.expand') : t('ui.collapse')}
+          {/* هوية النظام: Q VIREXA والمطوّر، وزر طيّ القائمة كأيقونة */}
+          <div className={cn('flex items-center gap-2 border-t border-ink/8 dark:border-white/10', collapsed ? 'flex-col px-2 py-3' : 'px-3 py-3')}>
+            <a
+              href={`mailto:${DEVELOPER.email}`}
+              className={cn('min-w-0 flex-1 rounded-lg p-1 hover:bg-surface-muted dark:hover:bg-white/5', collapsed && 'flex justify-center')}
+              title={`Q VIREXA · DEVELOPED BY ${DEVELOPER.nameEn.toUpperCase()} · ${DEVELOPER.email}`}
             >
               {collapsed ? (
-                <>
-                  <PanelLeftOpen className="h-4 w-4" />
-                  <span className="sr-only">{t('ui.expand')}</span>
-                </>
+                <QMark className="h-7 w-7" />
               ) : (
-                <>
-                  <PanelLeftClose className="h-4 w-4" />
-                  <span>{t('ui.collapse')}</span>
-                </>
+                <span className="block">
+                  <QLockup className="h-6" />
+                  <span dir="ltr" className="mt-1 block text-start text-[0.55rem] font-bold tracking-wide text-ink/35">
+                    DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
+                  </span>
+                </span>
               )}
+            </a>
+            <Button variant="ghost" size="icon-sm" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? t('a11y.expand') : t('a11y.collapse')} title={collapsed ? t('a11y.expand') : t('a11y.collapse')}>
+              <CollapseIcon className="h-4 w-4" />
             </Button>
           </div>
         </aside>
@@ -73,19 +88,23 @@ export function AppShell() {
         <div className="fixed inset-0 z-50 lg:hidden print:hidden">
           <button
             type="button"
-            aria-label="إغلاق القائمة"
+            aria-label={t('a11y.closeMenu')}
             className="absolute inset-0 bg-ink/45 backdrop-blur-sm animate-fade-in"
             onClick={() => setDrawerOpen(false)}
           />
           <div className="absolute inset-y-0 start-0 flex w-[290px] max-w-[85vw] flex-col bg-surface-raised shadow-float animate-slide-end dark:bg-surface-raised">
             <div className="flex h-16 items-center justify-between border-b border-ink/8 px-4 dark:border-white/10">
-              <Logo src={user?.hospital_logo_url} title={localName(user, 'hospital_name')} />
-              <Button variant="ghost" size="icon-sm" onClick={() => setDrawerOpen(false)} aria-label="إغلاق">
+              <Logo src={user?.hospital_logo_url} title={localName(user, 'hospital_name')} subtitle={t('nav.hospital')} />
+              <Button variant="ghost" size="icon-sm" onClick={() => setDrawerOpen(false)} aria-label={t('a11y.close')}>
                 <X className="h-5 w-5" />
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-4">
               <SidebarNav onNavigate={() => setDrawerOpen(false)} />
+            </div>
+            <div className="border-t border-ink/8 px-4 py-3 dark:border-white/10">
+              <QLockup className="h-6" />
+              <span dir="ltr" className="mt-1 block text-start text-[0.55rem] font-bold tracking-wide text-ink/35">DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}</span>
             </div>
           </div>
         </div>

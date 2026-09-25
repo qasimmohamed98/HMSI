@@ -5,7 +5,7 @@ import { Stethoscope, FilePenLine, Send, Pencil, Trash2 } from 'lucide-react';
 import { Button, Textarea, Avatar, Dialog } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type NoteInput, type NoteUpdateInput, type ChartData } from '@/lib/api';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDateTime, localName } from '@/lib/format';
 import { useToast, useConfirm } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 
@@ -62,7 +62,7 @@ export function NotesSection({ chart, kind, canWrite }: { chart: ChartData; kind
   return (
     <SectionCard
       title={t(titleKey)}
-      description={chart.patient.admission?.department_name_ar}
+      description={localName(chart.patient.admission, 'department_name')}
       action={
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-900/50 dark:text-brand-200">
           {kind === 'doctor' ? <Stethoscope className="h-4 w-4" /> : <FilePenLine className="h-4 w-4" />}

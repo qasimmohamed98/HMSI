@@ -6,7 +6,7 @@ import { Button, Dialog, Input, Textarea, Badge, Skeleton, EmptyState, Card, Car
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API, type LabResultInput } from '@/lib/api';
 import { useToast } from '@/components/ui';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDateTime, localName } from '@/lib/format';
 import { AdmittedPatientCard, useAdmittedCharts } from '@/features/departments';
 
 export default function LaboratoryPage() {
@@ -83,7 +83,7 @@ export default function LaboratoryPage() {
                     <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink/8 px-3.5 py-2.5 dark:border-white/10">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold text-ink">{l.test_name_ar}</p>
+                          <p className="font-bold text-ink">{localName(l, 'test_name')}</p>
                           <Badge variant={badge(l.status)}>{t(`laboratory.statuses.${l.status}`)}</Badge>
                         </div>
                         <p className="mt-0.5 text-xs text-ink/50">
@@ -104,7 +104,7 @@ export default function LaboratoryPage() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => setDialog({ admissionId: l.admission_id, labId: l.id, test: l.test_name_ar })}
+                            onClick={() => setDialog({ admissionId: l.admission_id, labId: l.id, test: localName(l, 'test_name') })}
                             icon={<Plus className="h-3.5 w-3.5" />}
                           >
                             {t('laboratory.updateResult')}

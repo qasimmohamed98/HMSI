@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { Button } from './Button';
@@ -20,6 +21,7 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
 }
 
 export function ErrorState({ title, description, onRetry }: { title: string; description?: string; onRetry?: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-50 text-danger-500 dark:bg-danger-900/30">
@@ -32,7 +34,7 @@ export function ErrorState({ title, description, onRetry }: { title: string; des
       {description && <p className="max-w-sm text-sm text-ink/55">{description}</p>}
       {onRetry && (
         <Button variant="secondary" size="sm" className="mt-2" onClick={onRetry}>
-          إعادة المحاولة
+          {t('common.retry')}
         </Button>
       )}
     </div>

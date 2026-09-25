@@ -335,6 +335,7 @@ export const en: Dict = {
   },
   occupancy: { bedsUsed: '{{used}} of {{total}} occupied' },
   errors: {
+    network: 'Cannot reach the server — check your network',
     generic: 'Something went wrong. Please try again.',
     notFound: 'Patient not found.',
     required: 'This field is required',
@@ -641,6 +642,7 @@ export const en: Dict = {
     pendingBanner_other: '{{count}} payment notices awaiting review',
   },
   aboutPage: {
+    englishVersion: 'English version (shown when English is selected)',
     mission: 'Our mission',
     vision: 'Our vision',
     values: 'Our values',
@@ -678,6 +680,27 @@ export const en: Dict = {
     noReports: 'No written reports',
     latestVitals: 'Vitals (last 15 readings)',
     activeMeds: 'Medications',
+  },
+  a11y: {
+    menu: 'Menu',
+    closeMenu: 'Close menu',
+    close: 'Close',
+    backdrop: 'Close dialog',
+    remove: 'Remove {{label}}',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+  },
+  examples: {
+    specialty: 'Cardiology',
+    labTest: 'Complete blood count (CBC)',
+    medication: 'Paracetamol',
+    dose: '500 mg',
+    frequency: 'Every 8 hours',
+    radiology: 'Chest CT',
+    patientName: 'e.g. محمد علي كريم',
+    department: 'Internal medicine',
+    hospital: 'City University Hospital',
+    ward: 'Medical ward 1',
   },
   logo: {
     title: 'Hospital logo',

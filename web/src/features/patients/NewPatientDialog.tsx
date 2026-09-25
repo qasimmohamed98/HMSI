@@ -87,7 +87,7 @@ export function NewPatientDialog({
     >
       <div className="space-y-4">
         {error && <p className="text-sm font-semibold text-danger-600">{error}</p>}
-        <Input label={t('patients.fullNameAr')} value={fullNameAr} onChange={(e) => setFullNameAr(e.target.value)} placeholder="مثال: محمد علي كريم" />
+        <Input label={t('patients.fullNameAr')} value={fullNameAr} onChange={(e) => setFullNameAr(e.target.value)} placeholder={t('examples.patientName')} />
         <Input label={t('patients.fullNameEn')} value={fullNameEn} onChange={(e) => setFullNameEn(e.target.value)} placeholder="Mohammed Ali Karim" />
         <div className="grid grid-cols-2 gap-3">
           <Select

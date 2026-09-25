@@ -170,7 +170,7 @@ function AdministerDialog({
     >
       <div className="space-y-4">
         <div className="rounded-xl bg-surface-muted/70 p-3 dark:bg-white/5">
-          <p className="font-bold text-ink">{medication.name_ar}</p>
+          <p className="font-bold text-ink">{localName(medication, 'name')}</p>
           <p className="text-sm text-ink/60">
             {medication.dose} · {medication.route} · {medication.frequency}
           </p>

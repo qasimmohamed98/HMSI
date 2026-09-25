@@ -1,3 +1,4 @@
+import { localName } from '@/lib/format';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -71,7 +72,7 @@ export function AdmitDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title={`${t('admit.title')} — ${patient.full_name_ar}`}
+      title={`${t('admit.title')} — ${localName(patient, 'full_name')}`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -126,7 +127,7 @@ export function AdmitDialog({
             label={t('admit.attendingDoctor')}
             value={doctorId}
             onChange={(e) => setDoctorId(e.target.value)}
-            options={(doctors ?? []).map((d: PublicUser) => ({ value: d.id, label: d.full_name_ar }))}
+            options={(doctors ?? []).map((d: PublicUser) => ({ value: d.id, label: localName(d, 'full_name') }))}
             placeholder={t('admit.noDoctor')}
           />
           <Textarea label={t('admit.reason')} value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />

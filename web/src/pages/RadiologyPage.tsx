@@ -6,7 +6,7 @@ import { Button, Dialog, Input, Textarea, Badge, Skeleton, EmptyState, Card, Car
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API, type RadiologyInput, type RadiologyUpdateInput } from '@/lib/api';
 import { useToast } from '@/components/ui';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDateTime, localName } from '@/lib/format';
 import { AdmittedPatientCard, useAdmittedCharts } from '@/features/departments';
 
 export default function RadiologyPage() {
@@ -90,7 +90,7 @@ export default function RadiologyPage() {
                   {items.map((r) => (
                     <li key={r.id} className="rounded-lg border border-ink/8 px-3.5 py-2.5 dark:border-white/10">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-bold text-ink">{r.study_type_ar}</p>
+                        <p className="font-bold text-ink">{localName(r, 'study_type')}</p>
                         <Badge variant={r.report ? 'success' : 'warning'}>{r.report ? t('laboratory.statuses.resulted') : t('laboratory.statuses.ordered')}</Badge>
                       </div>
                       <p className="mt-0.5 text-xs text-ink/50">{fmtDateTime(r.ordered_at)}</p>
@@ -102,7 +102,7 @@ export default function RadiologyPage() {
                           variant="outline"
                           className="mt-2"
                           icon={<PenLine className="h-3.5 w-3.5" />}
-                          onClick={() => setReportFor({ admissionId: r.admission_id, id: r.id, study: r.study_type_ar })}
+                          onClick={() => setReportFor({ admissionId: r.admission_id, id: r.id, study: localName(r, 'study_type') })}
                         >
                           {t('actions.enterReport')}
                         </Button>
@@ -182,7 +182,7 @@ function AddReportDialog({
       }
     >
       <div className="space-y-4">
-        <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder="أشعة مقطعية CT صدر" />
+        <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder={t('examples.radiology')} />
         <Textarea label={t('radiology.report')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} />
       </div>
     </Dialog>

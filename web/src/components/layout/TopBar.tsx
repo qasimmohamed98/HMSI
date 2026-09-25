@@ -34,7 +34,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
 
   return (
     <header className="sticky top-0 z-30 print:hidden flex h-14 items-center gap-2 border-b border-ink/8 bg-surface/85 px-3 backdrop-blur-md sm:h-16 sm:px-5 dark:border-white/10 dark:bg-surface/85">
-      <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenu} aria-label="القائمة">
+      <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenu} aria-label={t('a11y.menu')}>
         <Menu className="h-5 w-5" />
       </Button>
 
@@ -79,7 +79,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             aria-haspopup="menu"
             aria-expanded={menuOpen}
           >
-            <Avatar name={user.full_name_ar || user.username} className="h-8 w-8 text-xs" />
+            <Avatar name={localName(user, 'full_name') || user.username} className="h-8 w-8 text-xs" />
             <span className="hidden max-w-[10rem] flex-col items-start leading-tight sm:flex">
               <span className="truncate text-sm font-bold text-ink">{localName(user, 'full_name') || user.username}</span>
               <span className="truncate text-[0.68rem] font-semibold text-ink/45">{t(`user.role.${user.role}`)}</span>

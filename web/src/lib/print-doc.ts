@@ -1,5 +1,6 @@
 import { currentLang } from '@/i18n';
 import { fmtDateTime } from './format';
+import { Q_COLORS, qMarkSvg } from '@/components/brand/q-geometry';
 
 /**
  * إطار موحّد للمطبوعات (A4): ترويسة بشعار المستشفى واسمه، عنوان المستند، سطر بيانات،
@@ -59,7 +60,9 @@ const CSS = `
   .summary b{font-size:11pt}
   .sign{display:flex;justify-content:space-between;gap:24px;margin-top:36px;font-size:9.5pt;break-inside:avoid}
   .sign div{flex:1;border-top:1px solid #555;padding-top:4px;text-align:center}
-  .foot{margin-top:14px;border-top:1px solid #ccc;padding-top:4px;font-size:8pt;color:#666;display:flex;justify-content:space-between}
+  .foot{margin-top:14px;border-top:1px solid #ccc;padding-top:4px;font-size:8pt;color:#666;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .sysmark{display:inline-flex;align-items:center;gap:4px;font-family:Syncopate,'Segoe UI',sans-serif;font-weight:700;letter-spacing:.08em;font-size:6.5pt;color:#888}
+  .sysmark svg{width:11px;height:11px}
   .empty{color:#777;font-style:italic}
   @media screen{body{background:#e9ecef}.doc{background:#fff;max-width:210mm;margin:12px auto;padding:12mm;box-shadow:0 2px 12px rgba(0,0,0,.15)}.landscape .doc{max-width:297mm}}
 `;
@@ -75,14 +78,14 @@ ${CSS}
 </style></head><body><div class="doc">
 <div class="head">
   ${o.hospitalLogo ? `<img src="${esc(o.hospitalLogo)}" alt="">` : ''}
-  <div class="h"><p class="hosp">${esc(o.hospitalName)}</p><p class="sys">Q VIREXA</p></div>
+  <div class="h"><p class="hosp">${esc(o.hospitalName)}</p></div>
 </div>
 <div class="title">${esc(o.title)}</div>
 ${o.subtitle ? `<p class="sub">${esc(o.subtitle)}</p>` : ''}
 ${meta.length ? `<div class="meta">${meta.map(([k, v]) => `<div><b>${esc(k)}</b><bdi>${esc(v)}</bdi></div>`).join('')}</div>` : ''}
 ${o.body}
 ${o.signatures?.length ? `<div class="sign">${o.signatures.map((s) => `<div>${esc(s)}</div>`).join('')}</div>` : ''}
-<div class="foot"><span>${esc(o.printedAtLabel)}: ${esc(fmtDateTime(new Date().toISOString()))}</span><span>${esc(o.printedBy)}</span></div>
+<div class="foot"><span>${esc(o.printedAtLabel)}: ${esc(fmtDateTime(new Date().toISOString()))}</span><span>${esc(o.printedBy)}</span><span class="sysmark" dir="ltr">${qMarkSvg({ colors: Q_COLORS.mono('#888') })}Q VIREXA</span></div>
 </div>
 <script>window.addEventListener('load',function(){var imgs=[].slice.call(document.images);Promise.all(imgs.map(function(i){return i.complete?0:new Promise(function(r){i.onload=i.onerror=r})})).then(function(){setTimeout(function(){window.focus();window.print()},150)})});</script>
 </body></html>`;

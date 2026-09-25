@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ export function notifyError(message: string): void {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t: tr } = useTranslation();
   const [items, setItems] = useState<ToastItem[]>([]);
 
   const dismiss = useCallback((id: number) => setItems((prev) => prev.filter((t) => t.id !== id)), []);
@@ -75,7 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           >
             {icons[t.kind]}
             <p className="flex-1 text-sm font-medium text-ink">{t.message}</p>
-            <button type="button" onClick={() => dismiss(t.id)} className="text-ink/40 hover:text-ink" aria-label="إغلاق">
+            <button type="button" onClick={() => dismiss(t.id)} className="text-ink/40 hover:text-ink" aria-label={tr('a11y.close')}>
               <X className="h-4 w-4" />
             </button>
           </div>

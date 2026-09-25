@@ -14,7 +14,7 @@ export function AdmittedPatientCard({ patient, children }: { patient: Patient; c
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center gap-3 border-b border-ink/8 bg-surface-muted/50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
-        <Avatar name={patient.full_name_ar} />
+        <Avatar name={localName(patient, 'full_name')} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold text-ink">{localName(patient, 'full_name')}</p>
           <p className="text-xs text-ink/50">
@@ -22,7 +22,7 @@ export function AdmittedPatientCard({ patient, children }: { patient: Patient; c
             {admission && (
               <>
                 <span className="mx-1.5 text-ink/25">·</span>
-                {t('dept.wardBed', { ward: admission.ward_name_ar, bed: admission.bed_no })}
+                {t('dept.wardBed', { ward: localName(admission, 'ward_name'), bed: admission.bed_no })}
               </>
             )}
           </p>

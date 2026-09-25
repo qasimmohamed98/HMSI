@@ -336,6 +336,13 @@ export interface AboutContent {
   email: string;
   address: string;
   website: string;
+  name_en?: string;
+  tagline_en?: string;
+  intro_en?: string;
+  mission_en?: string;
+  vision_en?: string;
+  values_en?: string;
+  address_en?: string;
 }
 
 export type ReportType = 'admissions' | 'discharges' | 'census' | 'occupancy' | 'lab' | 'radiology' | 'pharmacy' | 'mar' | 'diagnoses' | 'doctors';

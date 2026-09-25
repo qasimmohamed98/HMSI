@@ -1,3 +1,4 @@
+import { localName } from '@/lib/format';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -45,7 +46,7 @@ export default function UsersPage() {
     <div>
       <PageHeader
         title={t('nav.users')}
-        subtitle={user?.hospital_name_ar}
+        subtitle={localName(user, 'hospital_name')}
         actions={
           user?.role === 'admin' || user?.role === 'super_admin' ? (
             <Button icon={<Plus className="h-4 w-4" />} onClick={() => setCreateOpen(true)}>
@@ -76,9 +77,9 @@ export default function UsersPage() {
                 const editable = (user?.role === 'super_admin' || user?.role === 'admin') && u.role !== 'super_admin';
                 return (
                   <div key={u.id} className="flex items-center gap-3 rounded-xl border border-ink/8 p-3.5 dark:border-white/10">
-                    <Avatar name={u.full_name_ar || u.username} />
+                    <Avatar name={localName(u, 'full_name') || u.username} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-ink">{u.full_name_ar || u.username}</p>
+                      <p className="truncate text-sm font-bold text-ink">{localName(u, 'full_name') || u.username}</p>
                       <p className="truncate text-xs text-ink/45">{u.username}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
@@ -220,7 +221,7 @@ function EditUserDialog({ open, user, onClose, onSuccess }: { open: boolean; use
     <Dialog
       open={open}
       onClose={onClose}
-      title={`${t('users.edit')} — ${user.full_name_ar || user.username}`}
+      title={`${t('users.edit')} — ${localName(user, 'full_name') || user.username}`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

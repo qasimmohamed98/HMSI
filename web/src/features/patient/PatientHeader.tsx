@@ -50,7 +50,7 @@ export function PatientHeader({
           <button type="button" onClick={onBack} className="mr-1 hidden h-10 w-10 items-center justify-center rounded-lg text-ink/50 hover:bg-surface-muted hover:text-ink lg:flex" aria-label={t('common.back')}>
             <ArrowRight className="h-5 w-5 ltr:rotate-180" />
           </button>
-          <Avatar name={patient.full_name_ar} className="h-14 w-14 text-lg" />
+          <Avatar name={localName(patient, 'full_name')} className="h-14 w-14 text-lg" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-xl font-extrabold text-ink sm:text-2xl">{localName(patient, 'full_name')}</h1>

@@ -352,6 +352,7 @@ export const ar = {
     bedsUsed: '{{used}} من {{total}} مشغولة',
   },
   errors: {
+    network: 'تعذّر الاتصال بالخادم — تحقق من الشبكة',
     generic: 'حدث خطأ ما، يرجى المحاولة مرة أخرى.',
     notFound: 'لم يتم العثور على المريض.',
     required: 'هذا الحقل مطلوب',
@@ -674,6 +675,7 @@ export const ar = {
     pendingBanner_other: '{{count}} إشعار دفع بانتظار المراجعة',
   },
   aboutPage: {
+    englishVersion: 'النسخة الإنجليزية (تظهر عند اختيار English)',
     mission: 'رسالتنا',
     vision: 'رؤيتنا',
     values: 'قيمنا',
@@ -711,6 +713,27 @@ export const ar = {
     noReports: 'لا توجد تقارير مكتوبة',
     latestVitals: 'العلامات الحيوية (آخر 15 قراءة)',
     activeMeds: 'الأدوية',
+  },
+  a11y: {
+    menu: 'القائمة',
+    closeMenu: 'إغلاق القائمة',
+    close: 'إغلاق',
+    backdrop: 'إغلاق النافذة',
+    remove: 'إزالة {{label}}',
+    collapse: 'طيّ القائمة',
+    expand: 'توسيع القائمة',
+  },
+  examples: {
+    specialty: 'طب القلب',
+    labTest: 'تعداد الدم الكامل CBC',
+    medication: 'باراسيتامول',
+    dose: '500 مغ',
+    frequency: 'كل 8 ساعات',
+    radiology: 'أشعة مقطعية CT صدر',
+    patientName: 'مثال: محمد علي كريم',
+    department: 'قسم الباطنية',
+    hospital: 'مستشفى المدينة الجامعية',
+    ward: 'ردهة الباطنية الأولى',
   },
   logo: {
     title: 'شعار المستشفى',

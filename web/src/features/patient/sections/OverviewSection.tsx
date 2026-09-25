@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Activity, Thermometer, HeartPulse, Wind, Droplets, Weight, Droplet, AlertTriangle } from 'lucide-react';
 import type { ChartData } from '@/lib/api';
 import { Badge } from '@/components/ui';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDateTime, localName } from '@/lib/format';
 import { SectionCard, EmptyLine } from './SectionCard';
 
 export function OverviewSection({ chart }: { chart: ChartData }) {
@@ -55,7 +55,7 @@ export function OverviewSection({ chart }: { chart: ChartData }) {
               {chart.diagnoses.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-2 rounded-lg border border-ink/8 px-3 py-2.5 dark:border-white/10">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-ink">{d.title_ar}</p>
+                    <p className="truncate text-sm font-bold text-ink">{localName(d, 'title')}</p>
                     {d.icd10 && <p className="tabular text-xs text-ink/45">{d.icd10}</p>}
                   </div>
                   <Badge variant={d.status === 'confirmed' ? 'brand' : d.status === 'suspected' ? 'warning' : 'success'}>
@@ -76,7 +76,7 @@ export function OverviewSection({ chart }: { chart: ChartData }) {
               {chart.medications.filter((m) => m.status === 'active').map((m) => (
                 <li key={m.id} className="flex items-start justify-between gap-2 rounded-lg border border-ink/8 px-3 py-2.5 dark:border-white/10">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-ink">{m.name_ar}</p>
+                    <p className="truncate text-sm font-bold text-ink">{localName(m, 'name')}</p>
                     <p className="text-xs text-ink/50">
                       {m.dose} · {m.route} · {m.frequency}
                     </p>
@@ -100,7 +100,7 @@ export function OverviewSection({ chart }: { chart: ChartData }) {
               .map((l) => (
                 <li key={l.id} className="flex items-center gap-2 text-sm">
                   <AlertTriangle className="h-4 w-4 text-warning-500" />
-                  <span className="font-semibold text-ink">{l.test_name_ar}</span>
+                  <span className="font-semibold text-ink">{localName(l, 'test_name')}</span>
                   <Badge variant="warning">{t(`laboratory.statuses.${l.status}`)}</Badge>
                 </li>
               ))}

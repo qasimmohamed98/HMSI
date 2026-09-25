@@ -188,7 +188,7 @@ export default function HospitalsPage() {
       {createOpen && <CreateHospitalDialog onClose={() => setCreateOpen(false)} onSubmit={(i) => createMut.mutate(i)} busy={createMut.isPending} />}
       {adminFor && (
         <AddAdminDialog
-          hospitalName={adminFor.name_ar}
+          hospitalName={localName(adminFor, 'name')}
           onClose={() => setAdminFor(null)}
           onSubmit={(input) => adminMut.mutate({ hospitalId: adminFor.id, input })}
           busy={adminMut.isPending}
@@ -198,7 +198,7 @@ export default function HospitalsPage() {
       <ConfirmDialog
         open={Boolean(toggleTarget)}
         onClose={() => setToggleTarget(null)}
-        title={`${t('hospitals.disable')} — ${toggleTarget?.name_ar ?? ''}`}
+        title={`${t('hospitals.disable')} — ${localName(toggleTarget, 'name')}`}
         message={t('hospitals.disableConfirm')}
         confirmLabel={t('hospitals.disable')}
         busy={toggleMut.isPending}

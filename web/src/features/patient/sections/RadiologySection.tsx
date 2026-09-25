@@ -7,7 +7,7 @@ import { SectionCard, EmptyLine } from './SectionCard';
 import { printRadiologyReport } from '../printChart';
 import { useAuth } from '@/lib/auth';
 import { API, type RadiologyInput, type RadiologyUpdateInput, type ChartData } from '@/lib/api';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDateTime, localName } from '@/lib/format';
 import { useToast, useConfirm } from '@/components/ui';
 
 /** canOrder: طلب أشعة (الطبيب) — canResult: كتابة التقرير (فني الأشعة) */
@@ -78,7 +78,7 @@ export function RadiologySection({ chart, canOrder, canResult }: { chart: ChartD
                     <ScanLine className="h-5 w-5" />
                   </span>
                   <div>
-                    <p className="font-bold text-ink">{r.study_type_ar}</p>
+                    <p className="font-bold text-ink">{localName(r, 'study_type')}</p>
                     <p className="text-xs text-ink/50">
                       {fmtDateTime(r.ordered_at)} · {t('radiology.orderedBy')}: {r.ordered_by}
                     </p>
@@ -206,7 +206,7 @@ function AddRadiologyDialog({ open, onClose, admissionId, withReport, onSubmit, 
       }
     >
       <div className="space-y-4">
-        <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder="أشعة مقطعية CT صدر" />
+        <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder={t('examples.radiology')} />
         {withReport && <Textarea label={t('orders.reportOptional')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} />}
       </div>
     </Dialog>

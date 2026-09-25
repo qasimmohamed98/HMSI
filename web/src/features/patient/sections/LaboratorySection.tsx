@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type LabInput, type ChartData, type LabResultInput } from '@/lib/api';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDateTime, localName } from '@/lib/format';
 import { useToast, useConfirm } from '@/components/ui';
 
 /** canOrder: طلب فحص (الطبيب) — canResult: إدخال النتائج (فني المختبر) */
@@ -82,7 +82,7 @@ export function LaboratorySection({ chart, canOrder, canResult }: { chart: Chart
                     <FlaskConical className="h-5 w-5" />
                   </span>
                   <div>
-                    <p className="font-bold text-ink">{l.test_name_ar}</p>
+                    <p className="font-bold text-ink">{localName(l, 'test_name')}</p>
                     <p className="text-xs text-ink/50">
                       {l.category ? `${l.category} · ` : ''}
                       {fmtDateTime(l.ordered_at)} · {t('laboratory.orderedBy')}: {l.ordered_by}
@@ -192,7 +192,7 @@ function AddLabDialog({ open, onClose, admissionId, withResult, onSubmit, busy }
       }
     >
       <div className="space-y-4">
-        <Input label={t('laboratory.test')} value={testNameAr} onChange={(e) => setTestNameAr(e.target.value)} autoFocus placeholder="تعداد الدم الكامل CBC" />
+        <Input label={t('laboratory.test')} value={testNameAr} onChange={(e) => setTestNameAr(e.target.value)} autoFocus placeholder={t('examples.labTest')} />
         <Input label={t('orders.category')} value={category} onChange={(e) => setCategory(e.target.value)} />
         {withResult && (
           <>

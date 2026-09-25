@@ -4,6 +4,7 @@ import { db } from '../../db/index.js';
  * التقارير التفصيلية: كل تقرير يعيد أعمدة وصفوفاً فعلية (وليس أرقاماً نهائية فقط) + ملخصاً.
  * أسماء الأعمدة والملخص تُترجم في الواجهة (reports.cols.* و reports.sum.*).
  * التواريخ تُحسب بتوقيت المستخدم (tz = فرق الدقائق عن UTC، العراق = 180).
+ * الأعمدة النصية لها نظير «_en» اختياري (مثل department_en) تعرضه الواجهة الإنجليزية إن لم يكن فارغاً.
  */
 export const REPORT_TYPES = ['admissions', 'discharges', 'census', 'occupancy', 'lab', 'radiology', 'pharmacy', 'mar', 'diagnoses', 'doctors'] as const;
 export type ReportType = (typeof REPORT_TYPES)[number];
@@ -56,10 +57,11 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
   const q = async (sql: string, args: (string | number)[]) => (await db.execute({ sql: `${sql} LIMIT ${MAX_ROWS}`, args })).rows.map((r) => clean(r as Row));
   const base = { type, from: f.from, to: f.to, snapshot: false };
 
-  const PATIENT = `p.file_number, p.full_name_ar AS patient, p.gender,
+  const PATIENT = `p.file_number, p.full_name_ar AS patient, p.full_name_en AS patient_en, p.gender,
                    CAST((julianday('now') - julianday(p.birth_date)) / 365.25 AS INTEGER) AS age`;
-  const PLACE = `d.name_ar AS department, w.name_ar AS ward, a.room || ' / ' || a.bed_no AS bed,
-                 (SELECT full_name_ar FROM users u WHERE u.id = a.attending_doctor_id) AS doctor`;
+  const PLACE = `d.name_ar AS department, d.name_en AS department_en, w.name_ar AS ward, w.name_en AS ward_en, a.room || ' / ' || a.bed_no AS bed,
+                 (SELECT full_name_ar FROM users u WHERE u.id = a.attending_doctor_id) AS doctor,
+                 (SELECT full_name_en FROM users u WHERE u.id = a.attending_doctor_id) AS doctor_en`;
   const FROM_ADM = `FROM admissions a JOIN patients p ON p.id = a.patient_id
                     LEFT JOIN departments d ON d.id = a.department_id LEFT JOIN wards w ON w.id = a.ward_id`;
   const LOS = `ROUND(julianday(COALESCE(a.discharged_at, datetime('now'))) - julianday(a.admitted_at), 1)`;
@@ -142,7 +144,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     }
     case 'occupancy': {
       const rows = await q(
-        `SELECT d.name_ar AS department, w.name_ar AS ward,
+        `SELECT d.name_ar AS department, d.name_en AS department_en, w.name_ar AS ward, w.name_en AS ward_en,
                 COUNT(b.id) AS beds,
                 SUM(CASE WHEN b.status = 'occupied' THEN 1 ELSE 0 END) AS occupied,
                 (SELECT COUNT(*) FROM admissions a WHERE a.ward_id = w.id AND ${inRange('a.admitted_at')}) AS admissions_in_range,
@@ -173,7 +175,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     }
     case 'lab': {
       const rows = await q(
-        `SELECT lr.ordered_at, p.file_number, p.full_name_ar AS patient, d.name_ar AS department, lr.test_name_ar AS test, lr.category,
+        `SELECT lr.ordered_at, p.file_number, p.full_name_ar AS patient, p.full_name_en AS patient_en, d.name_ar AS department, d.name_en AS department_en, lr.test_name_ar AS test, lr.test_name_en AS test_en, lr.category,
                 lr.ordered_by, lr.status, lr.result, lr.unit, lr.reference_range, lr.resulted_by, lr.resulted_at,
                 CASE WHEN lr.resulted_at IS NOT NULL THEN ROUND((julianday(lr.resulted_at) - julianday(lr.ordered_at)) * 24, 1) END AS tat_hours
          FROM lab_results lr JOIN admissions a ON a.id = lr.admission_id JOIN patients p ON p.id = a.patient_id LEFT JOIN departments d ON d.id = a.department_id
@@ -197,7 +199,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     }
     case 'radiology': {
       const rows = await q(
-        `SELECT rr.ordered_at, p.file_number, p.full_name_ar AS patient, d.name_ar AS department, rr.study_type_ar AS study,
+        `SELECT rr.ordered_at, p.file_number, p.full_name_ar AS patient, p.full_name_en AS patient_en, d.name_ar AS department, d.name_en AS department_en, rr.study_type_ar AS study, rr.study_type_en AS study_en,
                 rr.ordered_by, rr.status, rr.performed_by, rr.report
          FROM radiology_reports rr JOIN admissions a ON a.id = rr.admission_id JOIN patients p ON p.id = a.patient_id LEFT JOIN departments d ON d.id = a.department_id
          WHERE p.hospital_id = ? AND ${inRange('rr.ordered_at')}${dept} ORDER BY rr.ordered_at DESC`,
@@ -217,7 +219,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     }
     case 'pharmacy': {
       const rows = await q(
-        `SELECT m.created_at AS prescribed_at, p.file_number, p.full_name_ar AS patient, d.name_ar AS department, m.name_ar AS medication,
+        `SELECT m.created_at AS prescribed_at, p.file_number, p.full_name_ar AS patient, p.full_name_en AS patient_en, d.name_ar AS department, d.name_en AS department_en, m.name_ar AS medication, m.name_en AS medication_en,
                 m.dose, m.route, m.frequency, m.prescribed_by, m.status AS med_status, m.dispensed_by, m.dispensed_at
          FROM medications m JOIN admissions a ON a.id = m.admission_id JOIN patients p ON p.id = a.patient_id LEFT JOIN departments d ON d.id = a.department_id
          WHERE p.hospital_id = ? AND ${inRange('m.created_at')}${dept} ORDER BY m.created_at DESC`,
@@ -236,7 +238,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     }
     case 'mar': {
       const rows = await q(
-        `SELECT ma.administered_at, p.file_number, p.full_name_ar AS patient, w.name_ar AS ward, m.name_ar AS medication, m.dose,
+        `SELECT ma.administered_at, p.file_number, p.full_name_ar AS patient, p.full_name_en AS patient_en, w.name_ar AS ward, w.name_en AS ward_en, m.name_ar AS medication, m.name_en AS medication_en, m.dose,
                 ma.status AS dose_status, ma.administered_by, ma.note
          FROM medication_administrations ma JOIN medications m ON m.id = ma.medication_id
          JOIN admissions a ON a.id = ma.admission_id JOIN patients p ON p.id = a.patient_id LEFT JOIN wards w ON w.id = a.ward_id
@@ -258,7 +260,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     }
     case 'diagnoses': {
       const rows = await q(
-        `SELECT dg.title_ar AS diagnosis, dg.icd10, COUNT(*) AS cases,
+        `SELECT dg.title_ar AS diagnosis, MAX(dg.title_en) AS diagnosis_en, dg.icd10, COUNT(*) AS cases,
                 SUM(CASE WHEN dg.status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed,
                 SUM(CASE WHEN dg.status = 'suspected' THEN 1 ELSE 0 END) AS suspected,
                 SUM(CASE WHEN dg.status = 'resolved' THEN 1 ELSE 0 END) AS resolved
@@ -279,7 +281,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     }
     case 'doctors': {
       const rows = await q(
-        `SELECT u.full_name_ar AS doctor,
+        `SELECT u.full_name_ar AS doctor, u.full_name_en AS doctor_en,
                 (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND ${inRange('a.admitted_at')}) AS admissions_in_range,
                 (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND a.status = 'active') AS current_patients,
                 (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND a.status = 'discharged' AND ${inRange('a.discharged_at')}) AS discharges,

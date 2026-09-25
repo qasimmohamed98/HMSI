@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
@@ -17,6 +18,7 @@ export interface DialogProps {
 const widths = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl' };
 
 export function Dialog({ open, onClose, title, description, children, footer, size = 'md', closable = true }: DialogProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -36,7 +38,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={title}>
       <button
         type="button"
-        aria-label="خلفية"
+        aria-label={t('a11y.backdrop')}
         className="absolute inset-0 bg-ink/45 backdrop-blur-sm animate-fade-in"
         onClick={() => closable && onClose()}
       />
@@ -53,7 +55,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
               {description && <p className="mt-0.5 text-sm text-ink/55">{description}</p>}
             </div>
             {closable && (
-              <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="إغلاق">
+              <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t('a11y.close')}>
                 <X className="h-5 w-5" />
               </Button>
             )}

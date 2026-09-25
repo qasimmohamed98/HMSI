@@ -4,11 +4,16 @@ import { Eye, Globe, Heart, Mail, MapPin, MessageCircle, Phone, Target } from 'l
 import { Card, CardContent, Skeleton } from '@/components/ui';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { API } from '@/lib/api';
+import { currentLang } from '@/i18n';
 
 /** صفحة «من نحن» — محتواها يعدّله المدير العام من الإعدادات */
 export default function AboutPage() {
   const { t } = useTranslation();
-  const { data: a, isLoading } = useQuery({ queryKey: ['about'], queryFn: API.getAbout });
+  const { data: raw, isLoading } = useQuery({ queryKey: ['about'], queryFn: API.getAbout });
+  // الواجهة الإنجليزية: الحقول الإنجليزية إن كُتبت، وإلا العربية
+  const a = raw && currentLang() === 'en'
+    ? { ...raw, ...Object.fromEntries((['name', 'tagline', 'intro', 'mission', 'vision', 'values', 'address'] as const).filter((k) => raw[`${k}_en`]).map((k) => [k, raw[`${k}_en`]!])) }
+    : raw;
 
   return (
     <PublicLayout>

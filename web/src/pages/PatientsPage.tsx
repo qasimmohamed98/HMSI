@@ -73,7 +73,7 @@ export default function PatientsPage() {
     onSuccess: (res) => {
       invalidatePatients();
       void qc.invalidateQueries({ queryKey: ['wards'] });
-      if (admitTarget) setAdmittedPin({ name: admitTarget.full_name_ar, pin: res.family_pin });
+      if (admitTarget) setAdmittedPin({ name: localName(admitTarget, 'full_name'), pin: res.family_pin });
       setAdmitTarget(null);
     },
   });
@@ -185,7 +185,7 @@ export default function PatientsPage() {
                   <Td className="tabular whitespace-nowrap font-bold text-brand-700 dark:text-brand-300" dir="ltr">{p.file_number}</Td>
                   <Td>
                     <div className="flex items-center gap-3">
-                      <Avatar name={p.full_name_ar} className="h-9 w-9 text-xs" />
+                      <Avatar name={localName(p, 'full_name')} className="h-9 w-9 text-xs" />
                       <div>
                         <p className="whitespace-nowrap font-bold text-ink">{localName(p, 'full_name')}</p>
                         <p className="whitespace-nowrap text-xs text-ink/45">{currentLang() === 'ar' ? p.full_name_en : p.full_name_ar}</p>
@@ -255,7 +255,7 @@ export default function PatientsPage() {
           open
           onClose={() => setArchiveTarget(null)}
           title={t('patients.archivePatient')}
-          message={t('patients.archiveConfirm', { name: archiveTarget.full_name_ar })}
+          message={t('patients.archiveConfirm', { name: localName(archiveTarget, 'full_name') })}
           confirmLabel={t('common.archive')}
           busy={archiveMut.isPending}
           onConfirm={() => archiveMut.mutate(archiveTarget.id)}
@@ -288,7 +288,7 @@ function PatientMobileCard({ patient: p, onClick, onAdmit, onEdit, onArchive }: 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-ink/8 bg-surface-raised p-4 shadow-card transition-all hover:border-brand-300 hover:shadow-float dark:border-white/10 dark:hover:border-brand-700">
       <button type="button" onClick={onClick} className="flex w-full items-start gap-3 text-start">
-        <Avatar name={p.full_name_ar} />
+        <Avatar name={localName(p, 'full_name')} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-sm font-bold text-ink">{localName(p, 'full_name')}</p>

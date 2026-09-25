@@ -6,7 +6,7 @@ import { Button, Dialog, Input, Textarea } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type ProcedureUpdateInput, type ChartData } from '@/lib/api';
 import type { Procedure } from '@hmsi/shared';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDateTime, localName } from '@/lib/format';
 import { useToast, useConfirm } from '@/components/ui';
 
 export function ProceduresSection({ chart, canWrite }: { chart: ChartData; canWrite: boolean }) {
@@ -64,7 +64,7 @@ export function ProceduresSection({ chart, canWrite }: { chart: ChartData; canWr
                 <Scissors className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-bold text-ink">{p.name_ar}</p>
+                <p className="font-bold text-ink">{localName(p, 'name')}</p>
                 <p className="text-xs text-ink/50">
                   {fmtDateTime(p.performed_at)} · {t('procedures.performedBy')}: {p.performed_by}
                 </p>

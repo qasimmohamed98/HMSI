@@ -1,3 +1,4 @@
+import { localName } from '@/lib/format';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -64,12 +65,12 @@ export function DiagnosisSection({ chart, canWrite }: { chart: ChartData; canWri
                   <ClipboardList className="h-5 w-5" />
                 </span>
                 <div>
-                  <p className="font-bold text-ink">{d.title_ar}</p>
+                  <p className="font-bold text-ink">{localName(d, 'title')}</p>
                   <p className="text-xs text-ink/50">
                     {d.title_en}
                     {d.icd10 && <span className="tabular">{d.title_en ? ' · ' : ''}{d.icd10}</span>}
                   </p>
-                  <p className="mt-0.5 text-xs text-ink/40">بواسطة: {d.added_by}</p>
+                  <p className="mt-0.5 text-xs text-ink/40">{t('notes.by')}: {d.added_by}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

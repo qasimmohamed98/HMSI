@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@/styles/tokens.css';
-import '@/i18n';
+import i18n from '@/i18n';
+import { localizeServerMessage } from '@/i18n/server-messages';
 import { ThemeProvider } from '@/lib/theme';
 import { ToastProvider, ConfirmProvider, notifyError } from '@/components/ui';
 import { AuthProvider } from '@/lib/auth';
@@ -14,7 +15,7 @@ const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (error, _vars, _ctx, mutation) => {
       if (mutation.options.onError) return;
-      notifyError(error instanceof Error && error.message ? error.message : 'حدث خطأ');
+      notifyError(error instanceof Error && error.message ? localizeServerMessage(error.message) : i18n.t('errors.generic'));
     },
   }),
   defaultOptions: {

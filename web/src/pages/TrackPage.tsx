@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Activity, BedDouble, Building2, CalendarClock, FlaskConical, HeartPulse, Languages, Lock, MessageSquareText, Pill, RefreshCw, ScanLine, ShieldCheck, Stethoscope, UserRound } from 'lucide-react';
 import type { PublicTrackFamily } from '@hmsi/shared';
 import { Card, CardContent, Badge, Button, Input, Skeleton } from '@/components/ui';
-import { Logo } from '@/components/layout/Logo';
+import { QLockup } from '@/components/brand/QBrand';
 import { API } from '@/lib/api';
 import { fmtDate, fmtDateTime } from '@/lib/format';
 import { currentLang, setLanguage } from '@/i18n';
@@ -47,8 +47,8 @@ export default function TrackPage() {
   return (
     <div className="min-h-dvh bg-surface px-4 py-6 sm:py-10">
       <div className="mx-auto flex max-w-xl flex-col gap-4">
-        <header className="flex items-center justify-between">
-          <Logo compact />
+        {/* هوية المستشفى تظهر في البطاقة أدناه، وهوية النظام في التذييل */}
+        <header className="flex items-center justify-end">
           <Button variant="ghost" size="sm" onClick={() => setLanguage(lang === 'ar' ? 'en' : 'ar')}>
             <Languages className="h-4 w-4" />
             <span className="font-bold">{lang === 'ar' ? 'EN' : 'ع'}</span>
@@ -284,6 +284,11 @@ export default function TrackPage() {
             )}
           </>
         )}
+
+        <p className="flex items-center justify-center gap-2 pt-2 text-[0.7rem] text-ink/45" dir="ltr">
+          <span>POWERED BY</span>
+          <QLockup className="h-4" />
+        </p>
 
         <p className="flex items-start gap-2 text-xs leading-relaxed text-ink/50">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
