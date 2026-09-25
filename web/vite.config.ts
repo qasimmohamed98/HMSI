@@ -15,17 +15,17 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'favicon.svg'],
+        includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'favicon.svg', 'fonts/syncopate-700.woff2'],
         manifest: {
-          name: 'نظام إدارة المستشفى',
-          short_name: 'HMSI',
-          description: 'Hospital Management System - نظام إدارة المستشفى',
+          name: 'Q VIREXA',
+          short_name: 'Q VIREXA',
+          description: 'Q VIREXA — منصة تشغيل رقمية للمنشآت الصحية',
           lang: 'ar',
           dir: 'rtl',
           display: 'standalone',
           orientation: 'any',
           start_url: '/',
-          theme_color: '#0e7c66',
+          theme_color: '#13204A',
           background_color: '#f6f8f7',
           icons: [
             { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

@@ -82,7 +82,7 @@ const demoPin = () => String(Math.floor(100000 + Math.random() * 900000));
 const extraHospitals: Hospital[] = [];
 const uid = () => Math.random().toString(36).slice(2, 10);
 let demoAbout: AboutContent = {
-  name: 'فريق HMSI',
+  name: 'Q — تطوير قاسم محمد',
   tagline: 'نبني أدوات رقمية تخدم المستشفيات والمرضى',
   intro: 'نسخة عرض توضيحي — يعدّل المدير العام هذا المحتوى من الإعدادات.',
   mission: 'تمكين كل مستشفى من إدارة مرضاه رقمياً.',

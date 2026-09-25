@@ -103,6 +103,33 @@
   }
 }
 
+/* ——— هوية Q VIREXA: خط الشعار (مضمَّن ليعمل دون اتصال) وألوان الرمز */
+@font-face {
+  font-family: 'Syncopate';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/syncopate-700.woff2') format('woff2');
+}
+
+:root {
+  --q-ink: #13204a;
+  --q-output: #0a9e88;
+  --q-output-bright: #3ce0c3;
+  /* --q-a: المعمل (الحلقة وبداية الخط)، --q-b: المنتج (الخط الخارجي والاسم) */
+  --q-a: var(--q-ink);
+  --q-b: var(--q-output);
+}
+.dark,
+.q-on-dark {
+  --q-a: #ffffff;
+  --q-b: var(--q-output-bright);
+}
+.q-on-light {
+  --q-a: var(--q-ink);
+  --q-b: var(--q-output);
+}
+
 .dark {
   --color-surface: #0d1716;
   --color-surface-raised: #14211f;

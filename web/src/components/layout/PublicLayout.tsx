@@ -53,7 +53,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
       <footer className="border-t border-ink/8 py-6 text-center text-xs text-ink/50 print:hidden dark:border-white/10">
         <p>
-          © 2026 HMSI · {links.map((l, i) => (
+          © 2026 Q VIREXA · {links.map((l, i) => (
             <span key={l.to}>
               {i > 0 && ' · '}
               <Link to={l.to} className="hover:underline">

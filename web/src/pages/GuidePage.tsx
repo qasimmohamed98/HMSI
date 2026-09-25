@@ -49,7 +49,7 @@ export default function GuidePage() {
 
   return (
     <PublicLayout>
-      <section className="rounded-3xl bg-gradient-to-br from-brand-700 to-brand-900 px-6 py-8 text-white sm:px-10">
+      <section className="rounded-3xl bg-[var(--q-ink)] px-6 py-8 text-white sm:px-10">
         <h1 className="text-3xl font-extrabold">{g.title}</h1>
         <p className="mt-2 max-w-2xl text-white/80">{g.subtitle}</p>
         <label className="mt-5 flex max-w-xl items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-ink shadow-sm">

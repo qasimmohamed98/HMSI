@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui';
 import { PublicLayout } from '@/components/layout/PublicLayout';
+import { QLockup } from '@/components/brand/QBrand';
 import { SYSTEM_AR, SYSTEM_EN } from '@/i18n/content/system';
 import { currentLang } from '@/i18n';
 import { DEVELOPER } from '@/lib/developer';
@@ -44,8 +45,11 @@ export default function SystemPage() {
   const c = currentLang() === 'en' ? SYSTEM_EN : SYSTEM_AR;
   return (
     <PublicLayout>
-      <section className="rounded-3xl bg-gradient-to-br from-brand-700 to-brand-900 px-6 py-10 text-white sm:px-10">
-        <h1 className="text-3xl font-extrabold sm:text-4xl">{c.title}</h1>
+      <section className="rounded-3xl bg-[var(--q-ink)] px-6 py-10 text-white sm:px-10">
+        <h1 className="q-on-dark">
+          <span className="sr-only">{c.title}</span>
+          <QLockup className="h-14 sm:h-16" />
+        </h1>
         <p className="mt-4 max-w-3xl text-lg leading-relaxed text-white/85">{c.summary}</p>
         <div className="mt-6 flex flex-wrap gap-2">
           <Link to="/signup" className="rounded-xl bg-white px-4 py-2.5 text-sm font-extrabold text-brand-800 hover:bg-brand-50">

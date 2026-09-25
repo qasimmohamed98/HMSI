@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "HMSI",
+  "productName": "Q VIREXA",
   "version": "0.1.0",
   "identifier": "com.hmsi.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "نظام إدارة المستشفى — HMSI",
+        "title": "Q VIREXA",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

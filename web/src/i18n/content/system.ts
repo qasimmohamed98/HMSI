@@ -18,7 +18,7 @@ export interface SystemContent {
 }
 
 export const SYSTEM_AR: SystemContent = {
-  title: 'نظام إدارة المستشفى HMSI',
+  title: 'Q VIREXA',
   summary:
     'ملف طبي إلكتروني متكامل للمستشفيات: من تسجيل المريض وتنويمه، إلى العلاج اليومي والتحاليل والأشعة والأدوية، حتى الخروج — مع متابعة ذوي المريض عبر رمز QR، ويعمل على الحاسوب والهاتف باللغتين العربية والإنجليزية.',
   modulesTitle: 'ماذا يقدّم النظام؟',
@@ -71,7 +71,7 @@ export const SYSTEM_AR: SystemContent = {
 };
 
 export const SYSTEM_EN: SystemContent = {
-  title: 'HMSI Hospital Management System',
+  title: 'Q VIREXA',
   summary:
     'A complete electronic medical record for hospitals: from registering and admitting a patient, through daily care, labs, imaging and medications, to discharge — with QR-based family updates. Works on desktop and phone, in Arabic and English.',
   modulesTitle: 'What does it do?',

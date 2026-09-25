@@ -75,7 +75,7 @@ ${CSS}
 </style></head><body><div class="doc">
 <div class="head">
   ${o.hospitalLogo ? `<img src="${esc(o.hospitalLogo)}" alt="">` : ''}
-  <div class="h"><p class="hosp">${esc(o.hospitalName)}</p><p class="sys">HMSI</p></div>
+  <div class="h"><p class="hosp">${esc(o.hospitalName)}</p><p class="sys">Q VIREXA</p></div>
 </div>
 <div class="title">${esc(o.title)}</div>
 ${o.subtitle ? `<p class="sub">${esc(o.subtitle)}</p>` : ''}

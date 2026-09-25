@@ -51,8 +51,12 @@ await step('login', async () => {
 // ——— المدير
 await step('admin', async () => {
   const { page, ctx } = await session('manager');
+  // صور الدليل بلا شعار مستشفى، حتى لا يُخلط بشعار Q
+  {
+    const t = decodeURIComponent((await ctx.cookies()).find((c) => c.name === 'hmsi_csrf').value);
+    await ctx.request.delete(`${BASE}/api/hospitals/me/logo`, { headers: { 'x-csrf-token': t, origin: BASE } });
+  }
   await go(page, '/settings');
-  await page.locator('input[type=file]').setInputFiles(local('../web/public/icons/icon-512.png')).catch(() => {});
   await wait(page, 1200);
   await go(page, '/'); await shot(page, 'dashboard');
   await go(page, '/settings'); await page.getByText('شعار المستشفى').first().scrollIntoViewIfNeeded(); await shot(page, 'settings-logo');

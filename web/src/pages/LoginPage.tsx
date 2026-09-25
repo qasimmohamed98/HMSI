@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Activity, ShieldCheck, HeartPulse, Stethoscope, Lock, User as UserIcon, LogIn } from 'lucide-react';
 import { Button, Input, Alert } from '@/components/ui';
 import { Logo } from '@/components/layout/Logo';
+import { QLockup } from '@/components/brand/QBrand';
 import { useAuth } from '@/lib/auth';
 import { API } from '@/lib/api';
 import { DEVELOPER } from '@/lib/developer';
@@ -54,10 +55,11 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-dvh bg-surface lg:grid-cols-2">
       {/* Brand panel */}
-      <div className="relative hidden overflow-hidden bg-gradient-to-br from-brand-800 via-brand-700 to-brand-950 text-white lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:26px_26px]" />
+      <div className="q-on-dark relative hidden overflow-hidden bg-[var(--q-ink)] text-white lg:flex lg:flex-col lg:justify-between lg:p-12">
+        {/* شبكة «مخطط الإنتاج» من هوية Q */}
+        <div className="pointer-events-none absolute inset-0 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:28px_28px]" />
         <div className="relative">
-          <Logo light />
+          <QLockup className="h-12" />
         </div>
         <div className="relative max-w-md">
           <h1 className="text-4xl font-extrabold leading-snug">{t('auth.heroTitle')}</h1>
@@ -76,7 +78,7 @@ export default function LoginPage() {
           </ul>
         </div>
         <p className="relative flex flex-wrap gap-3 text-sm text-white/60">
-          <span>© 2026 HMSI</span>
+          <span dir="ltr">© 2026 Q VIREXA</span>
           <Link to="/guide" className="hover:text-white">{t('nav.guide')}</Link>
           <Link to="/system" className="hover:text-white">{t('nav.aboutSystem')}</Link>
           <Link to="/about" className="hover:text-white">{t('nav.about')}</Link>

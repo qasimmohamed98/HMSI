@@ -16,7 +16,7 @@ export default function AboutPage() {
         <Skeleton className="h-64 w-full rounded-3xl" />
       ) : (
         <div className="space-y-6">
-          <section className="rounded-3xl bg-gradient-to-br from-brand-700 to-brand-900 px-6 py-10 text-white sm:px-10">
+          <section className="rounded-3xl bg-[var(--q-ink)] px-6 py-10 text-white sm:px-10">
             <p className="text-sm font-bold text-white/70">{t('nav.about')}</p>
             <h1 className="mt-1 text-3xl font-extrabold sm:text-4xl">{a.name}</h1>
             {a.tagline && <p className="mt-3 text-lg text-white/85">{a.tagline}</p>}
