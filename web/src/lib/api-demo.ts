@@ -1056,6 +1056,10 @@ export const demoApi: Api = {
   async publicPaymentInfo() {
     return { ...{ price: '', bank_name: '', account_name: '', account_number: '', phone: '', notes: '' }, trial_days: 14 };
   },
+  // التقارير التفصيلية تعمل على البيانات الفعلية فقط
+  async detailedReport(type, params) {
+    return { type, from: params.from, to: params.to, snapshot: false, columns: [{ key: 'patient', kind: 'text' as const }], rows: [], summary: [{ key: 'total', value: 0 }] };
+  },
   async getAbout() {
     return demoAbout;
   },

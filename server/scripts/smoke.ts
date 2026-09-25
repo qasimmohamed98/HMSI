@@ -421,6 +421,21 @@ console.log('\n— صفحة من نحن');
   check('التعديل ظاهر للزوار', (await anon.get('/public/about')).json.name === 'شركة الاختبار');
 }
 
+console.log('\n— التقارير التفصيلية');
+{
+  const range = 'from=2026-01-01&to=2026-12-31&tz=180';
+  for (const type of ['admissions', 'discharges', 'census', 'occupancy', 'lab', 'radiology', 'pharmacy', 'mar', 'diagnoses', 'doctors']) {
+    const r = await manager.get(`/reports/detail/${type}?${range}`);
+    check(`تقرير ${type}`, r.status === 200 && Array.isArray(r.json.rows) && r.json.columns.length > 0 && r.json.summary.length > 0, r.json);
+  }
+  const census = await manager.get(`/reports/detail/census?${range}`);
+  check('المنوّمون حالياً فيه صفوف فعلية', census.json.rows.length > 0 && census.json.rows.every((x: any) => x.patient && x.file_number));
+  const other = await admin2.get(`/reports/detail/admissions?${range}`);
+  check('التقرير معزول عن المستشفيات الأخرى', !other.json.rows.some((x: any) => x.patient === 'سارة أحمد يوسف'));
+  check('نوع تقرير غير معروف (404)', (await manager.get(`/reports/detail/xyz?${range}`)).status === 404);
+  check('المشاهد لا يرى التقارير (403)', (await viewer.get(`/reports/detail/admissions?${range}`)).status === 403);
+}
+
 console.log('\n— كلمات المرور');
 {
   const nurse2 = client(await login('nurse2'));

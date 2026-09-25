@@ -338,6 +338,23 @@ export interface AboutContent {
   website: string;
 }
 
+export type ReportType = 'admissions' | 'discharges' | 'census' | 'occupancy' | 'lab' | 'radiology' | 'pharmacy' | 'mar' | 'diagnoses' | 'doctors';
+export interface ReportColumn {
+  key: string;
+  kind: 'text' | 'number' | 'date' | 'datetime' | 'percent' | 'enum';
+  enumPrefix?: string;
+}
+/** تقرير تفصيلي: صفوف فعلية + ملخص */
+export interface DetailedReport {
+  type: ReportType;
+  from: string;
+  to: string;
+  snapshot: boolean;
+  columns: ReportColumn[];
+  rows: Record<string, string | number | null>[];
+  summary: { key: string; value: number | string }[];
+}
+
 export interface Api {
   mode: 'demo' | 'live';
   login(username: string, password: string): Promise<User>;
@@ -421,6 +438,7 @@ export interface Api {
   deleteAttachment(admissionId: string, attachmentId: string): Promise<void>;
   attachmentUrl(admissionId: string, attachmentId: string): string;
   reportsOverview(from: string, to: string): Promise<ReportOverview>;
+  detailedReport(type: ReportType, params: { from: string; to: string; department?: string; doctor?: string }): Promise<DetailedReport>;
   // المدير العام
   listHospitals(): Promise<HospitalListItem[]>;
   createHospital(input: CreateHospitalInput): Promise<Hospital>;

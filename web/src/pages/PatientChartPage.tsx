@@ -6,8 +6,9 @@ import { hasPermission, type ChartSection, type Permission } from '@hmsi/shared'
 import { useAuth } from '@/lib/auth';
 import { API } from '@/lib/api';
 import { Card, CardContent, Skeleton, EmptyState, Alert, Select, Button } from '@/components/ui';
-import { Printer, Tag } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import { printWristband } from '@/lib/labels';
+import { PrintMenu } from '@/features/patient/PrintMenu';
 import { fmtDate, fmtDateTime, localName } from '@/lib/format';
 import { PatientHeader } from '@/features/patient/PatientHeader';
 import { OverviewSection } from '@/features/patient/sections/OverviewSection';
@@ -172,9 +173,7 @@ export default function PatientChartPage() {
             {t('labels.wristband')}
           </Button>
         )}
-        <Button size="sm" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>
-          {t('ui.printSection')}
-        </Button>
+        <PrintMenu chart={chart} />
       </div>
 
       {/* ترويسة الورق فقط: القسم المطبوع ووقت الطباعة ومن طبعه */}

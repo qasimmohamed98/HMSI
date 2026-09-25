@@ -289,6 +289,12 @@ export const liveApi: Api = {
   },
   deleteAttachment: (admissionId, attachmentId) => request(`/patients/${admissionId}/attachments/${attachmentId}`, { method: 'DELETE' }),
   attachmentUrl: (admissionId, attachmentId) => `${BASE}/patients/${admissionId}/attachments/${attachmentId}`,
+  detailedReport: (type, params) => {
+    const qs = new URLSearchParams({ from: params.from, to: params.to, tz: String(-new Date().getTimezoneOffset()) });
+    if (params.department) qs.set('department', params.department);
+    if (params.doctor) qs.set('doctor', params.doctor);
+    return request(`/reports/detail/${type}?${qs}`);
+  },
   reportsOverview: (from, to) => {
     const qs = new URLSearchParams({ from, to });
     return request(`/reports/overview?${qs}`);

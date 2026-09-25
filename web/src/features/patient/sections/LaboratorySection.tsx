@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, FlaskConical, PenLine, Trash2, Tag } from 'lucide-react';
+import { Plus, FlaskConical, PenLine, Trash2, Tag, Printer } from 'lucide-react';
 import { printSpecimenLabel } from '@/lib/labels';
+import { printLabReport } from '../printChart';
+import { useAuth } from '@/lib/auth';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type LabInput, type ChartData, type LabResultInput } from '@/lib/api';
@@ -12,6 +14,7 @@ import { useToast, useConfirm } from '@/components/ui';
 /** canOrder: طلب فحص (الطبيب) — canResult: إدخال النتائج (فني المختبر) */
 export function LaboratorySection({ chart, canOrder, canResult }: { chart: ChartData; canOrder: boolean; canResult: boolean }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const confirm = useConfirm();
   const qc = useQueryClient();
   const toast = useToast();
@@ -53,11 +56,18 @@ export function LaboratorySection({ chart, canOrder, canResult }: { chart: Chart
     <SectionCard
       title={t('laboratory.title')}
       action={
-        canAdd && chart.admissionId ? (
-          <Button size="sm" variant="secondary" onClick={() => setOpen(true)} icon={<Plus className="h-4 w-4" />}>
-            {canResult ? t('laboratory.addResult') : t('orders.labOrder')}
-          </Button>
-        ) : undefined
+        <div className="flex gap-2">
+          {chart.labs.some((l) => l.result) && (
+            <Button size="sm" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => printLabReport(chart, t, user)}>
+              {t('print.labReport')}
+            </Button>
+          )}
+          {canAdd && chart.admissionId && (
+            <Button size="sm" variant="secondary" onClick={() => setOpen(true)} icon={<Plus className="h-4 w-4" />}>
+              {canResult ? t('laboratory.addResult') : t('orders.labOrder')}
+            </Button>
+          )}
+        </div>
       }
     >
       {chart.labs.length === 0 ? (

@@ -7,10 +7,12 @@ import { SectionCard, EmptyLine } from './SectionCard';
 import { API, type DischargeInput, type ChartData } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { fmtDateTime } from '@/lib/format';
-import { printDischargeSummary } from './printDischarge';
+import { printDischargeSummary } from '../printChart';
+import { useAuth } from '@/lib/auth';
 
 export function DischargeSection({ chart, canDischarge }: { chart: ChartData; canDischarge: boolean }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -60,7 +62,7 @@ export function DischargeSection({ chart, canDischarge }: { chart: ChartData; ca
               <p className="mt-1 whitespace-pre-wrap text-sm text-ink/85">{chart.patient.admission.discharge_summary}</p>
             </div>
           )}
-          <Button className="mt-3" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => printDischargeSummary(chart, t)}>
+          <Button className="mt-3" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => printDischargeSummary(chart, t, user)}>
             {t('ui.printSummary')}
           </Button>
         </div>

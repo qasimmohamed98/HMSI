@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, ScanLine, PenLine, Trash2 } from 'lucide-react';
+import { Plus, ScanLine, PenLine, Trash2, Printer } from 'lucide-react';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
+import { printRadiologyReport } from '../printChart';
+import { useAuth } from '@/lib/auth';
 import { API, type RadiologyInput, type RadiologyUpdateInput, type ChartData } from '@/lib/api';
 import { fmtDateTime } from '@/lib/format';
 import { useToast, useConfirm } from '@/components/ui';
@@ -11,6 +13,7 @@ import { useToast, useConfirm } from '@/components/ui';
 /** canOrder: طلب أشعة (الطبيب) — canResult: كتابة التقرير (فني الأشعة) */
 export function RadiologySection({ chart, canOrder, canResult }: { chart: ChartData; canOrder: boolean; canResult: boolean }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const confirm = useConfirm();
   const qc = useQueryClient();
   const toast = useToast();
@@ -49,11 +52,18 @@ export function RadiologySection({ chart, canOrder, canResult }: { chart: ChartD
     <SectionCard
       title={t('radiology.title')}
       action={
-        canAdd && chart.admissionId ? (
-          <Button size="sm" variant="secondary" onClick={() => setOpen(true)} icon={<Plus className="h-4 w-4" />}>
-            {canResult ? t('radiology.add') : t('orders.radOrder')}
-          </Button>
-        ) : undefined
+        <div className="flex gap-2">
+          {chart.radiology.some((r) => r.report) && (
+            <Button size="sm" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => printRadiologyReport(chart, t, user)}>
+              {t('print.radReport')}
+            </Button>
+          )}
+          {canAdd && chart.admissionId && (
+            <Button size="sm" variant="secondary" onClick={() => setOpen(true)} icon={<Plus className="h-4 w-4" />}>
+              {canResult ? t('radiology.add') : t('orders.radOrder')}
+            </Button>
+          )}
+        </div>
       }
     >
       {chart.radiology.length === 0 ? (
@@ -76,6 +86,11 @@ export function RadiologySection({ chart, canOrder, canResult }: { chart: ChartD
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={r.report ? 'success' : 'warning'}>{r.report ? t('laboratory.statuses.resulted') : t('laboratory.statuses.ordered')}</Badge>
+                  {r.report && (
+                    <Button size="icon-sm" variant="ghost" aria-label={t('print.radReport')} title={t('print.radReport')} onClick={() => printRadiologyReport(chart, t, user, r.id)}>
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  )}
                   {chart.admissionId && (
                     <>
                       {canResult && !r.report && (
