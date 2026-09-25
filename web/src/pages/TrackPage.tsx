@@ -80,7 +80,11 @@ export default function TrackPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="flex items-center gap-2 font-bold text-ink">
-                    <Building2 className="h-5 w-5 text-brand-600" />
+                    {data.hospital.logo_url ? (
+                      <img src={data.hospital.logo_url} alt="" className="h-9 w-9 rounded-lg bg-white object-contain ring-1 ring-ink/10" />
+                    ) : (
+                      <Building2 className="h-5 w-5 text-brand-600" />
+                    )}
                     {name(data.hospital)}
                   </p>
                   <Badge variant={data.occupied ? 'success' : 'neutral'} dot>

@@ -9,12 +9,15 @@ import { SidebarNav } from './SidebarNav';
 import { TopBar } from './TopBar';
 import { BottomNav } from './BottomNav';
 import { useMediaQuery } from '@/lib/use-media';
+import { useAuth } from '@/lib/auth';
+import { localName } from '@/lib/format';
 
 export function AppShell() {
   const { t } = useTranslation();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
 
   return (
     <div className="flex min-h-dvh bg-surface text-ink">
@@ -27,7 +30,7 @@ export function AppShell() {
           )}
         >
           <div className={cn('flex h-16 items-center border-b border-ink/8 px-4 dark:border-white/10', collapsed && 'justify-center px-2')}>
-            <Logo compact={collapsed} />
+            <Logo compact={collapsed} src={user?.hospital_logo_url} title={localName(user, 'hospital_name')} />
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-4">
             <SidebarNav />
@@ -67,7 +70,7 @@ export function AppShell() {
           />
           <div className="absolute inset-y-0 start-0 flex w-[290px] max-w-[85vw] flex-col bg-surface-raised shadow-float animate-slide-end dark:bg-surface-raised">
             <div className="flex h-16 items-center justify-between border-b border-ink/8 px-4 dark:border-white/10">
-              <Logo />
+              <Logo src={user?.hospital_logo_url} title={localName(user, 'hospital_name')} />
               <Button variant="ghost" size="icon-sm" onClick={() => setDrawerOpen(false)} aria-label="إغلاق">
                 <X className="h-5 w-5" />
               </Button>

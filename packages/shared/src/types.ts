@@ -155,6 +155,8 @@ export interface User {
   created_at: string;
   /** المستشفى الأصلي للمستخدم (يختلف عن hospital_id عندما يتصفح المدير العام مستشفى آخر) */
   home_hospital_id?: string;
+  /** رابط شعار المستشفى النشط (null = لا شعار) */
+  hospital_logo_url?: string | null;
 }
 
 export interface PublicUser {
@@ -481,6 +483,7 @@ export interface Hospital {
   code: string;
   is_active: boolean;
   created_at: string;
+  logo_url?: string | null;
 }
 
 export interface Department {
@@ -500,7 +503,7 @@ export interface UnassignedPatient {
 
 /** ما يراه أي شخص يمسح QR السرير — بدون أي بيانات طبية أو اسم كامل */
 export interface PublicTrackInfo {
-  hospital: { name_ar: string; name_en: string };
+  hospital: { name_ar: string; name_en: string; logo_url?: string | null };
   department: { name_ar: string; name_en: string } | null;
   ward: { name_ar: string; name_en: string } | null;
   room: string;

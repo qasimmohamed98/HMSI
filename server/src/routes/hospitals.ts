@@ -4,7 +4,8 @@ import { getSession, requireAuth, requirePermission } from '../middleware/auth.j
 import { parseBody } from '../lib/validate.js';
 import { writeAudit } from '../lib/audit.js';
 import { clientIp } from '../config.js';
-import { listHospitals, createHospital, createHospitalAdmin, getHospital, updateHospital, setActiveHospital } from '../repos/hospitalRepo.js';
+import { listHospitals, createHospital, createHospitalAdmin, getHospital, updateHospital, setActiveHospital, setHospitalLogo, clearHospitalLogo, MAX_LOGO_BYTES } from '../repos/hospitalRepo.js';
+import { contentMatchesMime } from './attachments.js';
 
 export const hospitalRoutes = new Hono();
 
@@ -24,6 +25,25 @@ hospitalRoutes.patch('/me', requireAuth(), requirePermission('settings.manage'),
   const hospital = await updateHospital(session.user.hospital_id, input);
   if (!hospital) return c.json({ message: 'المستشفى غير موجود' }, 404);
   await writeAudit({ actorId: session.user.id, action: 'settings_changed', resourceType: 'hospital', resourceId: hospital.id, meta: input, ip: clientIp(c) });
+  return c.json(hospital, 200);
+});
+
+/** رفع شعار المستشفى (multipart: file) */
+hospitalRoutes.post('/me/logo', requireAuth(), requirePermission('settings.manage'), async (c) => {
+  const session = getSession(c)!;
+  if (Number(c.req.header('content-length') ?? 0) > MAX_LOGO_BYTES + 64 * 1024) return c.json({ message: 'حجم الشعار يتجاوز 300 كيلوبايت' }, 413);
+  const form = await c.req.formData();
+  const file = form.get('file');
+  if (!(file instanceof File) || file.size === 0) return c.json({ message: 'الملف مطلوب' }, 400);
+  const hospital = await setHospitalLogo(session.user.hospital_id, new Uint8Array(await file.arrayBuffer()), file.type, contentMatchesMime);
+  await writeAudit({ actorId: session.user.id, action: 'hospital_logo_changed', resourceType: 'hospital', resourceId: session.user.hospital_id, ip: clientIp(c) });
+  return c.json(hospital, 200);
+});
+
+hospitalRoutes.delete('/me/logo', requireAuth(), requirePermission('settings.manage'), async (c) => {
+  const session = getSession(c)!;
+  const hospital = await clearHospitalLogo(session.user.hospital_id);
+  await writeAudit({ actorId: session.user.id, action: 'hospital_logo_removed', resourceType: 'hospital', resourceId: session.user.hospital_id, ip: clientIp(c) });
   return c.json(hospital, 200);
 });
 

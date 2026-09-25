@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { FamilyPinSchema } from '@hmsi/shared/validate';
 import { getPublicTrack, getFamilyTrack } from '../repos/trackRepo.js';
+import { getHospitalLogo } from '../repos/hospitalRepo.js';
 import { isBruteForced, recordLoginAttempt } from '../middleware/security.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit } from '../lib/audit.js';
@@ -15,6 +16,16 @@ import { clientIp } from '../config.js';
 export const publicTrackRoutes = new Hono();
 
 const CODE_RE = /^[a-z0-9]{6,32}$/i;
+
+publicTrackRoutes.get('/hospitals/:id/logo', async (c) => {
+  const logo = await getHospitalLogo(c.req.param('id'));
+  if (!logo) return c.json({ message: 'لا يوجد شعار' }, 404);
+  return c.body(new Uint8Array(logo.data), 200, {
+    'Content-Type': logo.mime,
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Content-Security-Policy': "default-src 'none'",
+  });
+});
 
 publicTrackRoutes.get('/track/:code', async (c) => {
   const code = c.req.param('code');

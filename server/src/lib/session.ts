@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 import type { Context } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { db } from '../../db/index.js';
+import { logoUrl } from './logo.js';
 import { COOKIE_CSRF, COOKIE_SESSION, HEADER_CSRF, SESSION_TTL_MS, env, isHttps, isSameOrigin } from '../config.js';
 import type { User } from '@hmsi/shared';
 
@@ -78,7 +79,7 @@ export async function currentSession(ctx: Context): Promise<SessionUser | null> 
   const rows = await db.execute({
     sql: `SELECT s.id AS session_id, s.csrf_token,
                  u.id, u.hospital_id AS home_hospital_id, u.username, u.full_name_ar, u.full_name_en, u.email, u.role, u.is_active, u.created_at,
-                 h.id AS hospital_id, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.is_active AS hospital_active
+                 h.id AS hospital_id, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.is_active AS hospital_active, h.logo_updated_at AS hospital_logo_updated_at
           FROM sessions s
           JOIN users u ON u.id = s.user_id
           JOIN hospitals h ON h.id = COALESCE(s.active_hospital_id, u.hospital_id)
@@ -106,6 +107,7 @@ export async function currentSession(ctx: Context): Promise<SessionUser | null> 
       role,
       is_active: Boolean(r.is_active),
       created_at: String(r.created_at),
+      hospital_logo_url: logoUrl(r.hospital_id, r.hospital_logo_updated_at),
     },
   };
 }

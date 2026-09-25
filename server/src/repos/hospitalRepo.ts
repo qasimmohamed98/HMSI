@@ -3,6 +3,7 @@ import type { Hospital, HospitalListItem, HospitalAdminInfo } from '@hmsi/shared
 import { db, uuid } from '../../db/index.js';
 import { hashPassword } from '../lib/password.js';
 import { HttpConflict, HttpError, isUniqueViolation } from '../lib/errors.js';
+import { logoUrl } from '../lib/logo.js';
 
 type Row = Record<string, unknown>;
 
@@ -14,6 +15,7 @@ function mapHospital(r: Row): Hospital {
     code: String(r.code),
     is_active: r.is_active === undefined ? true : Boolean(Number(r.is_active)),
     created_at: String(r.created_at),
+    logo_url: logoUrl(r.id, r.logo_updated_at),
   };
 }
 
@@ -102,4 +104,30 @@ export async function createHospitalAdmin(
 /** المدير العام يعمل داخل مستشفى آخر؛ null = العودة لمستشفاه الأصلي */
 export async function setActiveHospital(sessionId: string, hospitalId: string | null): Promise<void> {
   await db.execute({ sql: `UPDATE sessions SET active_hospital_id = ? WHERE id = ?`, args: [hospitalId, sessionId] });
+}
+
+const LOGO_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export const MAX_LOGO_BYTES = 300 * 1024;
+
+/** يحفظ شعار المستشفى بعد التحقق من النوع الفعلي والحجم */
+export async function setHospitalLogo(id: string, bytes: Uint8Array, mime: string, matches: (b: Uint8Array, m: string) => boolean): Promise<Hospital | null> {
+  if (!(LOGO_MIME as readonly string[]).includes(mime) || !matches(bytes, mime)) throw new HttpError('الشعار يجب أن يكون صورة PNG أو JPEG أو WEBP', 415);
+  if (bytes.length > MAX_LOGO_BYTES) throw new HttpError('حجم الشعار يتجاوز 300 كيلوبايت', 413);
+  await db.execute({
+    sql: `UPDATE hospitals SET logo_data = ?, logo_mime = ?, logo_updated_at = ? WHERE id = ?`,
+    args: [Buffer.from(bytes).toString('base64'), mime, new Date().toISOString(), id],
+  });
+  return getHospital(id);
+}
+
+export async function clearHospitalLogo(id: string): Promise<Hospital | null> {
+  await db.execute({ sql: `UPDATE hospitals SET logo_data = NULL, logo_mime = NULL, logo_updated_at = NULL WHERE id = ?`, args: [id] });
+  return getHospital(id);
+}
+
+export async function getHospitalLogo(id: string): Promise<{ data: Buffer; mime: string } | null> {
+  const rows = await db.execute({ sql: `SELECT logo_data, logo_mime FROM hospitals WHERE id = ? AND logo_data IS NOT NULL LIMIT 1`, args: [id] });
+  const r = rows.rows[0] as Row | undefined;
+  if (!r) return null;
+  return { data: Buffer.from(String(r.logo_data), 'base64'), mime: String(r.logo_mime) };
 }

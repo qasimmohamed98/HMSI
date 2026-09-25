@@ -12,7 +12,8 @@ export function securityHeaders(): MiddlewareHandler {
     c.header('X-Frame-Options', 'DENY');
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    c.header('Cache-Control', 'no-store');
+    // المسارات التي تضبط كاشها صراحة (مثل الشعار العام) تحتفظ به؛ الباقي لا يُخزَّن
+    if (!c.res.headers.get('Cache-Control')) c.header('Cache-Control', 'no-store');
     if (isHttps(c)) {
       c.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
     }

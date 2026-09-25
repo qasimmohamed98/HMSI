@@ -373,6 +373,9 @@ export interface Api {
   bedOccupant(bedId: string): Promise<{ admission_id: string; patient_id: string; patient_name_ar: string } | null>;
   hospitalProfile(): Promise<Hospital>;
   updateHospital(input: HospitalProfileInput): Promise<Hospital>;
+  /** شعار المستشفى: PNG/JPEG/WEBP حتى 300KB */
+  uploadHospitalLogo(file: File): Promise<Hospital>;
+  removeHospitalLogo(): Promise<Hospital>;
   listUsers(): Promise<User[]>;
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
   resetUserPassword(userId: string, password: string): Promise<void>;

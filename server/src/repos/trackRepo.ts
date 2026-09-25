@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { PublicTrackInfo, PublicTrackFamily, FamilyShareCategory } from '@hmsi/shared';
 import { FAMILY_SHARE_CATEGORIES } from '@hmsi/shared';
 import { parseShare } from './patientRepo.js';
+import { logoUrl } from '../lib/logo.js';
 import { db } from '../../db/index.js';
 
 type Row = Record<string, unknown>;
@@ -25,7 +26,7 @@ async function loadBedContext(code: string): Promise<BedContext | null> {
     sql: `SELECT b.id, b.room, b.bed_no,
                  w.name_ar AS ward_name_ar, w.name_en AS ward_name_en,
                  d.name_ar AS department_name_ar, d.name_en AS department_name_en,
-                 h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en
+                 h.id AS hospital_id, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.logo_updated_at AS hospital_logo_updated_at
           FROM beds b
           JOIN wards w ON w.id = b.ward_id
           JOIN departments d ON d.id = w.department_id
@@ -50,7 +51,7 @@ async function loadBedContext(code: string): Promise<BedContext | null> {
   const adm = admRows.rows[0] as Row | undefined;
 
   const info: PublicTrackInfo = {
-    hospital: { name_ar: String(bed.hospital_name_ar), name_en: String(bed.hospital_name_en) },
+    hospital: { name_ar: String(bed.hospital_name_ar), name_en: String(bed.hospital_name_en), logo_url: logoUrl(bed.hospital_id, bed.hospital_logo_updated_at) },
     department: { name_ar: String(bed.department_name_ar), name_en: String(bed.department_name_en) },
     ward: { name_ar: String(bed.ward_name_ar), name_en: String(bed.ward_name_en) },
     room: String(bed.room),

@@ -358,6 +358,26 @@ console.log('\n— سلة المحذوفات والاستعادة');
   check('إلغاء الأرشفة يعيده للقائمة', ((await manager.get('/patients?search=' + encodeURIComponent('مريض للأرشفة'))).json as any[]).length === 1);
 }
 
+console.log('\n— شعار المستشفى');
+{
+  const { readFileSync } = await import('node:fs');
+  const png = readFileSync(new URL('../../web/public/icons/icon-192.png', import.meta.url));
+  const s = await login('manager');
+  const up = async (bytes: Uint8Array, name: string, type: string) => {
+    const fd = new FormData();
+    fd.append('file', new File([Buffer.from(bytes)], name, { type }));
+    return api.request(`${BASE}/hospitals/me/logo`, { method: 'POST', headers: { cookie: s.cookie, 'x-csrf-token': s.csrf }, body: fd });
+  };
+  const r = await up(new Uint8Array(png), 'logo.png', 'image/png');
+  const h = (await r.json()) as { logo_url: string };
+  check('رفع شعار المستشفى', r.status === 200 && /^\/api\/public\/hospitals\/h-1\/logo\?v=/.test(h.logo_url), h);
+  const pub = await api.request(`http://localhost${h.logo_url}`);
+  check('الشعار عام ومخزّن مؤقتاً', pub.status === 200 && pub.headers.get('content-type') === 'image/png' && (pub.headers.get('cache-control') ?? '').includes('immutable'));
+  check('صورة مزوّرة مرفوضة (415)', (await up(new TextEncoder().encode('<svg onload=alert(1)>'), 'x.png', 'image/png')).status === 415);
+  check('الطبيب لا يغيّر الشعار (403)', (await doctor.del('/hospitals/me/logo')).status === 403);
+  check('الشعار في بيانات المستخدم', typeof (await manager.get('/auth/me')).json.hospital_logo_url === 'string');
+}
+
 console.log('\n— كلمات المرور');
 {
   const nurse2 = client(await login('nurse2'));

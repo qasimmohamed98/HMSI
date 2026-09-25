@@ -476,6 +476,15 @@ export const en: Dict = {
     privacy: 'To protect patient privacy, only what the care team chooses to share appears here. Please contact the medical staff about the patient\'s condition.',
     refresh: 'Refresh',
   },
+  logo: {
+    title: 'Hospital logo',
+    hint: 'Shown in the sidebar, the family tracking page and all printouts. PNG, JPEG or WEBP up to 300 KB — a square image with a transparent background works best.',
+    upload: 'Upload logo',
+    change: 'Change',
+    remove: 'Remove',
+    badType: 'The logo must be a PNG, JPEG or WEBP image',
+    tooBig: 'The logo exceeds 300 KB',
+  },
   trash: {
     title: 'Trash',
     subtitleManager: 'Nothing is deleted permanently. Restore any deleted item and review restore requests from staff.',

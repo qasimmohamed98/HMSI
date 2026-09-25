@@ -272,6 +272,12 @@ export const liveApi: Api = {
       }),
     }),
   listDoctors: () => request('/doctors'),
+  uploadHospitalLogo: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request('/hospitals/me/logo', { method: 'POST', body: form });
+  },
+  removeHospitalLogo: () => request('/hospitals/me/logo', { method: 'DELETE' }),
   uploadAttachment: (admissionId, file) => {
     const form = new FormData();
     form.append('file', file);

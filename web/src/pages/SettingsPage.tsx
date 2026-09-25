@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil, KeyRound } from 'lucide-react';
+import { Languages, Moon, Sun, ShieldCheck, Hospital, Pencil, KeyRound, ImagePlus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Dialog, Input, Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useTheme } from '@/lib/theme';
@@ -98,6 +98,7 @@ export default function SettingsPage() {
           {!hospital ? (
             <Skeleton className="h-16 w-full rounded-xl" />
           ) : (
+            <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-muted/70 p-4 dark:bg-white/5">
               <div className="min-w-0">
                 <p className="truncate font-bold text-ink">{hospital.name_ar}</p>
@@ -115,6 +116,8 @@ export default function SettingsPage() {
                   </Button>
                 )}
               </div>
+            </div>
+            <LogoCard logoUrl={hospital.logo_url ?? null} canEdit={canEdit} />
             </div>
           )}
         </CardContent>
@@ -246,5 +249,54 @@ function ChangePasswordCard() {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+/** شعار المستشفى: يظهر في القائمة الجانبية وصفحة ذوي المريض والطباعة */
+function LogoCard({ logoUrl, canEdit }: { logoUrl: string | null; canEdit: boolean }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { refresh } = useAuth();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const done = async () => {
+    await qc.invalidateQueries({ queryKey: ['hospital'] });
+    await refresh();
+    toast.success(t('common.done'));
+  };
+  const upload = useMutation({ mutationFn: (f: File) => API.uploadHospitalLogo(f), onSuccess: done });
+  const remove = useMutation({ mutationFn: () => API.removeHospitalLogo(), onSuccess: done });
+
+  const onPick = (f: File | undefined) => {
+    if (inputRef.current) inputRef.current.value = '';
+    if (!f) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(f.type)) return toast.error(t('logo.badType'));
+    if (f.size > 300 * 1024) return toast.error(t('logo.tooBig'));
+    upload.mutate(f);
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-4 rounded-xl border border-dashed border-ink/15 p-4 dark:border-white/15">
+      <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-ink/10">
+        {logoUrl ? <img src={logoUrl} alt={t('logo.title')} className="h-full w-full object-contain" /> : <Hospital className="h-8 w-8 text-ink/25" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-bold text-ink">{t('logo.title')}</p>
+        <p className="text-xs text-ink/55">{t('logo.hint')}</p>
+      </div>
+      {canEdit && (
+        <div className="flex gap-2">
+          <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => onPick(e.target.files?.[0])} />
+          <Button size="sm" variant="secondary" icon={<ImagePlus className="h-4 w-4" />} loading={upload.isPending} onClick={() => inputRef.current?.click()}>
+            {logoUrl ? t('logo.change') : t('logo.upload')}
+          </Button>
+          {logoUrl && (
+            <Button size="sm" variant="ghost" className="text-danger-600" icon={<Trash2 className="h-4 w-4" />} loading={remove.isPending} onClick={() => remove.mutate()}>
+              {t('logo.remove')}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

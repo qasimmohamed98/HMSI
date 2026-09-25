@@ -411,4 +411,12 @@ CREATE INDEX IF NOT EXISTS idx_trash_hospital ON trash(hospital_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_trash_record ON trash(table_name, record_id);
 `,
   },
+  {
+    id: "011_hospital_logo.sql",
+    sql: `-- 011 — شعار المستشفى (يُخزَّن في القاعدة كباقي الملفات، بحد 300KB، PNG/JPEG/WEBP)
+ALTER TABLE hospitals ADD COLUMN logo_data TEXT;
+ALTER TABLE hospitals ADD COLUMN logo_mime TEXT;
+ALTER TABLE hospitals ADD COLUMN logo_updated_at TEXT;
+`,
+  },
 ];

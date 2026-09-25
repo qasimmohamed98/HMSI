@@ -667,6 +667,26 @@ export const demoApi: Api = {
     return { ...store.hospital, id: store.hospital.id };
   },
 
+  async uploadHospitalLogo(file: File): Promise<Hospital> {
+    const url = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error('تعذّرت قراءة الملف'));
+      r.readAsDataURL(file);
+    });
+    (store.hospital as Hospital).logo_url = url;
+    store.users.forEach((u) => u.hospital_id === store.hospital.id && (u.hospital_logo_url = url));
+    if (store.currentUser) store.currentUser.hospital_logo_url = url;
+    return { ...store.hospital };
+  },
+
+  async removeHospitalLogo(): Promise<Hospital> {
+    (store.hospital as Hospital).logo_url = null;
+    store.users.forEach((u) => u.hospital_id === store.hospital.id && (u.hospital_logo_url = null));
+    if (store.currentUser) store.currentUser.hospital_logo_url = null;
+    return { ...store.hospital };
+  },
+
   async updateHospital(input: HospitalProfileInput): Promise<Hospital> {
     await delay(200);
     store.hospital.name_ar = input.nameAr;
