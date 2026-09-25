@@ -43,30 +43,16 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-const ADMIN_PERMISSIONS: readonly Permission[] = [
-  'users.manage',
-  'patients.create',
-  'patients.update',
-  'patients.archive',
-  'patients.view',
-  'chart.view',
-  'admissions.manage',
-  'discharge.approve',
-  'departments.manage',
-  'wards.manage',
-  'settings.manage',
-  'audit.view',
-  'reports.view',
-  'files.manage',
-];
-
 /**
- * المدير العام (super_admin) = صلاحيات مدير المستشفى + إدارة المستشفيات.
- * لا يملك صلاحيات سريرية (كتابة ملاحظات/أدوية/نتائج) — مبدأ أقل صلاحية.
- * يستطيع التبديل إلى أي مستشفى والعمل فيه كمدير.
+ * قرار صاحب المشروع (2026-09-25، يحل محل D4):
+ * - مدير المستشفى (admin): كل الصلاحيات داخل مستشفاه، بما فيها السريرية (الملاحظات، الأدوية، النتائج، الصرف، مشاركة العائلة).
+ * - مدير النظام (super_admin): كل الصلاحيات + إدارة المستشفيات، ويعمل داخل أي مستشفى يبدّل إليه.
+ * عزل المستشفيات يبقى كما هو: كل عملية مقيّدة بالمستشفى النشط في الجلسة.
  */
+const ADMIN_PERMISSIONS: readonly Permission[] = PERMISSIONS.filter((p) => p !== 'hospitals.manage');
+
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  super_admin: [...ADMIN_PERMISSIONS, 'hospitals.manage'],
+  super_admin: PERMISSIONS,
   admin: ADMIN_PERMISSIONS,
   doctor: [
     'patients.create',
