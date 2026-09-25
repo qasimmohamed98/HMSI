@@ -820,6 +820,26 @@ check('seed بتوكن خاطئ = 404', (await api.request(`${BASE}/__staff/seed
   env.seedToken = '';
 }
 
+console.log('\n— تهيئة مستشفى جديد: أقسام وردهات وأسرّة');
+{
+  const a2 = client(await login('admin2'));
+  const dep = await a2.post('/org/departments', { name_ar: 'قسم الطوارئ', name_en: 'Emergency' });
+  check('مدير المستشفى يضيف قسماً', dep.status === 201, dep.json);
+  const ward = await a2.post('/org/wards', { department_id: dep.json.id, name_ar: 'ردهة الطوارئ', name_en: 'ER ward', ward_type: 'mixed' });
+  check('يضيف ردهة', ward.status === 201, ward.json);
+  const bed = await a2.post('/org/beds', { ward_id: ward.json.id, room: 'ER-1', bed_no: 'B1' });
+  check('يضيف سريراً (201)', bed.status === 201 && bed.json.status === 'free' && Boolean(bed.json.code), bed.json);
+  const bed2 = await a2.post('/org/beds', { ward_id: ward.json.id, room: 'ER-1', bed_no: 'B2' });
+  check('يضيف سريراً ثانياً', bed2.status === 201);
+  check('السرير يظهر في الردهات', (await a2.get('/wards')).json.some((w: any) => w.id === ward.json.id && w.beds.length === 2));
+  check('يعدّل السرير', (await a2.patch(`/org/beds/${bed.json.id}`, { bed_no: 'B1A' })).status === 200);
+  check('يحذف السرير (إلى المحذوفات)', (await a2.del(`/org/beds/${bed2.json.id}`)).status === 204);
+  check('يعدّل الردهة', (await a2.patch(`/org/wards/${ward.json.id}`, { name_ar: 'ردهة الطوارئ العامة' })).status === 200);
+  check('يعدّل القسم', (await a2.patch(`/org/departments/${dep.json.id}`, { name_en: 'Emergency Dept' })).status === 200);
+  const h1Ward = (await manager.get('/wards')).json[0].id;
+  check('لا يضيف سريراً في ردهة مستشفى آخر', (await a2.post('/org/beds', { ward_id: h1Ward, room: 'X', bed_no: 'X' })).status === 409);
+}
+
 console.log('\n— حذف بيانات التجربة والمستشفيات (آخر الاختبارات: يمسح البيانات)');
 {
   const sa = client(await login('admin'));

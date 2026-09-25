@@ -133,7 +133,7 @@ async function getWardById(id: string, hospitalId: string): Promise<Ward | null>
 }
 
 export async function createBed(input: { ward_id: string; room: string; bed_no: string }, hospitalId: string): Promise<Bed> {
-  const rows = await db.execute({ sql: `SELECT id FROM wards w JOIN departments d ON d.id = w.department_id WHERE w.id = ? AND d.hospital_id = ? LIMIT 1`, args: [input.ward_id, hospitalId] });
+  const rows = await db.execute({ sql: `SELECT w.id FROM wards w JOIN departments d ON d.id = w.department_id WHERE w.id = ? AND d.hospital_id = ? LIMIT 1`, args: [input.ward_id, hospitalId] });
   if (rows.rows.length === 0) throw new HttpConflict('الردهة غير موجودة');
   const id = uuid('bed');
   const code = generateBedCode();
