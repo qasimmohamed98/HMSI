@@ -1,0 +1,23 @@
+[Unit]
+Description=Q VIREXA (HMSI) API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hmsi
+Group=hmsi
+WorkingDirectory=/opt/hmsi/app/server
+EnvironmentFile=/etc/hmsi/hmsi.env
+ExecStart=/usr/bin/node dist/src/main.js
+Restart=always
+RestartSec=3
+# عزل: الخدمة تكتب فقط في مجلد البيانات
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hmsi
+
+[Install]
+WantedBy=multi-user.target

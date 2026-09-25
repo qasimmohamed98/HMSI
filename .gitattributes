@@ -1,0 +1,6 @@
+# سكربتات الخادم تعمل على Linux: نهايات أسطر LF دائماً
+deploy/**/*.sh text eol=lf
+deploy/**/*.conf text eol=lf
+deploy/**/*.service text eol=lf
+deploy/**/*.timer text eol=lf
+deploy/*.example text eol=lf

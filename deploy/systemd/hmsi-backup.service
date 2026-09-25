@@ -1,0 +1,15 @@
+[Unit]
+Description=Q VIREXA daily database backup
+
+[Service]
+Type=oneshot
+User=hmsi
+Group=hmsi
+WorkingDirectory=/opt/hmsi/app/server
+EnvironmentFile=/etc/hmsi/hmsi.env
+ExecStart=/usr/bin/node dist/scripts/backup-cron.js
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hmsi
