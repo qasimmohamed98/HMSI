@@ -8,11 +8,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./validate": {
       "types": "./dist/validate.d.ts",
-      "import": "./dist/validate.js"
+      "import": "./dist/validate.js",
+      "default": "./dist/validate.js"
     }
   },
   "scripts": {
