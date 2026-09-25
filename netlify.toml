@@ -1,55 +1,29 @@
-# النشر على Netlify: الواجهة (web/dist) + الـ API كـ Netlify Function على /api/*
-# متغيرات البيئة المطلوبة في لوحة Netlify (Site settings → Environment variables):
-#   TURSO_URL, TURSO_AUTH_TOKEN, SESSION_SECRET (إلزامي), SEED_TOKEN (اختياري للصيانة)
-#   BACKUP_KEY (موصى به): يشفّر النسخ الاحتياطية اليومية — احفظ قيمته خارج Netlify، بدونه لا تُفك النسخ
-# الدالة المجدولة netlify/functions/backup-daily.ts تنسخ القاعدة يومياً إلى Netlify Blobs (آخر 30 نسخة)
+# ⚠ النظام انتقل إلى Hostinger: https://virexa.qproductshub.tech (deploy/README-hostinger.md)
+# هذا الموقع على Netlify يبقى فقط لتحويل الزوار القدامى:
+# - sw.js يمسح النسخة المحفوظة لدى من فتح النظام سابقاً وينقله للعنوان الجديد
+# - كل المسارات الأخرى (ومنها /api) تحويل دائم 301
+# الدوال معطّلة عمداً (لا API ولا نسخ مجدولة على Turso بعد الآن).
 
 [build]
-  command = "npm run build"
-  publish = "web/dist"
+  command = "echo 'moved to Hostinger'"
+  publish = "netlify/moved"
 
-  [build.environment]
-    NODE_VERSION = "22"
-    # الواجهة تتصل بالـ API الحقيقي (وليس بيانات العرض التوضيحي)
-    VITE_API_MODE = "live"
-
-# توجيه /api/* إلى الدالة يتم داخل الدالة نفسها: `export const config = { path: ['/api/*'] }`
-# في netlify/functions/hmsi.ts (Netlify Functions v2). لا تضف قاعدة [[redirects]] إلى
-# /.netlify/functions/... — الدالة ذات المسار المخصص لا تُخدم على مسارها الافتراضي.
 [functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
-  # وحدات أصلية (native) لا يمكن دمجها في الـ bundle
-  external_node_modules = ["@node-rs/argon2", "@libsql/client", "libsql"]
+  # مجلد غير موجود = لا دوال (المجلد الافتراضي netlify/functions كان سيُنشر لو حُذف هذا السطر)
+  directory = "netlify/disabled-functions"
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Strict-Transport-Security = "max-age=63072000; includeSubDomains"
-    # سياسة صارمة: لا سكربت إلا من ملفات الموقع نفسه (لا inline ولا eval ولا مصادر خارجية)،
-    # والاتصال بالـ API على نفس النطاق فقط. نوافذ الطباعة والملصقات تُدار من الصفحة الأم (بلا سكربت داخلها).
-    # الأنماط inline مسموحة (React style + قوالب الطباعة) — لا تنفّذ كوداً.
-    # اختبرها محلياً على البناء قبل أي تعديل: vite preview + حقن الترويسة (راجع PROJECT_STATUS).
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'self' blob:; media-src 'self' blob:; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
-
-# ملفات البناء تحمل بصمة في اسمها — تُخزَّن سنة
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-# الـ Service Worker يجب أن يُفحص في كل زيارة ليصل التحديث فوراً
 [[headers]]
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"
 
-# SPA fallback (بعد الملفات الثابتة ودالة الـ API)
+[[redirects]]
+  from = "/sw.js"
+  to = "/sw.js"
+  status = 200
+
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
+  to = "https://virexa.qproductshub.tech/:splat"
+  status = 301
+  force = true
