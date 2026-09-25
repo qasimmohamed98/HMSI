@@ -6,6 +6,7 @@ import { Activity, BedDouble, Building2, CalendarClock, FlaskConical, HeartPulse
 import type { PublicTrackFamily } from '@hmsi/shared';
 import { Card, CardContent, Badge, Button, Input, Skeleton } from '@/components/ui';
 import { QLockup } from '@/components/brand/QBrand';
+import { ProductsLink } from '@/features/products/OurProducts';
 import { API } from '@/lib/api';
 import { doctorName, fmtDate, fmtDateTime } from '@/lib/format';
 import { currentLang, setLanguage } from '@/i18n';
@@ -288,6 +289,9 @@ export default function TrackPage() {
         <p className="flex items-center justify-center gap-2 pt-2 text-[0.7rem] text-ink/45" dir="ltr">
           <span>POWERED BY</span>
           <QLockup className="h-4" />
+        </p>
+        <p className="text-center text-xs text-ink/55">
+          <ProductsLink source="track" className="text-brand-700 dark:text-brand-300" />
         </p>
 
         <p className="flex items-start gap-2 text-xs leading-relaxed text-ink/50">

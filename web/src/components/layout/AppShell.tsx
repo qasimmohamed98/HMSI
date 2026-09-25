@@ -12,6 +12,7 @@ import { useMediaQuery } from '@/lib/use-media';
 import { useAuth } from '@/lib/auth';
 import { QLockup, QMark } from '@/components/brand/QBrand';
 import { DEVELOPER } from '@/lib/developer';
+import { ProductsLink } from '@/features/products/OurProducts';
 import { localName } from '@/lib/format';
 import { ForcePasswordChange } from '@/features/security/ForcePasswordChange';
 import { IdleLogout } from '@/features/security/IdleLogout';
@@ -116,6 +117,7 @@ export function AppShell() {
             <div className="border-t border-ink/8 px-4 py-3 dark:border-white/10">
               <QLockup className="h-6" />
               <span dir="ltr" className="mt-1 block text-start text-[0.55rem] font-bold tracking-wide text-ink/35">DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}</span>
+              <ProductsLink source="sidebar" className="mt-1 text-[0.7rem] text-brand-700 dark:text-brand-300" />
             </div>
           </div>
         </div>

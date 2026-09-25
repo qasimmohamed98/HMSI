@@ -1,3 +1,4 @@
+import { OurProducts } from '@/features/products/OurProducts';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Eye, Globe, Heart, Mail, MapPin, MessageCircle, Phone, Target } from 'lucide-react';
@@ -102,6 +103,9 @@ export default function AboutPage() {
           )}
         </div>
       )}
+      <div className="mt-8">
+        <OurProducts source="about" />
+      </div>
     </PublicLayout>
   );
 }

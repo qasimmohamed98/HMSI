@@ -865,6 +865,13 @@ export const en: Dict = {
   session: {
     expired: 'Session expired — please sign in again',
   },
+  products: {
+    title: 'Our products — Q Products',
+    subtitle: 'Digital solutions for healthcare and productivity from the same developer',
+    visit: 'Visit Q Products',
+    more: 'Discover Q Products',
+    status: { current: 'You are using it', available: 'Available', soon: 'Coming soon' },
+  },
   purge: {
     title: 'Delete demo data',
     body: 'The system contains demo data (fictional hospitals, patients and users). Delete it before handing the system to hospitals. Only the system administrator account remains.',
@@ -1175,11 +1182,11 @@ export const en: Dict = {
     online: 'Active sessions now',
     countsNote: '{{h}} hospitals · {{u}} users · {{a}} admitted',
     backups: 'Backups',
-    backupsHint: 'A full automatic backup runs daily at 01:00 UTC and the last 30 are kept. Download one regularly and store it outside Netlify.',
+    backupsHint: 'A full automatic backup runs daily at 01:00 UTC and the last 30 are kept. Download one regularly and store it outside the server.',
     backupNow: 'Back up now',
     backupDone: 'Backup created ({{size}} in {{sec}}s)',
     encrypted: 'Backups are encrypted (AES-256)',
-    notEncrypted: 'Backups are not encrypted: add the BACKUP_KEY environment variable in Netlify and keep its value somewhere safe — encrypted backups cannot be opened without it.',
+    notEncrypted: 'Backups are not encrypted: add BACKUP_KEY to the server settings file and keep its value somewhere safe — encrypted backups cannot be opened without it.',
     noBackups: 'No backups yet',
     backupTime: 'Time',
     backupKind: 'Type',

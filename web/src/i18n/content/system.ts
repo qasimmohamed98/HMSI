@@ -66,7 +66,7 @@ export const SYSTEM_AR: SystemContent = {
   tech: [
     'تطبيق ويب يعمل على أي متصفح، ويُثبَّت على الهاتف والحاسوب كتطبيق (PWA).',
     'العربية والإنجليزية مع اتجاه الكتابة الصحيح، ووضع ليلي.',
-    'قاعدة بيانات سحابية (Turso) مع نشر على Netlify.',
+    'خادم مخصص في ألمانيا (Hostinger) بقاعدة بيانات محلية سريعة، واتصال مشفّر HTTPS، ونسخ احتياطي يومي مشفّر.',
   ],
 };
 
@@ -119,6 +119,6 @@ export const SYSTEM_EN: SystemContent = {
   tech: [
     'A web app that runs in any browser and installs on phones and computers as an app (PWA).',
     'Arabic and English with correct text direction, plus dark mode.',
-    'Cloud database (Turso) deployed on Netlify.',
+    'Dedicated server in Germany (Hostinger) with a fast local database, encrypted HTTPS and daily encrypted backups.',
   ],
 };

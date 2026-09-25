@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, NavLink } from 'react-router-dom';
 import { ArrowRight, Languages, Mail, MessageCircle, Phone } from 'lucide-react';
 import { DEVELOPER } from '@/lib/developer';
+import { ProductsLink } from '@/features/products/OurProducts';
 import { Logo } from './Logo';
 import { useAuth } from '@/lib/auth';
 import { currentLang, setLanguage } from '@/i18n';
@@ -61,6 +62,9 @@ export function PublicLayout({ children }: { children: ReactNode }) {
               </Link>
             </span>
           ))}
+        </p>
+        <p className="mt-3">
+          <ProductsLink source="public-footer" className="text-brand-700 dark:text-brand-300" />
         </p>
         <p className="mt-3 font-bold tracking-wide text-ink/65" dir="ltr">
           DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}

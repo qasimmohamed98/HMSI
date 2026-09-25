@@ -1,3 +1,4 @@
+import { OurProducts } from '@/features/products/OurProducts';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -149,6 +150,9 @@ export default function SystemPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+      <div className="mt-8">
+        <OurProducts source="system" />
       </div>
     </PublicLayout>
   );

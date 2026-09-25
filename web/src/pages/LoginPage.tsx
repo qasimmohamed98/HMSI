@@ -8,6 +8,7 @@ import { QLockup } from '@/components/brand/QBrand';
 import { useAuth } from '@/lib/auth';
 import { API } from '@/lib/api';
 import { DEVELOPER } from '@/lib/developer';
+import { ProductsLink } from '@/features/products/OurProducts';
 import { setLanguage, currentLang } from '@/i18n';
 import { useTheme } from '@/lib/theme';
 
@@ -100,6 +101,7 @@ export default function LoginPage() {
           <Link to="/guide" className="hover:text-white">{t('nav.guide')}</Link>
           <Link to="/system" className="hover:text-white">{t('nav.aboutSystem')}</Link>
           <Link to="/about" className="hover:text-white">{t('nav.about')}</Link>
+          <ProductsLink source="login-panel" className="text-[var(--q-b-light,#3CE0C3)] hover:text-white" />
           <Link to="/about" className="font-bold tracking-wide text-white/75 hover:text-white" dir="ltr">
             DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
           </Link>
@@ -198,6 +200,9 @@ export default function LoginPage() {
               <Link to="/guide" className="hover:underline">{t('nav.guide')}</Link>
               <Link to="/system" className="hover:underline">{t('nav.aboutSystem')}</Link>
               <Link to="/about" className="hover:underline">{t('nav.about')}</Link>
+            </p>
+            <p className="mt-2 text-center text-xs lg:hidden">
+              <ProductsLink source="login-mobile" className="text-brand-700 dark:text-brand-300" />
             </p>
             <p className="mt-3 text-center text-[0.7rem] font-bold tracking-wide text-ink/40 lg:hidden" dir="ltr">
               DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
