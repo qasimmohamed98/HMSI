@@ -1,5 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
-import type { PublicTrackInfo, PublicTrackFamily } from '@hmsi/shared';
+import type { PublicTrackInfo, PublicTrackFamily, FamilyShareCategory } from '@hmsi/shared';
+import { FAMILY_SHARE_CATEGORIES } from '@hmsi/shared';
+import { parseShare } from './patientRepo.js';
 import { db } from '../../db/index.js';
 
 type Row = Record<string, unknown>;
@@ -36,7 +38,7 @@ async function loadBedContext(code: string): Promise<BedContext | null> {
   if (!bed) return null;
 
   const admRows = await db.execute({
-    sql: `SELECT a.id, a.admitted_at, a.family_pin,
+    sql: `SELECT a.id, a.admitted_at, a.family_pin, a.family_share, a.family_message, a.family_message_by, a.family_message_at,
                  p.full_name_ar, p.full_name_en, p.gender,
                  (SELECT full_name_ar FROM users u WHERE u.id = a.attending_doctor_id) AS attending_doctor,
                  (SELECT MAX(t.created_at) FROM timeline_events t WHERE t.admission_id = a.id) AS last_update
@@ -90,12 +92,23 @@ export async function getFamilyTrack(code: string, pin: string): Promise<FamilyT
   const b = Buffer.from(ctx.familyPin);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, reason: 'bad_pin' };
 
-  const vit = await db.execute({
-    sql: `SELECT recorded_at, temperature, pulse, bp_systolic, bp_diastolic, spo2 FROM vitals WHERE admission_id = ? ORDER BY recorded_at DESC LIMIT 1`,
-    args: [ctx.admissionId],
-  });
-  const v = vit.rows[0] as Row | undefined;
+  // لا يُرسل إلا ما فعّله الطاقم، ومن السجلات المكتملة فقط
+  const share = parseShare(ctx.patient.family_share);
+  const shared = FAMILY_SHARE_CATEGORIES.filter((k) => share[k]) as FamilyShareCategory[];
+  const on = (k: FamilyShareCategory) => shared.includes(k);
+  const rows = async (sql: string) => (await db.execute({ sql, args: [ctx.admissionId] })).rows.map((r) => ({ ...(r as Row) }));
+  const s = (x: unknown) => (x === null || x === undefined || x === '' ? null : String(x));
   const num = (x: unknown) => (x === null || x === undefined ? null : Number(x));
+
+  const [vit, diagnoses, medications, labs, radiology, procedures] = await Promise.all([
+    on('vitals') ? rows(`SELECT recorded_at, temperature, pulse, bp_systolic, bp_diastolic, spo2 FROM vitals WHERE admission_id = ? ORDER BY recorded_at DESC LIMIT 1`) : [],
+    on('diagnosis') ? rows(`SELECT title_ar, title_en, status FROM diagnoses WHERE admission_id = ? AND status IN ('confirmed','resolved') ORDER BY created_at DESC LIMIT 20`) : [],
+    on('medications') ? rows(`SELECT name_ar, name_en, dose, route, frequency FROM medications WHERE admission_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 30`) : [],
+    on('labs') ? rows(`SELECT test_name_ar, test_name_en, result, unit, reference_range, status, resulted_at FROM lab_results WHERE admission_id = ? AND result IS NOT NULL AND status IN ('resulted','abnormal') ORDER BY resulted_at DESC LIMIT 40`) : [],
+    on('radiology') ? rows(`SELECT study_type_ar, study_type_en, report, ordered_at FROM radiology_reports WHERE admission_id = ? AND report IS NOT NULL AND report != '' ORDER BY ordered_at DESC LIMIT 20`) : [],
+    on('procedures') ? rows(`SELECT name_ar, name_en, performed_at FROM procedures WHERE admission_id = ? ORDER BY performed_at DESC LIMIT 20`) : [],
+  ]);
+  const v = vit[0];
 
   return {
     ok: true,
@@ -117,6 +130,17 @@ export async function getFamilyTrack(code: string, pin: string): Promise<FamilyT
             spo2: num(v.spo2),
           }
         : null,
+      shared,
+      message: ctx.patient.family_message
+        ? { text: String(ctx.patient.family_message), by: s(ctx.patient.family_message_by), at: s(ctx.patient.family_message_at) }
+        : null,
+      ...(on('diagnosis') && { diagnoses: diagnoses.map((d) => ({ title_ar: String(d.title_ar), title_en: s(d.title_en), status: String(d.status) as 'confirmed' | 'resolved' })) }),
+      ...(on('medications') && { medications: medications.map((m) => ({ name_ar: String(m.name_ar), name_en: s(m.name_en), dose: String(m.dose ?? ''), route: String(m.route ?? ''), frequency: String(m.frequency ?? '') })) }),
+      ...(on('labs') && {
+        labs: labs.map((l) => ({ test_name_ar: String(l.test_name_ar), test_name_en: s(l.test_name_en), result: String(l.result), unit: s(l.unit), reference_range: s(l.reference_range), abnormal: String(l.status) === 'abnormal', resulted_at: s(l.resulted_at) })),
+      }),
+      ...(on('radiology') && { radiology: radiology.map((r) => ({ study_type_ar: String(r.study_type_ar), study_type_en: s(r.study_type_en), report: String(r.report), ordered_at: String(r.ordered_at) })) }),
+      ...(on('procedures') && { procedures: procedures.map((p) => ({ name_ar: String(p.name_ar), name_en: s(p.name_en), performed_at: String(p.performed_at) })) }),
     },
   };
 }

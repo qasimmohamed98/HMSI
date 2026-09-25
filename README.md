@@ -19,7 +19,7 @@ server/                   Backend: Hono + libsql/Turso (اسم الحزمة @hms
   src/repos/              الوصول لقاعدة البيانات (كل استعلام مقيّد بـ hospital_id)
   db/migrations/*.sql     ملفات الـ migrations (المصدر)
   db/migrations.ts        نسخة مضمّنة مولّدة منها (npm run db:gen -w @hmsi/api)
-  scripts/smoke.ts        اختبار e2e شامل (107 فحوص)
+  scripts/smoke.ts        اختبار e2e شامل (119 فحصاً)
 netlify/functions/hmsi.ts دالة Netlify التي تشغّل الـ API على /api/*
 packages/shared/          الأنواع + التحقق (Zod) + الصلاحيات (RBAC) المشتركة
 tauri/                    غلاف ويندوز (Tauri v2)

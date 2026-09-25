@@ -1,4 +1,5 @@
-import type { Patient, AdmissionSummary } from '@hmsi/shared';
+import type { Patient, AdmissionSummary, FamilyShare } from '@hmsi/shared';
+import { FAMILY_SHARE_CATEGORIES } from '@hmsi/shared';
 import { db, uuid, withTx } from '../../db/index.js';
 import { isUniqueViolation } from '../lib/errors.js';
 
@@ -10,11 +11,21 @@ export interface PatientListOptions {
 /** أعمدة التنويم الموحّدة — تتطلب aliases: a (admissions)، d (departments)، w (wards) */
 export const ADMISSION_COLUMNS = `a.id AS admission_id, a.patient_id, a.department_id, a.ward_id, a.room,
        a.bed_no, a.status, a.admitted_at, a.discharged_at, a.discharge_type, a.discharge_summary, a.reason, a.family_pin,
+       a.family_share, a.family_message, a.family_message_by, a.family_message_at,
        d.name_ar AS department_name_ar, d.name_en AS department_name_en,
        w.name_ar AS ward_name_ar, w.name_en AS ward_name_en,
        (SELECT full_name_ar FROM users u WHERE u.id = a.attending_doctor_id) AS attending_doctor`;
 
 const str = (v: unknown): string | null => (v === null || v === undefined || v === '' ? null : String(v));
+
+export function parseShare(v: unknown): FamilyShare {
+  try {
+    const o = JSON.parse(String(v ?? '{}')) as Record<string, unknown>;
+    return Object.fromEntries(FAMILY_SHARE_CATEGORIES.filter((k) => o[k] === true).map((k) => [k, true]));
+  } catch {
+    return {};
+  }
+}
 
 export function mapAdmission(r: Record<string, unknown>): AdmissionSummary | null {
   if (!r.admission_id) return null;
@@ -36,6 +47,10 @@ export function mapAdmission(r: Record<string, unknown>): AdmissionSummary | nul
     discharge_type: str(r.discharge_type) as AdmissionSummary['discharge_type'],
     discharge_summary: str(r.discharge_summary),
     family_pin: str(r.family_pin),
+    family_share: parseShare(r.family_share),
+    family_message: str(r.family_message),
+    family_message_by: str(r.family_message_by),
+    family_message_at: str(r.family_message_at),
   };
 }
 

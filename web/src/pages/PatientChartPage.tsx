@@ -147,6 +147,8 @@ export default function PatientChartPage() {
         admission={chart.patient.admission}
         onBack={() => navigate('/patients')}
         canManagePin={can('admissions.manage')}
+        canShare={can('family.share') && chart.patient.admission?.status === 'active' && !viewingPast}
+        isDoctor={can('notes.write.doctor')}
       />
 
       {chart.admissions.length > 1 && (

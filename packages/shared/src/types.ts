@@ -28,6 +28,7 @@ export const PERMISSIONS = [
   'medications.manage',
   'medications.dispense',
   'medications.administer',
+  'family.share',
   'lab.order',
   'lab.add_result',
   'radiology.order',
@@ -75,6 +76,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'notes.write.doctor',
     'medications.manage',
     'medications.administer',
+    'family.share',
     'lab.order',
     'radiology.order',
     'admissions.manage',
@@ -88,6 +90,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'notes.write.nursing',
     'vitals.write',
     'medications.administer',
+    'family.share',
     'admissions.manage',
     'files.manage',
   ],
@@ -211,7 +214,22 @@ export interface AdmissionSummary {
   discharge_summary?: string | null;
   /** رمز متابعة ذوي المريض عبر صفحة QR (يظهر للطاقم فقط) */
   family_pin?: string | null;
+  /** ما يسمح الطاقم بعرضه لذوي المريض (بعد إدخال رمز العائلة) */
+  family_share?: FamilyShare;
+  family_message?: string | null;
+  family_message_by?: string | null;
+  family_message_at?: string | null;
 }
+
+/**
+ * فئات المعلومات التي يمكن مشاركتها مع ذوي المريض. لا شيء يُعرض إلا بتفعيل صريح من الطاقم،
+ * ولا تُعرض إلا السجلات المكتملة (نتائج صادرة، تشخيص مؤكد) — لا طلبات معلّقة ولا تشخيص «مشتبه».
+ */
+export const FAMILY_SHARE_CATEGORIES = ['vitals', 'diagnosis', 'medications', 'labs', 'radiology', 'procedures'] as const;
+export type FamilyShareCategory = (typeof FAMILY_SHARE_CATEGORIES)[number];
+export type FamilyShare = Partial<Record<FamilyShareCategory, boolean>>;
+/** الفئات التي يقرر مشاركتها الطبيب فقط؛ التمريض يشارك العلامات الحيوية والرسالة */
+export const FAMILY_SHARE_DOCTOR_ONLY: readonly FamilyShareCategory[] = ['diagnosis', 'medications', 'labs', 'radiology', 'procedures'];
 
 export const DISCHARGE_TYPES = ['home', 'transfer', 'death', 'ama'] as const;
 export type DischargeType = (typeof DISCHARGE_TYPES)[number];
@@ -526,6 +544,14 @@ export interface PublicTrackFamily extends PublicTrackInfo {
     bp_diastolic: number | null;
     spo2: number | null;
   } | null;
+  /** الفئات المفعّلة من الطاقم — الحقول أدناه تُرسل فقط إن كانت فئتها مفعّلة */
+  shared: FamilyShareCategory[];
+  message?: { text: string; by: string | null; at: string | null } | null;
+  diagnoses?: { title_ar: string; title_en: string | null; status: 'confirmed' | 'resolved' }[];
+  medications?: { name_ar: string; name_en: string | null; dose: string; route: string; frequency: string }[];
+  labs?: { test_name_ar: string; test_name_en: string | null; result: string; unit: string | null; reference_range: string | null; abnormal: boolean; resulted_at: string | null }[];
+  radiology?: { study_type_ar: string; study_type_en: string | null; report: string; ordered_at: string }[];
+  procedures?: { name_ar: string; name_en: string | null; performed_at: string }[];
 }
 
 export interface HospitalAdminInfo {

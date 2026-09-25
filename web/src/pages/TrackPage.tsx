@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { BedDouble, Building2, CalendarClock, HeartPulse, Languages, Lock, RefreshCw, ShieldCheck, Stethoscope, UserRound } from 'lucide-react';
+import { Activity, BedDouble, Building2, CalendarClock, FlaskConical, HeartPulse, Languages, Lock, MessageSquareText, Pill, RefreshCw, ScanLine, ShieldCheck, Stethoscope, UserRound } from 'lucide-react';
 import type { PublicTrackFamily } from '@hmsi/shared';
 import { Card, CardContent, Badge, Button, Input, Skeleton } from '@/components/ui';
 import { Logo } from '@/components/layout/Logo';
@@ -141,41 +141,142 @@ export default function TrackPage() {
             )}
 
             {family && (
-              <Card>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="flex items-center gap-2 font-bold text-ink">
-                      <HeartPulse className="h-5 w-5 text-danger-500" />
-                      {t('track.latestVitals')}
-                    </p>
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => familyMut.mutate(pin)} loading={familyMut.isPending} icon={<RefreshCw className="h-3.5 w-3.5" />}>
-                        {t('track.refresh')}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setFamily(null); setPin(''); }}>
-                        {t('track.hide')}
-                      </Button>
-                    </div>
-                  </div>
-                  {family.latest_vitals ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <Field label={t('track.temperature')} value={family.latest_vitals.temperature != null ? `${family.latest_vitals.temperature} °C` : '—'} mono />
-                        <Field label={t('track.pulse')} value={family.latest_vitals.pulse != null ? `${family.latest_vitals.pulse}` : '—'} mono />
-                        <Field
-                          label={t('track.bp')}
-                          value={family.latest_vitals.bp_systolic != null ? `${family.latest_vitals.bp_systolic}/${family.latest_vitals.bp_diastolic ?? '—'}` : '—'}
-                          mono
-                        />
-                        <Field label={t('track.spo2')} value={family.latest_vitals.spo2 != null ? `${family.latest_vitals.spo2}%` : '—'} mono />
-                      </div>
-                      <p className="text-xs text-ink/45">{fmtDateTime(family.latest_vitals.recorded_at)}</p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-ink/55">{t('track.noVitals')}</p>
-                  )}
-                </CardContent>
-              </Card>
+              <>
+                <div className="flex items-center justify-end gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => familyMut.mutate(pin)} loading={familyMut.isPending} icon={<RefreshCw className="h-3.5 w-3.5" />}>
+                    {t('track.refresh')}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setFamily(null); setPin(''); }}>
+                    {t('track.hide')}
+                  </Button>
+                </div>
+
+                {family.message && (
+                  <Card className="border-brand-200 dark:border-brand-900">
+                    <CardContent className="space-y-2">
+                      <p className="flex items-center gap-2 font-bold text-ink">
+                        <MessageSquareText className="h-5 w-5 text-brand-600" />
+                        {t('track.message')}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{family.message.text}</p>
+                      {family.message.at && (
+                        <p className="text-xs text-ink/45">
+                          {family.message.by} · <span className="tabular">{fmtDateTime(family.message.at)}</span>
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {family.shared.includes('vitals') && (
+                  <Section icon={<HeartPulse className="h-5 w-5 text-danger-500" />} title={t('track.latestVitals')}>
+                    {family.latest_vitals ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <Field label={t('track.temperature')} value={family.latest_vitals.temperature != null ? `${family.latest_vitals.temperature} °C` : '—'} mono />
+                          <Field label={t('track.pulse')} value={family.latest_vitals.pulse != null ? `${family.latest_vitals.pulse}` : '—'} mono />
+                          <Field
+                            label={t('track.bp')}
+                            value={family.latest_vitals.bp_systolic != null ? `${family.latest_vitals.bp_systolic}/${family.latest_vitals.bp_diastolic ?? '—'}` : '—'}
+                            mono
+                          />
+                          <Field label={t('track.spo2')} value={family.latest_vitals.spo2 != null ? `${family.latest_vitals.spo2}%` : '—'} mono />
+                        </div>
+                        <p className="text-xs text-ink/45">{fmtDateTime(family.latest_vitals.recorded_at)}</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-ink/55">{t('track.noVitals')}</p>
+                    )}
+                  </Section>
+                )}
+
+                {family.diagnoses && (
+                  <Section icon={<Stethoscope className="h-5 w-5 text-brand-600" />} title={t('track.diagnoses')} empty={family.diagnoses.length === 0}>
+                    <ul className="space-y-1.5 text-sm">
+                      {family.diagnoses.map((d, i) => (
+                        <li key={i} className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-ink">{lang === 'en' ? d.title_en || d.title_ar : d.title_ar}</span>
+                          <Badge variant={d.status === 'resolved' ? 'success' : 'neutral'}>{t(`diagnosis.statuses.${d.status}`)}</Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {family.medications && (
+                  <Section icon={<Pill className="h-5 w-5 text-brand-600" />} title={t('track.medications')} empty={family.medications.length === 0}>
+                    <ul className="space-y-1.5 text-sm">
+                      {family.medications.map((m, i) => (
+                        <li key={i}>
+                          <span className="font-semibold text-ink">{lang === 'en' ? m.name_en || m.name_ar : m.name_ar}</span>
+                          <span className="text-ink/55"> — {m.dose} · {m.route} · {m.frequency}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {family.labs && (
+                  <Section icon={<FlaskConical className="h-5 w-5 text-brand-600" />} title={t('track.labs')} empty={family.labs.length === 0}>
+                    <ul className="divide-y divide-ink/6 text-sm dark:divide-white/5">
+                      {family.labs.map((l, i) => (
+                        <li key={i} className="flex items-center justify-between gap-3 py-2">
+                          <span className="min-w-0">
+                            <span className="block font-semibold text-ink">{lang === 'en' ? l.test_name_en || l.test_name_ar : l.test_name_ar}</span>
+                            {l.resulted_at && <span className="block text-xs tabular text-ink/45">{fmtDateTime(l.resulted_at)}</span>}
+                          </span>
+                          <span className="shrink-0 text-end">
+                            <bdi dir="ltr" className={`font-bold tabular ${l.abnormal ? 'text-danger-600' : 'text-ink'}`}>
+                              {l.result} {l.unit ?? ''}
+                            </bdi>
+                            {l.reference_range && (
+                              <span className="block text-xs text-ink/45" dir="ltr">
+                                {l.reference_range}
+                              </span>
+                            )}
+                            {l.abnormal && <span className="block text-xs font-bold text-danger-600">{t('track.abnormal')}</span>}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {family.radiology && (
+                  <Section icon={<ScanLine className="h-5 w-5 text-brand-600" />} title={t('track.radiology')} empty={family.radiology.length === 0}>
+                    <ul className="space-y-3 text-sm">
+                      {family.radiology.map((r, i) => (
+                        <li key={i}>
+                          <p className="font-semibold text-ink">
+                            {lang === 'en' ? r.study_type_en || r.study_type_ar : r.study_type_ar} ·{' '}
+                            <span className="text-xs font-medium tabular text-ink/45">{fmtDate(r.ordered_at, { day: 'numeric', month: 'short' })}</span>
+                          </p>
+                          <p className="whitespace-pre-wrap text-ink/75">{r.report}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {family.procedures && (
+                  <Section icon={<Activity className="h-5 w-5 text-brand-600" />} title={t('track.procedures')} empty={family.procedures.length === 0}>
+                    <ul className="space-y-1.5 text-sm">
+                      {family.procedures.map((p, i) => (
+                        <li key={i} className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-ink">{lang === 'en' ? p.name_en || p.name_ar : p.name_ar}</span>
+                          <span className="text-xs tabular text-ink/45">{fmtDate(p.performed_at, { day: 'numeric', month: 'short' })}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {family.shared.length === 0 && !family.message && (
+                  <Card>
+                    <CardContent className="text-sm text-ink/60">{t('track.nothingShared')}</CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </>
         )}
@@ -200,5 +301,20 @@ function Field({ label, value, mono, icon }: { label: string; value: string; mon
         {value}
       </p>
     </div>
+  );
+}
+
+function Section({ icon, title, empty, children }: { icon: ReactNode; title: string; empty?: boolean; children: ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <p className="flex items-center gap-2 font-bold text-ink">
+          {icon}
+          {title}
+        </p>
+        {empty ? <p className="text-sm text-ink/55">{t('track.noneYet')}</p> : children}
+      </CardContent>
+    </Card>
   );
 }

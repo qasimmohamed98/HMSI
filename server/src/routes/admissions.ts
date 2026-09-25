@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
-import { DischargeSchema, AdmitPatientSchema, TransferPatientSchema } from '@hmsi/shared/validate';
-import { getSession, requireAuth, requirePermission } from '../middleware/auth.js';
+import { DischargeSchema, AdmitPatientSchema, TransferPatientSchema, FamilyShareSchema } from '@hmsi/shared/validate';
+import { FAMILY_SHARE_CATEGORIES, FAMILY_SHARE_DOCTOR_ONLY, type FamilyShareCategory } from '@hmsi/shared';
+import { getSession, requireAuth, requirePermission, sessionHas } from '../middleware/auth.js';
+import { getAdmissionScope } from '../repos/chartRepo.js';
+import { HttpError } from '../lib/errors.js';
+import { db } from '../../db/index.js';
 import { admitPatient, transferAdmission, dischargeAdmission, regenerateFamilyPin } from '../repos/admissionRepo.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit, addTimeline } from '../lib/audit.js';
@@ -60,4 +64,52 @@ admissionRoutes.post('/:id/family-pin', requireAuth(), requirePermission('admiss
   const pin = await regenerateFamilyPin(admissionId, session.user.hospital_id);
   await writeAudit({ actorId: session.user.id, action: 'family_pin_regenerated', resourceType: 'admission', resourceId: admissionId, ip: clientIp(c) });
   return c.json({ family_pin: pin }, 200);
+});
+
+/**
+ * ما يراه ذوو المريض في صفحة المتابعة (بعد رمز العائلة).
+ * الطبيب يتحكم بكل الفئات؛ التمريض بالعلامات الحيوية والرسالة فقط (الفئات السريرية قرار الطبيب).
+ */
+admissionRoutes.patch('/:id/family-share', requireAuth(), requirePermission('family.share'), async (c) => {
+  const parsed = await parseBody(c, FamilyShareSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof FamilyShareSchema)['_output'];
+  const session = getSession(c)!;
+  const admissionId = c.req.param('id');
+  const scope = await getAdmissionScope(admissionId, session.user.hospital_id);
+  if (!scope) throw new HttpError('التنويم غير موجود', 404);
+  if (scope.admission.status !== 'active') throw new HttpError('التنويم منتهٍ', 409);
+
+  const current = scope.admission.family_share ?? {};
+  const next = { ...current };
+  const changed: FamilyShareCategory[] = [];
+  for (const k of FAMILY_SHARE_CATEGORIES) {
+    const v = input.share?.[k];
+    if (v === undefined || Boolean(current[k]) === v) continue;
+    if (FAMILY_SHARE_DOCTOR_ONLY.includes(k) && !sessionHas(c, 'notes.write.doctor')) {
+      throw new HttpError('مشاركة المعلومات السريرية مع ذوي المريض قرار الطبيب المعالج', 403);
+    }
+    if (v) next[k] = true;
+    else delete next[k];
+    changed.push(k);
+  }
+
+  const sets = ['family_share = ?'];
+  const args: (string | null)[] = [JSON.stringify(next)];
+  if (input.message !== undefined) {
+    const text = input.message?.trim() || null;
+    sets.push('family_message = ?', 'family_message_by = ?', 'family_message_at = ?');
+    args.push(text, text ? session.user.full_name_ar : null, text ? new Date().toISOString() : null);
+  }
+  await db.execute({ sql: `UPDATE admissions SET ${sets.join(', ')} WHERE id = ?`, args: [...args, admissionId] });
+  await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'family', titleAr: 'تحديث ما يُعرض لذوي المريض', titleEn: 'Family view updated' });
+  await writeAudit({
+    actorId: session.user.id,
+    action: 'family_share_updated',
+    resourceType: 'admission',
+    resourceId: admissionId,
+    ip: clientIp(c),
+    meta: { share: next, changed, message: input.message !== undefined },
+  });
+  return c.json({ family_share: next, family_message: input.message !== undefined ? input.message?.trim() || null : (scope.admission.family_message ?? null) }, 200);
 });

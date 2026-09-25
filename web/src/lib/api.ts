@@ -30,6 +30,7 @@ import type {
   FluidEntry,
   AdministrationStatus,
   MedicationAdministration,
+  FamilyShare,
 } from '@hmsi/shared';
 import { demoApi } from './api-demo';
 import { liveApi } from './api-live';
@@ -292,6 +293,8 @@ export interface Api {
   deletePatient(id: string): Promise<void>;
   admitPatient(input: AdmitInput): Promise<{ admission_id: string; family_pin: string }>;
   regenerateFamilyPin(admissionId: string): Promise<{ family_pin: string }>;
+  /** ما يراه ذوو المريض: الفئات المفعّلة ورسالة الطاقم (null تمسح الرسالة) */
+  updateFamilyShare(admissionId: string, input: { share?: FamilyShare; message?: string | null }): Promise<{ family_share: FamilyShare; family_message: string | null }>;
   transferPatient(input: TransferInput): Promise<void>;
   getChart(patientId: string, admissionId?: string): Promise<ChartData>;
   addVitals(input: NewVitalsInput): Promise<Vitals>;

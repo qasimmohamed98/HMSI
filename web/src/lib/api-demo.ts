@@ -27,8 +27,10 @@ import type {
   MedicationAdministration,
   FluidEntry,
   MewsAlert,
+  FamilyShare,
+  FamilyShareCategory,
 } from '@hmsi/shared';
-import { calcMews } from '@hmsi/shared';
+import { calcMews, FAMILY_SHARE_CATEGORIES, FAMILY_SHARE_DOCTOR_ONLY, hasPermission } from '@hmsi/shared';
 import type {
   Api,
   ChartData,
@@ -766,13 +768,50 @@ export const demoApi: Api = {
     await delay(250);
     const { info, entry } = demoTrack(code);
     if (!entry?.record || entry.record.admission.family_pin !== pin) throw new Error('رمز العائلة غير صحيح');
-    const v = entry.record.vitals[0];
+    const r = entry.record;
+    const adm = r.admission;
+    const share = adm.family_share ?? { vitals: true };
+    const shared = FAMILY_SHARE_CATEGORIES.filter((k) => share[k]) as FamilyShareCategory[];
+    const on = (k: FamilyShareCategory) => shared.includes(k);
+    const v = on('vitals') ? [...r.vitals].sort((a, b) => (a.recorded_at > b.recorded_at ? -1 : 1))[0] : undefined;
     return {
       ...info,
       patient: { full_name_ar: entry.patient.full_name_ar, full_name_en: entry.patient.full_name_en, gender: entry.patient.gender },
-      attending_doctor: entry.record.admission.attending_doctor,
+      attending_doctor: adm.attending_doctor,
       latest_vitals: v ? { recorded_at: v.recorded_at, temperature: v.temperature, pulse: v.pulse, bp_systolic: v.bp_systolic, bp_diastolic: v.bp_diastolic, spo2: v.spo2 } : null,
+      shared,
+      message: adm.family_message ? { text: adm.family_message, by: adm.family_message_by ?? null, at: adm.family_message_at ?? null } : null,
+      ...(on('diagnosis') && { diagnoses: r.diagnoses.filter((d) => d.status !== 'suspected').map((d) => ({ title_ar: d.title_ar, title_en: d.title_en, status: d.status as 'confirmed' | 'resolved' })) }),
+      ...(on('medications') && { medications: r.medications.filter((m) => m.status === 'active').map((m) => ({ name_ar: m.name_ar, name_en: m.name_en, dose: m.dose, route: m.route, frequency: m.frequency })) }),
+      ...(on('labs') && {
+        labs: r.labs.filter((l) => l.result && (l.status === 'resulted' || l.status === 'abnormal')).map((l) => ({ test_name_ar: l.test_name_ar, test_name_en: l.test_name_en, result: l.result!, unit: l.unit, reference_range: l.reference_range, abnormal: l.status === 'abnormal', resulted_at: l.resulted_at })),
+      }),
+      ...(on('radiology') && { radiology: r.radiology.filter((x) => x.report).map((x) => ({ study_type_ar: x.study_type_ar, study_type_en: x.study_type_en, report: x.report!, ordered_at: x.ordered_at })) }),
+      ...(on('procedures') && { procedures: r.procedures.map((p) => ({ name_ar: p.name_ar, name_en: p.name_en, performed_at: p.performed_at })) }),
     };
+  },
+
+  async updateFamilyShare(admissionId: string, input: { share?: FamilyShare; message?: string | null }) {
+    const u = requireUser();
+    const record = findRecord(admissionId);
+    const adm = record.admission;
+    const next: FamilyShare = { ...(adm.family_share ?? { vitals: true }) };
+    for (const k of FAMILY_SHARE_CATEGORIES) {
+      const v = input.share?.[k];
+      if (v === undefined || Boolean(next[k]) === v) continue;
+      if (FAMILY_SHARE_DOCTOR_ONLY.includes(k) && !hasPermission(u.role, 'notes.write.doctor')) throw new Error('مشاركة المعلومات السريرية مع ذوي المريض قرار الطبيب المعالج');
+      if (v) next[k] = true;
+      else delete next[k];
+    }
+    adm.family_share = next;
+    if (input.message !== undefined) {
+      const text = input.message?.trim() || null;
+      adm.family_message = text;
+      adm.family_message_by = text ? actorName(u) : null;
+      adm.family_message_at = text ? new Date().toISOString() : null;
+    }
+    pushTimeline(record, actorName(u), 'family', 'تحديث ما يُعرض لذوي المريض', 'Family view updated', new Date().toISOString());
+    return { family_share: next, family_message: adm.family_message ?? null };
   },
 
   async admitPatient(input: AdmitInput): Promise<{ admission_id: string; family_pin: string }> {

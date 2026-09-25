@@ -11,6 +11,7 @@ import {
   FLUID_DIRECTIONS,
   FLUID_KINDS,
   ADMINISTRATION_STATUSES,
+  FAMILY_SHARE_CATEGORIES,
 } from './types.js';
 
 const id = z.string().min(1).max(64);
@@ -94,6 +95,13 @@ export const CreateFluidSchema = z
     recorded_at: recordedAt,
   })
   .refine((v) => (FLUID_KINDS[v.direction] as readonly string[]).includes(v.kind), { message: 'نوع السائل لا يطابق الاتجاه', path: ['kind'] });
+
+export const FamilyShareSchema = z
+  .object({
+    share: z.object(Object.fromEntries(FAMILY_SHARE_CATEGORIES.map((k) => [k, z.boolean().optional()])) as Record<(typeof FAMILY_SHARE_CATEGORIES)[number], z.ZodOptional<z.ZodBoolean>>).strict().optional(),
+    message: z.string().max(1000).nullable().optional(),
+  })
+  .refine((v) => v.share !== undefined || v.message !== undefined, { message: 'لا توجد بيانات للتحديث' });
 
 export const AdministerMedicationSchema = z
   .object({

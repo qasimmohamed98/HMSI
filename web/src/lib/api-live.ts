@@ -126,6 +126,7 @@ export const liveApi: Api = {
   transferPatient: (input) =>
     request(`/admissions/${input.admissionId}/transfer`, { method: 'POST', body: JSON.stringify({ bed_id: input.bedId }) }),
   regenerateFamilyPin: (admissionId) => request(`/admissions/${admissionId}/family-pin`, { method: 'POST' }),
+  updateFamilyShare: (admissionId, input) => request(`/admissions/${admissionId}/family-share`, { method: 'PATCH', body: JSON.stringify(input) }),
   wards: () => request('/wards'),
   listDepartments: () => request('/org/departments'),
   createDepartment: (input) =>

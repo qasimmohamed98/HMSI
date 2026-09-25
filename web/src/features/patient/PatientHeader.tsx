@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FAMILY_SHARE_CATEGORIES } from '@hmsi/shared';
+import { FamilyShareDialog } from './FamilyShareDialog';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Patient, AdmissionSummary } from '@hmsi/shared';
-import { ArrowRight, CalendarClock, KeyRound, MapPin, RefreshCw, Stethoscope, UserRound } from 'lucide-react';
+import { ArrowRight, CalendarClock, Eye, KeyRound, MapPin, RefreshCw, Stethoscope, UserRound } from 'lucide-react';
 import { Badge, Chip, Avatar, Button, useToast } from '@/components/ui';
 import { API } from '@/lib/api';
 import { currentLang } from '@/i18n';
@@ -13,11 +16,15 @@ export function PatientHeader({
   admission,
   onBack,
   canManagePin = false,
+  canShare = false,
+  isDoctor = false,
 }: {
   patient: Patient;
   admission: AdmissionSummary | null;
   onBack: () => void;
   canManagePin?: boolean;
+  canShare?: boolean;
+  isDoctor?: boolean;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -29,6 +36,7 @@ export function PatientHeader({
       toast.success(t('familyPin.regenerated'));
     },
   });
+  const [shareOpen, setShareOpen] = useState(false);
   const allergies = jsonParse<string[]>(patient.allergies_json, []);
   const alerts = jsonParse<string[]>(patient.critical_alerts_json, []);
   const hasIssues = allergies.length > 0 || alerts.length > 0;
@@ -86,20 +94,10 @@ export function PatientHeader({
                 <Meta icon={<Stethoscope className="h-4 w-4" />} label={t('history.reason')} value={admission.reason} />
               </div>
             )}
-            {admission.status === 'active' && admission.family_pin && (
-              <div className="no-print col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-brand-300 px-3 py-2 sm:col-span-4 lg:col-span-3 dark:border-brand-800" title={t('familyPin.hint')}>
-                <KeyRound className="h-4 w-4 text-brand-600" />
-                <span className="text-xs font-bold text-ink/55">{t('familyPin.title')}:</span>
-                <span className="font-mono text-base font-extrabold tracking-[0.3em] text-ink" dir="ltr">{admission.family_pin}</span>
-                {canManagePin && (
-                  <Button size="sm" variant="ghost" className="ms-auto" loading={pinMut.isPending} icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => pinMut.mutate(admission.id)}>
-                    {t('familyPin.regenerate')}
-                  </Button>
-                )}
-              </div>
-            )}
           </div>
         )}
+
+        {shareOpen && admission && <FamilyShareDialog patientId={patient.id} admission={admission} isDoctor={isDoctor} onClose={() => setShareOpen(false)} />}
 
         {/* Issues */}
         {hasIssues && (
@@ -123,6 +121,31 @@ export function PatientHeader({
           </div>
         )}
       </div>
+      {admission && admission.status === 'active' && admission.family_pin && (
+        <div className="no-print mx-4 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-dashed border-brand-300 px-3 py-2 sm:mx-6 dark:border-brand-800" title={t('familyPin.hint')}>
+          <KeyRound className="h-4 w-4 text-brand-600" />
+          <span className="text-xs font-bold text-ink/55">{t('familyPin.title')}:</span>
+          <span className="font-mono text-base font-extrabold tracking-[0.3em] text-ink" dir="ltr">{admission.family_pin}</span>
+          {canManagePin && (
+            <Button size="sm" variant="ghost" loading={pinMut.isPending} icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => pinMut.mutate(admission.id)}>
+              {t('familyPin.regenerate')}
+            </Button>
+          )}
+          <div className="flex flex-1 flex-wrap items-center gap-1.5 border-brand-200 sm:border-s sm:ps-3 dark:border-brand-900">
+            <span className="text-xs font-bold text-ink/55">{t('familyShare.visible')}:</span>
+            {FAMILY_SHARE_CATEGORIES.filter((k) => admission.family_share?.[k]).map((k) => (
+              <Badge key={k} variant="brand">{t(`familyShare.categories.${k}`)}</Badge>
+            ))}
+            {admission.family_message && <Badge variant="info">{t('familyShare.hasMessage')}</Badge>}
+            {!FAMILY_SHARE_CATEGORIES.some((k) => admission.family_share?.[k]) && !admission.family_message && <span className="text-xs text-ink/45">{t('familyShare.nothing')}</span>}
+            {canShare && (
+              <Button size="sm" variant="outline" className="ms-auto" icon={<Eye className="h-3.5 w-3.5" />} onClick={() => setShareOpen(true)}>
+                {t('familyShare.edit')}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

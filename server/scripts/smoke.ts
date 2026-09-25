@@ -162,6 +162,31 @@ check('لا بيانات طبية أو اسم كامل في الرد العام'
 check('رمز خاطئ = 403', (await anon.post(`/public/track/${code}/family`, { pin: admit.json.family_pin === '000000' ? '111111' : '000000' })).status === 403);
 const fam = await anon.post(`/public/track/${code}/family`, { pin: admit.json.family_pin });
 check('الرمز الصحيح يعرض الاسم الكامل', fam.status === 200 && fam.json.patient.full_name_ar === 'مريض اختبار أول', fam.json);
+{
+  // ما يراه ذوو المريض: الافتراضي العلامات الحيوية فقط، والباقي بقرار الطاقم
+  const admId = admit.json.admission_id;
+  const pin = admit.json.family_pin;
+  check('افتراضياً: العلامات الحيوية فقط', fam.json.shared.length === 1 && fam.json.shared[0] === 'vitals' && !('labs' in fam.json) && !('diagnoses' in fam.json), fam.json.shared);
+  check('الممرض لا يشارك التحاليل (403)', (await nurse.patch(`/admissions/${admId}/family-share`, { share: { labs: true } })).status === 403);
+  check('المشاهد لا يغيّر المشاركة (403)', (await viewer.patch(`/admissions/${admId}/family-share`, { share: { vitals: false } })).status === 403);
+  check('الممرض يكتب رسالة للعائلة', (await nurse.patch(`/admissions/${admId}/family-share`, { message: 'المريض مستقر ويتناول طعامه' })).status === 200);
+  await doctor.post(`/patients/${admId}/diagnoses`, { admission_id: admId, title_ar: 'التهاب الزائدة', status: 'confirmed' });
+  await doctor.post(`/patients/${admId}/diagnoses`, { admission_id: admId, title_ar: 'تشخيص مشتبه سري', status: 'suspected' });
+  const lo = await doctor.post(`/patients/${admId}/labs`, { admission_id: admId, test_name_ar: 'خضاب الدم' });
+  await lab.patch(`/patients/${admId}/labs/${lo.json.id}`, { result: '13.5', unit: 'g/dL' });
+  await doctor.post(`/patients/${admId}/labs`, { admission_id: admId, test_name_ar: 'طلب معلّق' });
+  const sh = await doctor.patch(`/admissions/${admId}/family-share`, { share: { labs: true, diagnosis: true } });
+  check('الطبيب يشارك التحاليل والتشخيص', sh.status === 200 && sh.json.family_share.labs === true && sh.json.family_share.vitals === true, sh.json);
+  const fam2 = await anon.post(`/public/track/${code}/family`, { pin });
+  check('العائلة ترى التحاليل الصادرة فقط', fam2.status === 200 && fam2.json.labs.length === 1 && fam2.json.labs[0].result === '13.5', fam2.json.labs);
+  check('التشخيص المشتبه لا يظهر للعائلة', fam2.json.diagnoses.length === 1 && !JSON.stringify(fam2.json).includes('مشتبه سري'));
+  check('رسالة الطاقم تظهر للعائلة', fam2.json.message?.text === 'المريض مستقر ويتناول طعامه');
+  check('الأدوية غير المفعّلة لا تُرسل', !('medications' in fam2.json));
+  check('لا شيء سريري بدون رمز العائلة', !JSON.stringify((await anon.get(`/public/track/${code}`)).json).includes('13.5'));
+  await doctor.patch(`/admissions/${admId}/family-share`, { share: { labs: false } });
+  check('إلغاء المشاركة يخفي التحاليل', !('labs' in (await anon.post(`/public/track/${code}/family`, { pin })).json));
+  check('مستخدم من مستشفى آخر لا يغيّر المشاركة', [403, 404].includes((await admin2.patch(`/admissions/${admId}/family-share`, { share: { vitals: false } })).status));
+}
 check('كود سرير غير موجود = 404', (await anon.get('/public/track/bnotexisting00')).status === 404);
 {
   const bruteCode = h1Wards[0].beds[0].code;
