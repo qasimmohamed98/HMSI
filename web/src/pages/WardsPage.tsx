@@ -7,7 +7,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent, CardHeader, CardTitle, Skeleton, EmptyState, Badge, Button, Dialog, Input, Select, ConfirmDialog } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API, type WardInput, type BedInput } from '@/lib/api';
-import { useToast } from '@/components/ui';
+import { useToast, useConfirm } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { ROLE_PERMISSIONS } from '@hmsi/shared';
 import type { Ward, Bed, Department } from '@hmsi/shared';
@@ -42,6 +42,7 @@ export default function WardsPage() {
     void qc.invalidateQueries({ queryKey: ['departments'] });
   };
 
+  const confirm = useConfirm();
   const onError = (e: unknown) => toast.error((e as Error).message || t('errors.generic'));
   const onDone = () => toast.success(t('common.done'));
 
@@ -167,7 +168,7 @@ export default function WardsPage() {
       {wardDialog && (
         <WardDialog open onClose={() => setWardDialog(null)} ward={wardDialog.ward} departments={departments ?? []} onSubmit={(input) => wardDialog.ward ? updateWardMut.mutate({ id: wardDialog.ward.id, input }) : createWardMut.mutate(input)} busy={createWardMut.isPending || updateWardMut.isPending} />
       )}
-      {bedDialog && <BedDialog open onClose={() => setBedDialog(null)} ward={bedDialog.ward} bed={bedDialog.bed} canAdm={canAdm} canWard={canWard} onAssign={(admissionId) => assignMut.mutate({ bedId: bedDialog.bed.id, admissionId })} assignBusy={assignMut.isPending} onFree={() => freeMut.mutate(bedDialog.bed.id)} freeBusy={freeMut.isPending} onEdit={() => { setEditBed(bedDialog); }} onDelete={() => setDeleteBed(bedDialog)} onViewPatient={(pid) => navigate(`/patients/${pid}`)} />}
+      {bedDialog && <BedDialog open onClose={() => setBedDialog(null)} ward={bedDialog.ward} bed={bedDialog.bed} canAdm={canAdm} canWard={canWard} onAssign={(admissionId) => assignMut.mutate({ bedId: bedDialog.bed.id, admissionId })} assignBusy={assignMut.isPending} onFree={async () => { if (await confirm(t('wards.freeBedConfirm'))) freeMut.mutate(bedDialog.bed.id); }} freeBusy={freeMut.isPending} onEdit={() => { setEditBed(bedDialog); }} onDelete={() => setDeleteBed(bedDialog)} onViewPatient={(pid) => navigate(`/patients/${pid}`)} />}
       {addBedFor && <BedFormDialog open onClose={() => setAddBedFor(null)} ward={addBedFor} onSubmit={(input) => createBedMut.mutate(input as BedInput)} busy={createBedMut.isPending} />}
       {editBed && <BedFormDialog open onClose={() => setEditBed(null)} ward={editBed.ward} bed={editBed.bed} onSubmit={(input) => updateBedMut.mutate({ id: editBed.bed.id, input })} busy={updateBedMut.isPending} />}
       {deleteWard && (
