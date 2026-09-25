@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink } from 'react-router-dom';
-import { ArrowRight, Languages } from 'lucide-react';
+import { ArrowRight, Languages, Mail, MessageCircle, Phone } from 'lucide-react';
+import { DEVELOPER } from '@/lib/developer';
 import { Logo } from './Logo';
 import { useAuth } from '@/lib/auth';
 import { currentLang, setLanguage } from '@/i18n';
@@ -50,15 +51,34 @@ export function PublicLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
-      <footer className="border-t border-ink/8 py-6 text-center text-xs text-ink/45 print:hidden dark:border-white/10">
-        © 2026 HMSI · {links.map((l, i) => (
-          <span key={l.to}>
-            {i > 0 && ' · '}
-            <Link to={l.to} className="hover:underline">
-              {l.label}
-            </Link>
-          </span>
-        ))}
+      <footer className="border-t border-ink/8 py-6 text-center text-xs text-ink/50 print:hidden dark:border-white/10">
+        <p>
+          © 2026 HMSI · {links.map((l, i) => (
+            <span key={l.to}>
+              {i > 0 && ' · '}
+              <Link to={l.to} className="hover:underline">
+                {l.label}
+              </Link>
+            </span>
+          ))}
+        </p>
+        <p className="mt-3 font-bold tracking-wide text-ink/65" dir="ltr">
+          DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
+        </p>
+        <p className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <a href={`mailto:${DEVELOPER.email}`} className="inline-flex items-center gap-1 hover:text-brand-700">
+            <Mail className="h-3.5 w-3.5" />
+            <bdi dir="ltr">{DEVELOPER.email}</bdi>
+          </a>
+          <a href={`tel:${DEVELOPER.phone}`} className="inline-flex items-center gap-1 hover:text-brand-700">
+            <Phone className="h-3.5 w-3.5" />
+            <bdi dir="ltr">{DEVELOPER.phoneDisplay}</bdi>
+          </a>
+          <a href={DEVELOPER.whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-brand-700">
+            <MessageCircle className="h-3.5 w-3.5" />
+            WhatsApp
+          </a>
+        </p>
       </footer>
     </div>
   );

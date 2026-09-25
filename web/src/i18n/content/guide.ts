@@ -352,6 +352,7 @@ export const GUIDE_AR: GuideContent = {
     { q: 'انقطع الإنترنت أثناء العمل، هل ضاعت البيانات؟', a: 'العلامات الحيوية والسوائل والجرعات تُحفظ على الجهاز وتُرسل تلقائياً عند عودة الاتصال (خلال 48 ساعة).' },
     { q: 'مسحتُ رمز QR فظهرت صفحة تسجيل الدخول؟', a: 'الجهاز يعرض نسخة قديمة محفوظة من الموقع. افتح الموقع مرة وأعد تحميل الصفحة، ثم امسح الرمز مجدداً.' },
     { q: 'كيف أغيّر لغة النظام؟', a: 'اضغط زر EN / ع في الشريط العلوي، أو من «الإعدادات» ← اللغة.' },
+    { q: 'كيف أتواصل مع الدعم الفني أو مطوّر النظام؟', a: 'تطوير: قاسم محمد — البريد qasimmohamed14@gmail.com — الهاتف وواتساب ‎+964 774 477 7950. لمشكلات الحسابات والصلاحيات راجع مدير مستشفاك أولاً.' },
   ],
 };
 
@@ -647,5 +648,6 @@ export const GUIDE_EN: GuideContent = {
     { q: 'The internet dropped while working. Is data lost?', a: 'Vitals, fluids and doses are saved on the device and sent automatically when the connection returns (within 48 hours).' },
     { q: 'I scanned the QR code and got the sign-in page?', a: 'The device is showing an old cached copy of the site. Open the site once, reload, then scan again.' },
     { q: 'How do I change the language?', a: 'Press EN / ع in the top bar, or Settings → Language.' },
+    { q: 'How do I contact technical support or the developer?', a: 'Developed by Qasim Mohammed — email qasimmohamed14@gmail.com — phone & WhatsApp +964 774 477 7950. For account and permission issues, ask your hospital admin first.' },
   ],
 };

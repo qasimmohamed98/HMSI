@@ -10,6 +10,7 @@ import { TopBar } from './TopBar';
 import { BottomNav } from './BottomNav';
 import { useMediaQuery } from '@/lib/use-media';
 import { useAuth } from '@/lib/auth';
+import { DEVELOPER } from '@/lib/developer';
 import { localName } from '@/lib/format';
 
 export function AppShell() {
@@ -38,6 +39,11 @@ export function AppShell() {
           <div className="flex-1 overflow-y-auto px-3 py-4">
             <SidebarNav />
           </div>
+          {!collapsed && (
+            <a href={`mailto:${DEVELOPER.email}`} className="block px-4 pb-2 text-center text-[0.62rem] font-bold tracking-wide text-ink/35 hover:text-brand-700" dir="ltr" title={`${DEVELOPER.email} · ${DEVELOPER.phoneDisplay}`}>
+              DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
+            </a>
+          )}
           <div className="border-t border-ink/8 p-3 dark:border-white/10">
             <Button
               variant="ghost"

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Eye, Globe, Heart, Mail, MapPin, Phone, Target } from 'lucide-react';
+import { Eye, Globe, Heart, Mail, MapPin, MessageCircle, Phone, Target } from 'lucide-react';
 import { Card, CardContent, Skeleton } from '@/components/ui';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { API } from '@/lib/api';
@@ -65,6 +65,12 @@ export default function AboutPage() {
                     <a href={`tel:${a.phone}`} className="flex items-center gap-2 rounded-xl bg-surface-muted/70 p-3 font-bold text-ink hover:bg-surface-muted dark:bg-white/5">
                       <Phone className="h-4 w-4 text-brand-600" />
                       <bdi dir="ltr">{a.phone}</bdi>
+                    </a>
+                  )}
+                  {a.phone && (
+                    <a href={`https://wa.me/${a.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl bg-surface-muted/70 p-3 font-bold text-ink hover:bg-surface-muted dark:bg-white/5">
+                      <MessageCircle className="h-4 w-4 text-brand-600" />
+                      WhatsApp
                     </a>
                   )}
                   {a.email && (

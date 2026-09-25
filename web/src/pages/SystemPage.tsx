@@ -21,6 +21,7 @@ import { Card, CardContent } from '@/components/ui';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { SYSTEM_AR, SYSTEM_EN } from '@/i18n/content/system';
 import { currentLang } from '@/i18n';
+import { DEVELOPER } from '@/lib/developer';
 
 const ICONS: Record<string, LucideIcon> = {
   patients: Users,
@@ -129,6 +130,19 @@ export default function SystemPage() {
               ))}
             </ul>
             <p className="text-xs text-ink/45">{t('ui.version', { v: __APP_VERSION__ })}</p>
+            <div className="rounded-xl bg-surface-muted/70 p-3 text-sm dark:bg-white/5">
+              <p className="font-extrabold text-ink" dir="ltr">
+                DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
+              </p>
+              <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-ink/65">
+                <a href={`mailto:${DEVELOPER.email}`} className="hover:text-brand-700">
+                  <bdi dir="ltr">{DEVELOPER.email}</bdi>
+                </a>
+                <a href={`tel:${DEVELOPER.phone}`} className="hover:text-brand-700">
+                  <bdi dir="ltr">{DEVELOPER.phoneDisplay}</bdi>
+                </a>
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

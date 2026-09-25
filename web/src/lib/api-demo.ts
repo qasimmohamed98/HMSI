@@ -88,8 +88,8 @@ let demoAbout: AboutContent = {
   mission: 'تمكين كل مستشفى من إدارة مرضاه رقمياً.',
   vision: 'ملف طبي رقمي آمن لكل مريض.',
   values: 'خصوصية المريض أولاً\nالبساطة\nالموثوقية',
-  phone: '',
-  email: '',
+  phone: '+964 774 477 7950',
+  email: 'qasimmohamed14@gmail.com',
   address: 'العراق',
   website: '',
 };

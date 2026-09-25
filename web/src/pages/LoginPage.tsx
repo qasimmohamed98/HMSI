@@ -6,6 +6,7 @@ import { Button, Input, Alert } from '@/components/ui';
 import { Logo } from '@/components/layout/Logo';
 import { useAuth } from '@/lib/auth';
 import { API } from '@/lib/api';
+import { DEVELOPER } from '@/lib/developer';
 import { setLanguage, currentLang } from '@/i18n';
 import { useTheme } from '@/lib/theme';
 
@@ -79,6 +80,9 @@ export default function LoginPage() {
           <Link to="/guide" className="hover:text-white">{t('nav.guide')}</Link>
           <Link to="/system" className="hover:text-white">{t('nav.aboutSystem')}</Link>
           <Link to="/about" className="hover:text-white">{t('nav.about')}</Link>
+          <Link to="/about" className="font-bold tracking-wide text-white/75 hover:text-white" dir="ltr">
+            DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
+          </Link>
         </p>
       </div>
 
@@ -148,6 +152,9 @@ export default function LoginPage() {
               <Link to="/guide" className="hover:underline">{t('nav.guide')}</Link>
               <Link to="/system" className="hover:underline">{t('nav.aboutSystem')}</Link>
               <Link to="/about" className="hover:underline">{t('nav.about')}</Link>
+            </p>
+            <p className="mt-3 text-center text-[0.7rem] font-bold tracking-wide text-ink/40 lg:hidden" dir="ltr">
+              DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
             </p>
 
             {/* تلميح الحسابات التجريبية فقط في وضع العرض — لا يظهر أبداً في الإنتاج */}
