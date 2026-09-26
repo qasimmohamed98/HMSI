@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Plus, ScanLine, PenLine, Trash2, Printer } from 'lucide-react';
-import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
+import { Button, Dialog, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
 import { RecordFiles } from './RecordFiles';
-import { CatalogSuggestions } from './CatalogSuggestions';
+import { ImagingOrderDialog } from '@/features/radiology/ImagingOrderDialog';
 import { printRadiologyReport } from '../printChart';
 import { useAuth } from '@/lib/auth';
-import { API, type RadiologyInput, type RadiologyUpdateInput, type ChartData } from '@/lib/api';
+import { API, type RadiologyUpdateInput, type ChartData } from '@/lib/api';
 import { fmtDateTime, localName } from '@/lib/format';
 import { useToast, useConfirm } from '@/components/ui';
 
@@ -95,11 +95,13 @@ export function RadiologySection({ chart, canOrder, canResult, onNeedVisit, auto
                     <p className="font-bold text-ink">{localName(r, 'study_type')}</p>
                     <p className="text-xs text-ink/50">
                       {fmtDateTime(r.ordered_at)} · {t('radiology.orderedBy')}: {r.ordered_by}
+                      {r.indication ? ` · ${r.indication}` : ''}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={r.report ? 'success' : 'warning'}>{r.report ? t('laboratory.statuses.resulted') : t('laboratory.statuses.ordered')}</Badge>
+                  {r.priority && r.priority !== 'routine' && <Badge variant={r.priority === 'stat' ? 'danger' : 'warning'}>{t(`imaging.priorities.${r.priority}`)}</Badge>}
+                  <Badge variant={r.stage === 'verified' ? 'success' : r.stage === 'reported' ? 'info' : r.stage === 'performed' ? 'brand' : 'warning'}>{t(`imaging.stages.${r.stage ?? (r.report ? 'verified' : 'ordered')}`)}</Badge>
                   {r.report && (
                     <Button size="icon-sm" variant="ghost" aria-label={t('print.radReport')} title={t('print.radReport')} onClick={() => printRadiologyReport(chart, t, user, r.id)}>
                       <Printer className="h-4 w-4" />
@@ -129,6 +131,7 @@ export function RadiologySection({ chart, canOrder, canResult, onNeedVisit, auto
               {r.report && (
                 <div className="mt-3 rounded-lg bg-surface-muted/80 px-3.5 py-3 dark:bg-white/5">
                   <p className="text-sm leading-relaxed text-ink/85">{r.report}</p>
+                  {r.stage === 'reported' && <p className="mt-1.5 text-xs font-semibold text-info-600 dark:text-info-300">{t('imaging.preliminaryNote')}</p>}
                   {r.performed_by && <p className="mt-1.5 text-xs text-ink/45">{t('radiology.performedBy')}: {r.performed_by}</p>}
                 </div>
               )}
@@ -138,7 +141,7 @@ export function RadiologySection({ chart, canOrder, canResult, onNeedVisit, auto
         </div>
       )}
 
-      <AddRadiologyDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} withReport={canResult} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
+      <ImagingOrderDialog open={open} onClose={() => setOpen(false)} admissionId={chart.admissionId} gender={chart.patient.gender ?? null} withReport={canResult} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />
       {editRad && chart.admissionId && (
         <ReportRadiologyDialog
           open
@@ -186,44 +189,6 @@ function ReportRadiologyDialog({
     >
       <div className="space-y-4">
         <Textarea label={t('radiology.report')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} autoFocus />
-      </div>
-    </Dialog>
-  );
-}
-
-function AddRadiologyDialog({ open, onClose, admissionId, withReport, onSubmit, busy }: { open: boolean; onClose: () => void; admissionId: string | null; withReport: boolean; onSubmit: (i: RadiologyInput) => void; busy: boolean }) {
-  const { t } = useTranslation();
-  const [studyTypeAr, setStudyTypeAr] = useState('');
-  const [report, setReport] = useState('');
-
-  if (!admissionId) return null;
-  const submit = () => {
-    if (studyTypeAr.trim().length < 2) return;
-    onSubmit({ admissionId, studyTypeAr, report: withReport ? report.trim() || null : null });
-    setStudyTypeAr('');
-    setReport('');
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={withReport ? t('radiology.add') : t('orders.radOrder')}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={submit} loading={busy}>
-            {t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder={t('examples.radiology')} list="catalog-imaging" hint={t('orders.catalogHint')} />
-        <CatalogSuggestions id="catalog-imaging" kind="imaging" />
-        {withReport && <Textarea label={t('orders.reportOptional')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} />}
       </div>
     </Dialog>
   );

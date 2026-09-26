@@ -1,6 +1,10 @@
 import type {
   User,
   Role,
+  ImagingPriority,
+  ImagingStage,
+  SafetyAnswers,
+  SafetyQuestion,
   DepartmentKind,
   DepartmentUnit,
   Modality,
@@ -136,6 +140,57 @@ export interface RadiologyInput {
   studyTypeEn?: string | null;
   /** اختياري: بدون تقرير = طلب أشعة */
   report?: string | null;
+  /** فحص من كتالوج الخدمات (يحدد نوع الجهاز والصبغة) */
+  serviceId?: string | null;
+  priority?: ImagingPriority;
+  /** سبب الطلب (الاستطباب السريري) */
+  indication?: string | null;
+  safety?: SafetyAnswers | null;
+}
+
+/** بند في قائمة عمل الأشعة */
+export interface RadiologyWorkItem {
+  id: string;
+  admission_id: string;
+  patient_id: string;
+  full_name_ar: string;
+  full_name_en: string | null;
+  file_number: string;
+  gender: 'male' | 'female' | null;
+  birth_date: string | null;
+  encounter_type: EncounterType;
+  referral_source: string | null;
+  room: string | null;
+  bed_no: string | null;
+  ward_name_ar: string | null;
+  ward_name_en: string | null;
+  study_type_ar: string;
+  study_type_en: string | null;
+  modality: Modality | null;
+  priority: ImagingPriority;
+  indication: string | null;
+  stage: ImagingStage;
+  ordered_by: string;
+  ordered_at: string;
+  prep_ar: string | null;
+  prep_en: string | null;
+  unit_id: string | null;
+  unit_name_ar: string | null;
+  unit_name_en: string | null;
+  exam_done_by: string | null;
+  exam_done_at: string | null;
+  exam_note: string | null;
+  report: string | null;
+  performed_by: string | null;
+  performed_at: string | null;
+  verified_by: string | null;
+  safety: { questions: SafetyQuestion[]; answers: SafetyAnswers; warnings: string[]; unanswered: string[] };
+  files: { id: string; admission_id: string; file_name: string; size: number }[];
+}
+
+export interface RadiologyWorklist {
+  counts: Partial<Record<ImagingPriority, number>>;
+  items: RadiologyWorkItem[];
 }
 
 export interface ConsultationInput {
@@ -703,6 +758,9 @@ export interface Api {
   createUnit(departmentId: string, input: UnitInput): Promise<DepartmentUnit>;
   updateUnit(id: string, input: Partial<UnitInput>): Promise<DepartmentUnit>;
   deleteUnit(id: string): Promise<void>;
+  // قائمة عمل الأشعة (فني الأشعة وطبيبها)
+  radiologyWorklist(params?: { view?: 'open' | 'done'; modality?: Modality }): Promise<RadiologyWorklist>;
+  performRadiology(id: string, input: { unitId?: string | null; note?: string | null; safetyConfirmed: boolean }): Promise<void>;
   // كتالوج الخدمات والأسعار
   listServices(filter?: { kind?: ServiceKind; modality?: Modality; q?: string; all?: boolean }): Promise<ServiceItem[]>;
   createService(input: ServiceInput): Promise<ServiceItem>;

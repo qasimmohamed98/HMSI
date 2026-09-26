@@ -1,71 +1,94 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { PenLine, Plus, ScanLine } from 'lucide-react';
-import { Button, Dialog, Input, Textarea, Badge, Skeleton, EmptyState, Card, CardContent } from '@/components/ui';
+import { AlertTriangle, PenLine, Play, ScanLine, ShieldAlert } from 'lucide-react';
+import { hasPermission, type DepartmentUnit, type Modality } from '@hmsi/shared';
+import { Button, Dialog, Textarea, Select, Badge, Skeleton, EmptyState, Card, CardContent, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { API, type RadiologyInput, type RadiologyUpdateInput } from '@/lib/api';
-import { useToast } from '@/components/ui';
-import { fmtDateTime, localName } from '@/lib/format';
-import { AdmittedPatientCard, useAdmittedCharts } from '@/features/departments';
-import { RecordFiles } from '@/features/patient/sections/RecordFiles';
+import { API, type RadiologyUpdateInput, type RadiologyWorkItem } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { currentLang } from '@/i18n';
+import { localizeServerMessage } from '@/i18n/server-messages';
+import { calcAge, fmtDateTime, localName } from '@/lib/format';
+import { cn } from '@/lib/utils';
+import { RecordFileChips } from '@/features/patient/sections/RecordFiles';
 
+const STRIPE = { stat: 'bg-danger-600', urgent: 'bg-warning-500', routine: 'bg-transparent' } as const;
+
+/** قائمة عمل الأشعة: كل الطلبات الجارية في المستشفى (منوَّمون ومراجعون وطوارئ وفحص فقط) مرتبة بالأولوية */
 export default function RadiologyPage() {
   const { t } = useTranslation();
-  const { data, isLoading, error, refetch, refetchAll } = useAdmittedCharts();
+  const { user } = useAuth();
+  const qc = useQueryClient();
   const toast = useToast();
-  const [pendingOnly, setPendingOnly] = useState(true);
-  const [dialog, setDialog] = useState<string | null>(null);
-  const [reportFor, setReportFor] = useState<{ admissionId: string; id: string; study: string } | null>(null);
+  const [view, setView] = useState<'open' | 'done'>('open');
+  const [modality, setModality] = useState<Modality | ''>('');
+  const [performFor, setPerformFor] = useState<RadiologyWorkItem | null>(null);
+  const [reportFor, setReportFor] = useState<RadiologyWorkItem | null>(null);
 
-  // كتابة تقرير لطلب أشعة موجود (بدل إنشاء سجل جديد)
+  const canPerform = hasPermission(user?.role, 'radiology.perform') || hasPermission(user?.role, 'radiology.verify');
+  const canReport = hasPermission(user?.role, 'radiology.add_report');
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['radiology', 'worklist', view, modality],
+    queryFn: () => API.radiologyWorklist({ view, modality: modality || undefined }),
+    refetchInterval: 30_000,
+  });
+  const refresh = () => void qc.invalidateQueries({ queryKey: ['radiology', 'worklist'] });
+
   const reportMut = useMutation({
-    mutationFn: (args: { admissionId: string; id: string; input: RadiologyUpdateInput }) => API.updateRadiology(args.admissionId, args.id, args.input),
+    mutationFn: (a: { item: RadiologyWorkItem; input: RadiologyUpdateInput }) => API.updateRadiology(a.item.admission_id, a.item.id, a.input),
     onSuccess: () => {
-      refetchAll();
+      refresh();
       setReportFor(null);
       toast.success(t('common.done'));
     },
+    onError: (e) => toast.error(e instanceof Error ? localizeServerMessage(e.message) : t('errors.generic')),
   });
 
-  const mut = useMutation({
-    mutationFn: API.addRadiology,
-    onSuccess: () => {
-      refetchAll();
-      setDialog(null);
-      toast.success(t('common.done'));
-    },
-  });
-
-  const isPending = (r: { report: string | null }) => !r.report;
-  const rows = (data ?? [])
-    .map((d) => ({ ...d, items: pendingOnly ? d.chart.radiology.filter(isPending) : d.chart.radiology }))
-    .filter((d) => !pendingOnly || d.items.length > 0);
-  const pendingCount = (data ?? []).reduce((n, d) => n + d.chart.radiology.filter(isPending).length, 0);
+  const c = data?.counts ?? {};
+  const modalities = ['XR', 'CT', 'MR', 'US', 'MG', 'RF', 'DXA', 'IR', 'NM'] as const;
 
   return (
     <div>
-      <PageHeader title={t('nav.radiology')} subtitle={t('dept.radSubtitle')}
+      <PageHeader
+        title={t('nav.radiology')}
+        subtitle={t('dept.radSubtitle')}
         actions={
-          <div className="flex rounded-lg border border-ink/10 p-0.5 dark:border-white/10">
-            {[true, false].map((v) => (
-              <button
-                key={String(v)}
-                type="button"
-                onClick={() => setPendingOnly(v)}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${pendingOnly === v ? 'bg-brand-600 text-white' : 'text-ink/60 hover:text-ink'}`}
-              >
-                {v ? `${t('ui.pendingOnly')} (${pendingCount})` : t('ui.showAll')}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label={t('imaging.allModalities')}
+              value={modality}
+              onChange={(e) => setModality(e.target.value as Modality | '')}
+              className="h-9 rounded-lg border border-ink/12 bg-surface-raised px-2.5 text-sm font-semibold text-ink dark:border-white/12"
+            >
+              <option value="">{t('imaging.allModalities')}</option>
+              {modalities.map((m) => (
+                <option key={m} value={m}>
+                  {t(`org.modality.${m}`)}
+                </option>
+              ))}
+            </select>
+            <div className="flex rounded-lg border border-ink/10 p-0.5 dark:border-white/10">
+              {(['open', 'done'] as const).map((v) => (
+                <button key={v} type="button" onClick={() => setView(v)} className={cn('rounded-md px-3 py-1.5 text-sm font-semibold', view === v ? 'bg-brand-600 text-white' : 'text-ink/60 hover:text-ink')}>
+                  {t(`imaging.${v}`)}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
 
+      {view === 'open' && data && data.items.length > 0 && (
+        <p className="mb-3 text-sm font-semibold text-ink/60">{t('imaging.counts', { stat: c.stat ?? 0, urgent: c.urgent ?? 0, routine: c.routine ?? 0 })}</p>
+      )}
+
       {isLoading ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full rounded-2xl" />
+            <Skeleton key={i} className="h-36 w-full rounded-2xl" />
           ))}
         </div>
       ) : error || !data ? (
@@ -74,130 +97,227 @@ export default function RadiologyPage() {
             <EmptyState title={t('errors.generic')} action={{ label: t('common.retry'), onClick: () => void refetch() }} />
           </CardContent>
         </Card>
-      ) : rows.length === 0 ? (
+      ) : data.items.length === 0 ? (
         <Card>
           <CardContent>
-            <EmptyState title={pendingOnly ? t('ui.noPending') : t('dept.noAdmitted')} icon={<ScanLine className="h-6 w-6" />} />
+            <EmptyState title={view === 'open' ? t('imaging.emptyOpen') : t('imaging.emptyDone')} icon={<ScanLine className="h-6 w-6" />} />
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {rows.map(({ patient, chart, items }) => (
-            <AdmittedPatientCard key={patient.id} patient={patient}>
-              {items.length === 0 ? (
-                <p className="py-2 text-center text-sm font-medium text-ink/45">{t('radiology.empty')}</p>
-              ) : (
-                <ul className="space-y-2.5">
-                  {items.map((r) => (
-                    <li key={r.id} className="rounded-lg border border-ink/8 px-3.5 py-2.5 dark:border-white/10">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-bold text-ink">{localName(r, 'study_type')}</p>
-                        <Badge variant={r.report ? 'success' : 'warning'}>{r.report ? t('laboratory.statuses.resulted') : t('laboratory.statuses.ordered')}</Badge>
-                      </div>
-                      <p className="mt-0.5 text-xs text-ink/50">{fmtDateTime(r.ordered_at)}</p>
-                      {r.report ? (
-                        <p className="mt-2 text-sm leading-relaxed text-ink/80">{r.report}</p>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-2"
-                          icon={<PenLine className="h-3.5 w-3.5" />}
-                          onClick={() => setReportFor({ admissionId: r.admission_id, id: r.id, study: localName(r, 'study_type') })}
-                        >
-                          {t('actions.enterReport')}
-                        </Button>
-                      )}
-                      <RecordFiles chart={chart} recordType="radiology" recordId={r.id} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="mt-3">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setDialog(chart.admissionId)}
-                  icon={<Plus className="h-4 w-4" />}
-                >
-                  {t('radiology.add')}
-                </Button>
-              </div>
-            </AdmittedPatientCard>
+        <ul className="space-y-3">
+          {data.items.map((it) => (
+            <WorkCard key={it.id} item={it} canPerform={canPerform} canReport={canReport} onPerform={() => setPerformFor(it)} onReport={() => setReportFor(it)} />
           ))}
-        </div>
+        </ul>
       )}
 
-      {dialog && <AddReportDialog key={dialog} admissionId={dialog} open onClose={() => setDialog(null)} onSubmit={(i) => mut.mutate(i)} busy={mut.isPending} />}
+      {performFor && <PerformDialog key={performFor.id} item={performFor} onClose={() => setPerformFor(null)} onDone={() => { setPerformFor(null); refresh(); }} />}
       {reportFor && (
-        <WriteReportDialog
-          key={reportFor.id}
-          study={reportFor.study}
-          onClose={() => setReportFor(null)}
-          onSubmit={(input) => reportMut.mutate({ admissionId: reportFor.admissionId, id: reportFor.id, input })}
-          busy={reportMut.isPending}
-        />
+        <ReportDialog key={reportFor.id} item={reportFor} onClose={() => setReportFor(null)} busy={reportMut.isPending} onSubmit={(input) => reportMut.mutate({ item: reportFor, input })} />
       )}
     </div>
   );
 }
 
-function AddReportDialog({
-  open,
-  onClose,
-  admissionId,
-  onSubmit,
-  busy,
-}: {
-  open: boolean;
-  onClose: () => void;
-  admissionId: string | null;
-  onSubmit: (i: RadiologyInput) => void;
-  busy: boolean;
-}) {
-  const { t } = useTranslation();
-  const [studyTypeAr, setStudyTypeAr] = useState('');
-  const [report, setReport] = useState('');
+function questionText(item: RadiologyWorkItem, key: string) {
+  const q = item.safety.questions.find((x) => x.key === key);
+  return q ? (currentLang() === 'en' ? q.en : q.ar) : key;
+}
 
-  if (!admissionId) return null;
-  const submit = () => {
-    if (studyTypeAr.trim().length < 2) return;
-    onSubmit({ admissionId, studyTypeAr: studyTypeAr.trim(), report });
-    setStudyTypeAr('');
-    setReport('');
-  };
+function WorkCard({ item, canPerform, canReport, onPerform, onReport }: { item: RadiologyWorkItem; canPerform: boolean; canReport: boolean; onPerform: () => void; onReport: () => void }) {
+  const { t } = useTranslation();
+  const en = currentLang() === 'en';
+  const waiting = item.stage === 'ordered' || item.stage === 'scheduled';
+  const where = item.encounter_type === 'inpatient' && item.ward_name_ar ? t('dept.wardBed', { ward: localName({ name_ar: item.ward_name_ar, name_en: item.ward_name_en }, 'name'), bed: item.bed_no ?? '—' }) : null;
+  const prep = en && item.prep_en ? item.prep_en : item.prep_ar;
+  const w = item.safety.warnings.length;
+  const un = item.safety.unanswered.length;
+
+  return (
+    <li className="relative overflow-hidden rounded-2xl border border-ink/10 bg-surface-raised dark:border-white/10">
+      <span className={cn('absolute inset-y-0 start-0 w-1.5', STRIPE[item.priority])} aria-hidden />
+      <div className="space-y-2.5 p-4 ps-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <Link to={`/patients/${item.patient_id}?tab=radiology`} className="text-base font-extrabold text-ink hover:underline">
+              {localName(item, 'full_name')}
+            </Link>
+            <p className="text-xs text-ink/55">
+              {item.file_number}
+              {item.birth_date ? ` · ${calcAge(item.birth_date)}` : ''}
+              {item.gender ? ` · ${t(`gender.${item.gender}`)}` : ''}
+              {` · ${t(`encounter.types.${item.encounter_type}`)}`}
+              {where ? ` · ${where}` : ''}
+              {item.referral_source ? ` · ${t('encounter.referredBy', { source: item.referral_source })}` : ''}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {item.priority !== 'routine' && <Badge variant={item.priority === 'stat' ? 'danger' : 'warning'}>{t(`imaging.priorities.${item.priority}`)}</Badge>}
+            <Badge variant={item.stage === 'verified' ? 'success' : item.stage === 'reported' ? 'info' : item.stage === 'performed' ? 'brand' : 'warning'}>{t(`imaging.stages.${item.stage}`)}</Badge>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <ScanLine className="h-4 w-4 shrink-0 text-info-600" />
+          <span className="font-bold text-ink">{en && item.study_type_en ? item.study_type_en : item.study_type_ar}</span>
+          {item.modality && <Badge variant="info">{t(`org.modality.${item.modality}`)}</Badge>}
+        </div>
+        {item.indication && (
+          <p className="text-sm text-ink/80">
+            <span className="font-semibold text-ink/55">{t('imaging.reasonLabel')}: </span>
+            {item.indication}
+          </p>
+        )}
+        <p className="text-xs text-ink/50">{t('imaging.ordered', { by: item.ordered_by, at: fmtDateTime(item.ordered_at) })}</p>
+
+        {waiting && (w > 0 || un > 0) && (
+          <div className={cn('rounded-lg border px-3 py-2 text-sm', w > 0 ? 'border-danger-300 bg-danger-50 text-danger-800 dark:border-danger-700 dark:bg-danger-900/25 dark:text-danger-100' : 'border-warning-300 bg-warning-50 text-warning-800 dark:border-warning-700 dark:bg-warning-900/25 dark:text-warning-100')}>
+            <p className="flex items-center gap-1.5 font-bold">
+              {w > 0 ? <ShieldAlert className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+              {w > 0 ? t('imaging.warnCount', { n: w }) : t('imaging.unansweredCount', { n: un })}
+              {w > 0 && un > 0 ? ` · ${t('imaging.unansweredCount', { n: un })}` : ''}
+            </p>
+            {w > 0 && (
+              <ul className="mt-1 list-disc ps-5">
+                {item.safety.warnings.map((k) => (
+                  <li key={k}>{questionText(item, k)}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {waiting && prep && (
+          <p className="text-xs leading-relaxed text-ink/60">
+            <span className="font-bold">{t('imaging.prep')}: </span>
+            {prep}
+          </p>
+        )}
+
+        {item.exam_done_at && (
+          <p className="text-xs font-semibold text-ink/60">
+            {t('imaging.performedAt', { by: item.exam_done_by ?? '—', at: fmtDateTime(item.exam_done_at) })}
+            {item.unit_name_ar ? ` · ${localName({ name_ar: item.unit_name_ar, name_en: item.unit_name_en }, 'name')}` : ''}
+            {item.exam_note ? ` — ${item.exam_note}` : ''}
+          </p>
+        )}
+        {item.report && (
+          <div className="rounded-lg bg-surface-muted/80 px-3.5 py-3 dark:bg-white/5">
+            <p className="whitespace-pre-line text-sm leading-relaxed text-ink/85">{item.report}</p>
+            <p className="mt-1.5 text-xs text-ink/45">
+              {item.stage === 'verified' ? t('imaging.verifiedBy', { name: item.verified_by ?? item.performed_by ?? '—' }) : t('imaging.reportedBy', { name: item.performed_by ?? '—' })}
+            </p>
+            {item.stage === 'reported' && <p className="mt-0.5 text-xs font-semibold text-info-600 dark:text-info-300">{t('imaging.preliminaryNote')}</p>}
+          </div>
+        )}
+
+        <RecordFileChips admissionId={item.admission_id} files={item.files} recordType="radiology" recordId={item.id} />
+
+        {(canPerform || canReport) && item.stage !== 'verified' && (
+          <div className="flex flex-wrap gap-2 pt-0.5">
+            {waiting && canPerform && (
+              <Button size="sm" icon={<Play className="h-3.5 w-3.5" />} onClick={onPerform}>
+                {t('imaging.perform')}
+              </Button>
+            )}
+            {canReport && (item.stage === 'performed' || item.stage === 'reported' || (waiting && !canPerform)) && (
+              <Button size="sm" variant={item.stage === 'performed' ? 'primary' : 'outline'} icon={<PenLine className="h-3.5 w-3.5" />} onClick={onReport}>
+                {t('imaging.writeReport')}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function PerformDialog({ item, onClose, onDone }: { item: RadiologyWorkItem; onClose: () => void; onDone: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const en = currentLang() === 'en';
+  const { data: units } = useQuery({ queryKey: ['units', 'all'], queryFn: () => API.listUnits(), staleTime: 60_000 });
+  const [unitId, setUnitId] = useState(item.unit_id ?? '');
+  const [note, setNote] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const needsConfirm = item.safety.questions.length > 0;
+
+  // أجهزة من نوع الفحص فقط (أو بلا نوع)؛ ما ليس «يعمل» يظهر معطّلاً
+  const list: DepartmentUnit[] = (units ?? []).filter((u) => !item.modality || !u.modality || u.modality === item.modality);
+  const mut = useMutation({
+    mutationFn: () => API.performRadiology(item.id, { unitId: unitId || null, note, safetyConfirmed: confirmed }),
+    onSuccess: () => {
+      toast.success(t('imaging.performed'));
+      onDone();
+    },
+    onError: (e) => toast.error(e instanceof Error ? localizeServerMessage(e.message) : t('errors.generic')),
+  });
 
   return (
     <Dialog
-      open={open}
+      open
       onClose={onClose}
-      title={t('radiology.add')}
+      title={t('imaging.performTitle', { name: en && item.study_type_en ? item.study_type_en : item.study_type_ar })}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={submit} loading={busy}>
-            {t('common.save')}
+          <Button onClick={() => mut.mutate()} loading={mut.isPending} disabled={needsConfirm && !confirmed}>
+            {t('imaging.perform')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder={t('examples.radiology')} />
-        <Textarea label={t('radiology.report')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} />
+        <p className="text-sm font-semibold text-ink/70">
+          {localName(item, 'full_name')} · {item.file_number}
+        </p>
+
+        {needsConfirm && (
+          <div className="rounded-xl border border-ink/10 p-3.5 dark:border-white/10">
+            <p className="mb-2 text-sm font-bold text-ink">{t('imaging.safetyReview')}</p>
+            <ul className="space-y-1.5">
+              {item.safety.questions.map((q) => {
+                const a = item.safety.answers[q.key];
+                const warn = a === q.warnIf;
+                return (
+                  <li key={q.key} className="flex items-start justify-between gap-3 text-sm">
+                    <span className={cn('flex-1', warn ? 'font-bold text-danger-700 dark:text-danger-300' : 'text-ink/80')}>{en ? q.en : q.ar}</span>
+                    <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-bold', warn ? 'bg-danger-600 text-white' : a ? 'bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-200' : 'bg-ink/8 text-ink/50')}>
+                      {a ? t(`imaging.${a}`) : t('imaging.notAnswered')}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm font-semibold text-ink">
+              <input type="checkbox" className="mt-1 h-4 w-4" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+              {t('imaging.confirmSafety')}
+            </label>
+          </div>
+        )}
+
+        <Select
+          label={t('imaging.device')}
+          value={unitId}
+          onChange={(e) => setUnitId(e.target.value)}
+          placeholder={t('imaging.anyDevice')}
+          options={list.map((u) => ({ value: u.id, label: `${localName(u, 'name')}${u.status !== 'active' ? ` — ${t(`org.unitStatus.${u.status}`)}` : ''}` }))}
+        />
+        <Textarea label={t('imaging.techNote')} rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('imaging.techNoteHint')} />
       </div>
     </Dialog>
   );
 }
-function WriteReportDialog({ study, onClose, onSubmit, busy }: { study: string; onClose: () => void; onSubmit: (i: RadiologyUpdateInput) => void; busy: boolean }) {
+
+function ReportDialog({ item, onClose, onSubmit, busy }: { item: RadiologyWorkItem; onClose: () => void; onSubmit: (i: RadiologyUpdateInput) => void; busy: boolean }) {
   const { t } = useTranslation();
-  const [report, setReport] = useState('');
+  const [report, setReport] = useState(item.report ?? '');
   return (
     <Dialog
       open
       onClose={onClose}
-      title={`${t('actions.enterReport')} — ${study}`}
+      title={`${t('imaging.writeReport')} — ${item.study_type_ar}`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -209,7 +329,7 @@ function WriteReportDialog({ study, onClose, onSubmit, busy }: { study: string; 
         </>
       }
     >
-      <Textarea label={t('radiology.report')} rows={5} value={report} onChange={(e) => setReport(e.target.value)} autoFocus />
+      <Textarea label={t('radiology.report')} rows={7} value={report} onChange={(e) => setReport(e.target.value)} autoFocus />
     </Dialog>
   );
 }

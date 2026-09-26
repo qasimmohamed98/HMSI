@@ -338,7 +338,7 @@ export const GUIDE_AR: GuideContent = {
         {
           id: 'orders',
           title: 'طلب التحاليل والأشعة',
-          steps: ['في تبويب «المختبر» اضغط «طلب فحص» واكتب اسم الفحص.', 'في تبويب «الأشعة» اضغط «طلب أشعة» واختر نوع الدراسة.', 'يظهر الطلب «معلّق» حتى يُدخل الفني النتيجة، ثم تظهر النتيجة مباشرة في الملف.'],
+          steps: ['في تبويب «المختبر» اضغط «طلب فحص» واكتب اسم الفحص.', 'في تبويب «الأشعة» اضغط «طلب أشعة»، ابحث عن الفحص (مفراس، رنين، سونار…)، اختر الأولوية، اكتب سبب الطلب وأجب عن أسئلة الأمان التي تعرفها.', 'يظهر الطلب «معلّق» حتى يُدخل الفني النتيجة، ثم تظهر النتيجة مباشرة في الملف.'],
           images: [img('chart-lab', 'تبويب المختبر'), img('chart-lab-order', 'طلب فحص جديد')],
         },
         {
@@ -447,7 +447,13 @@ export const GUIDE_AR: GuideContent = {
         {
           id: 'rad-reports',
           title: 'تقارير الأشعة',
-          steps: ['افتح «الأشعة» — تظهر الطلبات المعلّقة.', 'اضغط «إدخال التقرير» واكتب التقرير ثم «حفظ».'],
+          steps: [
+            'افتح «الأشعة» — قائمة عمل بكل الطلبات الجارية في المستشفى، الأعلى أولوية أولاً (عاجل جداً ثم عاجل ثم عادي). تصلك إشعارات عند وصول طلب جديد، والعاجل جداً بتنبيه أقوى.',
+            'كل بطاقة فيها المريض ونوع الفحص وسبب الطلب وتعليمات التحضير. إن ظهر مربع أحمر فهو تنبيه أمان (حمل، صبغة وكلى، معادن في الرنين…) — راجعه مع المريض قبل الفحص.',
+            'اضغط «تنفيذ الفحص»، اختر الجهاز أو الغرفة، وأكّد مراجعة أسئلة الأمان، ثم اضغط «تنفيذ الفحص». يُسجَّل من نفّذ ومتى.',
+            'بعد التنفيذ اضغط «كتابة التقرير» واكتبه ثم «حفظ». تقرير الفني «أولي»، وتقرير طبيب الأشعة «معتمد»، ويصل الإشعار لمن طلب الفحص.',
+            'أرفق صور الفحص أو نسخة PDF بزر «إرفاق ملف» أسفل البطاقة. تبويب «المنتهية» يعرض ما أُنجز في آخر ٣ أيام.',
+          ],
           images: [img('radiology-page', 'صفحة الأشعة')],
         },
       ],
@@ -806,7 +812,7 @@ export const GUIDE_EN: GuideContent = {
         {
           id: 'orders',
           title: 'Ordering labs and imaging',
-          steps: ['In “Laboratory” press “Order test” and enter the test name.', 'In “Radiology” press “Order imaging”.', 'The order stays “Pending” until the technician enters the result, which then appears in the chart.'],
+          steps: ['In “Laboratory” press “Order test” and enter the test name.', 'In “Radiology” press “Order imaging”, search the exam (CT, MRI, ultrasound…), pick its priority, write the reason and answer the safety questions you know.', 'The order stays “Pending” until the technician enters the result, which then appears in the chart.'],
           images: [imgEn('chart-lab', 'Laboratory tab'), imgEn('chart-lab-order', 'New lab order')],
         },
         {
@@ -915,7 +921,13 @@ export const GUIDE_EN: GuideContent = {
         {
           id: 'rad-reports',
           title: 'Radiology reports',
-          steps: ['Open “Radiology” — pending orders are shown.', 'Press “Enter report”, write it and “Save”.'],
+          steps: [
+            'Open “Radiology” — a worklist of every open order in the hospital, highest priority first (STAT, urgent, routine). You are notified when a new order arrives; STAT alerts are louder.',
+            'Each card shows the patient, the exam, the reason for the request and the preparation. A red box is a safety warning (pregnancy, contrast and kidneys, metal in MRI…) — check it with the patient before the exam.',
+            'Press “Perform exam”, choose the device or room, confirm you reviewed the safety questions, then press “Perform exam”. Who did it and when is recorded.',
+            'After the exam press “Write report”, write it and “Save”. A technologist’s report is “preliminary”, a radiologist’s is “verified”, and whoever ordered the exam is notified.',
+            'Attach exam images or a PDF copy with “Attach file” under the card. The “Finished” tab shows the last 3 days.',
+          ],
           images: [imgEn('radiology-page', 'Radiology page')],
         },
       ],

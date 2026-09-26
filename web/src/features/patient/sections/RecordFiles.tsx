@@ -17,20 +17,25 @@ const ALLOWED = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'applicat
  * الرفع لمن يملك files.manage (الأطباء، التمريض، فني/طبيب الأشعة، المختبر).
  */
 export function RecordFiles({ chart, recordType, recordId }: { chart: ChartData; recordType: 'radiology' | 'lab'; recordId: string }) {
+  const files = chart.attachments.filter((a) => a.record_type === recordType && a.record_id === recordId);
+  return <RecordFileChips admissionId={chart.admissionId} files={files} recordType={recordType} recordId={recordId} />;
+}
+
+/** نفس المكوّن لمن لا يملك ملف المريض كاملاً (قائمة عمل الأشعة): الملفات وقسم الزيارة يأتيان من الخادم */
+export function RecordFileChips({ admissionId, files, recordType, recordId }: { admissionId: string | null; files: { id: string; admission_id: string; file_name: string; size: number }[]; recordType: 'radiology' | 'lab'; recordId: string }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
-  const files = chart.attachments.filter((a) => a.record_type === recordType && a.record_id === recordId);
-  const canUpload = Boolean(chart.admissionId) && hasPermission(user?.role, 'files.manage');
-  const admissionId = chart.admissionId;
+  const canUpload = Boolean(admissionId) && hasPermission(user?.role, 'files.manage');
 
   const upload = useMutation({
     mutationFn: (file: File) => API.uploadAttachment(admissionId!, file, { type: recordType, id: recordId }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['chart'] });
       void qc.invalidateQueries({ queryKey: ['dept', 'admitted'] });
+      void qc.invalidateQueries({ queryKey: ['radiology', 'worklist'] });
       toast.success(t('attachments.attached'));
     },
     onError: (e) => toast.error(e instanceof Error ? localizeServerMessage(e.message) : t('errors.generic')),

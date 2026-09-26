@@ -170,6 +170,8 @@ export const liveApi: Api = {
     request('/org/departments', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, kind: input.kind }) }),
   updateDepartment: (id, input) =>
     request(`/org/departments/${id}`, { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, kind: input.kind }) }),
+  radiologyWorklist: (p) => request(`/radiology/worklist${qs({ view: p?.view === 'done' ? 'done' : undefined, modality: p?.modality })}`),
+  performRadiology: (id, input) => request(`/radiology/${id}/perform`, { method: 'POST', body: JSON.stringify({ unit_id: input.unitId ?? null, note: input.note?.trim() || null, safety_confirmed: input.safetyConfirmed }) }),
   listUnits: (departmentId) => request(`/org/units${qs({ department: departmentId })}`),
   createUnit: (departmentId, input) => request(`/org/departments/${departmentId}/units`, { method: 'POST', body: JSON.stringify(input) }),
   updateUnit: (id, input) => request(`/org/units/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
@@ -282,6 +284,10 @@ export const liveApi: Api = {
         study_type_ar: input.studyTypeAr,
         study_type_en: input.studyTypeEn ?? null,
         report: input.report || null,
+        service_id: input.serviceId ?? undefined,
+        priority: input.priority ?? 'routine',
+        indication: input.indication?.trim() || null,
+        safety: input.safety && Object.keys(input.safety).length ? input.safety : null,
       }),
     }),
   addConsultation: (input) =>

@@ -43,6 +43,7 @@ import type {
   MedicationInput,
   LabInput,
   RadiologyInput,
+  RadiologyWorklist,
   ConsultationInput,
   ProcedureInput,
   DischargeInput,
@@ -537,6 +538,12 @@ export const demoApi: Api = {
   },
 
   // الأجهزة والكتالوج والزيارات تحتاج الخادم الحقيقي — العرض التوضيحي يعرضها فارغة
+  async radiologyWorklist(): Promise<RadiologyWorklist> {
+    return { counts: {}, items: [] };
+  },
+  async performRadiology(): Promise<void> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
   async listUnits() {
     return [];
   },
