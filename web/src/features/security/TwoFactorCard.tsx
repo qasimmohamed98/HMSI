@@ -14,6 +14,13 @@ export function TwoFactorCard() {
   const qc = useQueryClient();
   const toast = useToast();
   const status = useQuery({ queryKey: ['2fa-status'], queryFn: API.twofaStatus });
+  const forget = useMutation({
+    mutationFn: API.twofaForgetDevices,
+    onSuccess: () => {
+      void status.refetch();
+      toast.success(t('twofa.devicesForgotten'));
+    },
+  });
   const [setup, setSetup] = useState<{ secret: string; otpauth_url: string } | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [askPassword, setAskPassword] = useState<'disable' | 'codes' | null>(null);
@@ -39,10 +46,16 @@ export function TwoFactorCard() {
         {enabled ? (
           <>
             <p className="text-xs text-ink/50">{t('twofa.codesLeft', { count: status.data?.recovery_codes_left ?? 0 })}</p>
+            <p className="text-xs text-ink/50">{t('twofa.trustedDevices', { count: status.data?.trusted_devices ?? 0 })}</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" icon={<KeyRound className="h-4 w-4" />} onClick={() => setAskPassword('codes')}>
                 {t('twofa.newCodes')}
               </Button>
+              {(status.data?.trusted_devices ?? 0) > 0 && (
+                <Button variant="outline" size="sm" loading={forget.isPending} onClick={() => forget.mutate()}>
+                  {t('twofa.forgetDevices')}
+                </Button>
+              )}
               <Button variant="ghost" size="sm" className="text-danger-600" icon={<ShieldOff className="h-4 w-4" />} onClick={() => setAskPassword('disable')}>
                 {t('twofa.disable')}
               </Button>

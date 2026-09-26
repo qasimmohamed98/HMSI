@@ -11,7 +11,7 @@ interface AuthCtx {
   user: User | null;
   /** يعيد تذكرة الخطوة الثانية إن كان التحقق بخطوتين مفعّلاً، وإلا null بعد إتمام الدخول */
   login: (username: string, password: string) => Promise<{ mfaToken: string } | null>;
-  completeMfa: (mfaToken: string, code: string) => Promise<void>;
+  completeMfa: (mfaToken: string, code: string, remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   /** إعادة تحميل بيانات المستخدم (مثلاً بعد تبديل المستشفى) */
   refresh: () => Promise<void>;
@@ -71,8 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }, [qc]);
 
-  const completeMfa = useCallback(async (mfaToken: string, code: string) => {
-    const u = await API.loginMfa(mfaToken, code);
+  const completeMfa = useCallback(async (mfaToken: string, code: string, remember?: boolean) => {
+    const u = await API.loginMfa(mfaToken, code, remember);
     qc.clear();
     setUser(u);
     setStatus('authed');

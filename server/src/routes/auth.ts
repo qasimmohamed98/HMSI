@@ -12,6 +12,7 @@ import { writeAudit } from '../lib/audit.js';
 import { parseBody } from '../lib/validate.js';
 import { clientIp } from '../config.js';
 import { createMfaChallenge, isTotpEnabled } from './twofa.js';
+import { forgetAllDevices, isTrustedDevice } from '../lib/trustedDevice.js';
 
 export const authRoutes = new Hono();
 
@@ -47,7 +48,10 @@ authRoutes.post('/login', async (c) => {
   // كلمة مرور معروفة/ضعيفة (مثل الحسابات التجريبية): تغيير إجباري قبل أي عمل
   if (isWeakPassword(password, username)) await flagMustChangePassword(user.id);
   // التحقق بخطوتين: لا جلسة قبل الرمز
-  if (await isTotpEnabled(user.id)) {
+  // …إلا على جهاز اختار صاحبه «تذكّر هذا الجهاز» (30 يوماً)
+  const mfa = await isTotpEnabled(user.id);
+  const trusted = mfa && (await isTrustedDevice(c, user.id));
+  if (mfa && !trusted) {
     return c.json({ mfa_required: true, mfa_token: await createMfaChallenge(user.id) }, 200);
   }
   const full = await getUserById(user.id);
@@ -55,7 +59,7 @@ authRoutes.post('/login', async (c) => {
 
   await purgeExpired().catch(() => undefined);
   await createSession(c, full.id, ip, c.req.header('user-agent') ?? null);
-  await writeAudit({ actorId: full.id, action: 'login', resourceType: 'user', resourceId: full.id, ip });
+  await writeAudit({ actorId: full.id, action: 'login', resourceType: 'user', resourceId: full.id, ip, ...(trusted ? { meta: { mfa: 'trusted_device' } } : {}) });
   return c.json(full, 200);
 });
 
@@ -99,6 +103,8 @@ authRoutes.post('/password', requireAuth(), async (c) => {
   }
   if (isWeakPassword(new_password, session.user.username)) return c.json({ message: 'كلمة المرور هذه ضعيفة أو شائعة — اختر كلمة أقوى' }, 422);
   await setPassword(session.user.id, await hashPassword(new_password), session.sessionId);
+  // كلمة مرور جديدة: كل الأجهزة الموثوقة تعود لطلب رمز التحقق
+  await forgetAllDevices(session.user.id, c);
   await writeAudit({ actorId: session.user.id, action: 'password_changed', resourceType: 'user', resourceId: session.user.id, ip });
   return c.body(null, 204);
 });

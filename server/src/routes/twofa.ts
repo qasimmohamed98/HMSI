@@ -12,6 +12,7 @@ import { verifyPassword } from '../lib/password.js';
 import { getPasswordHash, getUserById } from '../repos/authRepo.js';
 import { createSession } from '../lib/session.js';
 import { consumeRecoveryCode, newRecoveryCodes, newTotpSecret, openSecret, otpauthUrl, sealSecret, verifyTotp } from '../lib/totp.js';
+import { countTrustedDevices, forgetAllDevices, trustThisDevice } from '../lib/trustedDevice.js';
 
 /**
  * التحقق بخطوتين (اختياري لكل مستخدم، ويُنصح به للمدراء):
@@ -79,12 +80,12 @@ async function checkCode(userId: string, row: TotpRow, code: string): Promise<'t
   return null;
 }
 
-const MfaLoginSchema = z.object({ mfa_token: z.string().min(10).max(200), code: z.string().trim().min(6).max(20) });
+const MfaLoginSchema = z.object({ mfa_token: z.string().min(10).max(200), code: z.string().trim().min(6).max(20), remember: z.boolean().optional() });
 
 twofaRoutes.post('/login', async (c) => {
   const parsed = await parseBody(c, MfaLoginSchema);
   if (!parsed.ok) return parsed.json;
-  const { mfa_token, code } = parsed.data as z.infer<typeof MfaLoginSchema>;
+  const { mfa_token, code, remember } = parsed.data as z.infer<typeof MfaLoginSchema>;
   const ip = clientIp(c);
   const r = await db.execute({
     sql: `SELECT id, user_id, attempts FROM mfa_challenges WHERE token_hash = ? AND expires_at > ? LIMIT 1`,
@@ -107,7 +108,8 @@ twofaRoutes.post('/login', async (c) => {
   const full = await getUserById(userId);
   if (!full) return c.json({ message: 'تعذر تحميل المستخدم' }, 500);
   await createSession(c, userId, ip, c.req.header('user-agent') ?? null);
-  await writeAudit({ actorId: userId, action: 'login', resourceType: 'user', resourceId: userId, ip, meta: { mfa: how } });
+  if (remember) await trustThisDevice(c, userId);
+  await writeAudit({ actorId: userId, action: 'login', resourceType: 'user', resourceId: userId, ip, meta: { mfa: how, remember: Boolean(remember) } });
   return c.json(full, 200);
 });
 
@@ -163,6 +165,7 @@ twofaRoutes.post('/disable', requireAuth(), async (c) => {
   const denied = await requirePassword(c, s.user.id);
   if (denied) return denied;
   await db.execute({ sql: `UPDATE users SET totp_enabled = 0, totp_secret = NULL, totp_recovery_json = NULL, totp_last_step = NULL WHERE id = ?`, args: [s.user.id] });
+  await forgetAllDevices(s.user.id, c);
   await writeAudit({ actorId: s.user.id, action: 'mfa_disabled', resourceType: 'user', resourceId: s.user.id, ip: clientIp(c) });
   return c.body(null, 204);
 });
@@ -187,7 +190,15 @@ twofaRoutes.get('/status', requireAuth(), async (c) => {
   } catch {
     /* */
   }
-  return c.json({ enabled: row?.totp_enabled === 1, recovery_codes_left: left }, 200);
+  return c.json({ enabled: row?.totp_enabled === 1, recovery_codes_left: left, trusted_devices: await countTrustedDevices(s.user.id) }, 200);
+});
+
+/** إلغاء تذكّر كل الأجهزة (فقدان هاتف أو حاسوب): يُطلب الرمز من جديد في كل مكان */
+twofaRoutes.post('/forget-devices', requireAuth(), async (c) => {
+  const s = getSession(c)!;
+  const n = await forgetAllDevices(s.user.id, c);
+  await writeAudit({ actorId: s.user.id, action: 'mfa_devices_forgotten', resourceType: 'user', resourceId: s.user.id, meta: { count: n }, ip: clientIp(c) });
+  return c.json({ forgotten: n });
 });
 
 /** مدير المستشفى يعيد ضبط التحقق بخطوتين لموظف فقد هاتفه (في نفس المستشفى فقط) */
@@ -201,6 +212,7 @@ twofaAdminRoutes.post('/:id/2fa/reset', requireAuth(), requirePermission('users.
   if (String((rows.rows[0] as Record<string, unknown>).role) === 'super_admin') return c.json({ message: 'لا يمكن تعديل حساب المدير العام' }, 403);
   await db.execute({ sql: `UPDATE users SET totp_enabled = 0, totp_secret = NULL, totp_recovery_json = NULL, totp_last_step = NULL WHERE id = ?`, args: [id] });
   await db.execute({ sql: `DELETE FROM sessions WHERE user_id = ?`, args: [id] });
+  await forgetAllDevices(id);
   await writeAudit({ actorId: s.user.id, action: 'mfa_reset', resourceType: 'user', resourceId: id, ip: clientIp(c) });
   return c.body(null, 204);
 });

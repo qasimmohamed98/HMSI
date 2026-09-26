@@ -49,6 +49,7 @@ export async function purgeHospital(hospitalId: string, keepUserIds: string[] = 
     await run('sessions', `DELETE FROM sessions WHERE user_id IN (${USERS})`, U);
     await tx.execute({ sql: `UPDATE sessions SET active_hospital_id = NULL WHERE active_hospital_id = ?`, args: H });
     await run('mfa_challenges', `DELETE FROM mfa_challenges WHERE user_id IN (${USERS})`, U);
+    await run('trusted_devices', `DELETE FROM trusted_devices WHERE user_id IN (${USERS})`, U);
     await run('audit_logs', `DELETE FROM audit_logs WHERE actor_id IN (${USERS})`, U);
     await run('timeline_events', `DELETE FROM timeline_events WHERE actor_id IN (${USERS})`, U);
     await run('users', `DELETE FROM users WHERE hospital_id = ? AND id NOT IN (${keepPh})`, U);

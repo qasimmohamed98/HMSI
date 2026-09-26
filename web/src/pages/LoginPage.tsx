@@ -31,6 +31,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  const [remember, setRemember] = useState(false);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,7 +43,7 @@ export default function LoginPage() {
     setError('');
     try {
       if (mfaToken) {
-        await completeMfa(mfaToken, code.trim());
+        await completeMfa(mfaToken, code.trim(), remember);
       } else {
         const r = await login(username, password);
         if (r) {
@@ -160,6 +161,13 @@ export default function LoginPage() {
                     maxLength={11}
                     autoFocus
                   />
+                  <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-ink/10 p-3 dark:border-white/10">
+                    <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand-600" />
+                    <span>
+                      <span className="block text-sm font-semibold text-ink">{t('twofa.remember')}</span>
+                      <span className="block text-xs text-ink/50">{t('twofa.rememberHint')}</span>
+                    </span>
+                  </label>
                   <button type="button" className="text-xs font-semibold text-ink/50 hover:underline" onClick={() => { setMfaToken(null); setCode(''); setError(''); }}>
                     {t('twofa.back')}
                   </button>

@@ -96,8 +96,9 @@ export const liveApi: Api = {
 
   login: (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
-  loginMfa: (mfaToken, code) => request('/auth/2fa/login', { method: 'POST', body: JSON.stringify({ mfa_token: mfaToken, code }) }),
+  loginMfa: (mfaToken, code, remember) => request('/auth/2fa/login', { method: 'POST', body: JSON.stringify({ mfa_token: mfaToken, code, remember: Boolean(remember) }) }),
   twofaStatus: () => request('/auth/2fa/status'),
+  twofaForgetDevices: () => request('/auth/2fa/forget-devices', { method: 'POST', body: '{}' }),
   twofaSetup: () => request('/auth/2fa/setup', { method: 'POST', body: '{}' }),
   twofaEnable: (code) => request('/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) }),
   twofaDisable: (password) => request('/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ password }) }),

@@ -628,8 +628,10 @@ export interface Api {
   mode: 'demo' | 'live';
   /** يعيد المستخدم، أو تذكرة خطوة ثانية إن كان التحقق بخطوتين مفعّلاً */
   login(username: string, password: string): Promise<User | { mfa_required: true; mfa_token: string }>;
-  loginMfa(mfaToken: string, code: string): Promise<User>;
-  twofaStatus(): Promise<{ enabled: boolean; recovery_codes_left: number }>;
+  loginMfa(mfaToken: string, code: string, remember?: boolean): Promise<User>;
+  twofaStatus(): Promise<{ enabled: boolean; recovery_codes_left: number; trusted_devices?: number }>;
+  /** إلغاء «تذكّر هذا الجهاز» لكل الأجهزة */
+  twofaForgetDevices(): Promise<{ forgotten: number }>;
   twofaSetup(): Promise<{ secret: string; otpauth_url: string }>;
   twofaEnable(code: string): Promise<{ recovery_codes: string[] }>;
   twofaDisable(password: string): Promise<void>;

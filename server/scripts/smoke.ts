@@ -616,6 +616,23 @@ console.log('\n— التحقق بخطوتين');
   check('التذكرة تُقفل بعد 5 محاولات', (await anon.post('/auth/2fa/login', { mfa_token: t3, code: recovery[1] })).json?.code === 'mfa_expired');
   check('تذكرة مزوّرة مرفوضة', (await anon.post('/auth/2fa/login', { mfa_token: 'x'.repeat(40), code: '123456' })).status === 401);
 
+  // «تذكّر هذا الجهاز 30 يوماً»
+  const loginWith = (cookie: string) =>
+    api.request(`${BASE}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.7.7.8', cookie }, body: JSON.stringify({ username: 'radiology', password: 'HmsiDemo2026' }) });
+  const t4 = ((await (await rawLogin('radiology')).json()) as { mfa_token: string }).mfa_token;
+  const rem = await api.request(`${BASE}/auth/2fa/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mfa_token: t4, code: recovery[2], remember: true }) });
+  const trustedCookie = cookiesOf(rem).hmsi_trusted;
+  check('«تذكّر هذا الجهاز» يضع ملف ارتباط الجهاز', rem.status === 200 && Boolean(trustedCookie));
+  const again = await loginWith(`hmsi_trusted=${trustedCookie}`);
+  const againJson = (await again.json()) as { mfa_required?: boolean; username?: string };
+  check('الجهاز المتذكَّر يدخل بكلمة المرور دون رمز', again.status === 200 && !againJson.mfa_required && againJson.username === 'radiology' && Boolean(cookiesOf(again).hmsi_session));
+  check('جهاز آخر (بلا الملف) يُطلب منه الرمز', ((await (await rawLogin('radiology')).json()) as { mfa_required?: boolean }).mfa_required === true);
+  check('ملف جهاز مزوّر لا يتجاوز الرمز', ((await (await loginWith('hmsi_trusted=forged-token-value')).json()) as { mfa_required?: boolean }).mfa_required === true);
+  const radSess = client({ cookie: `hmsi_session=${cookiesOf(again).hmsi_session}; hmsi_csrf=${cookiesOf(again).hmsi_csrf}`, csrf: decodeURIComponent(cookiesOf(again).hmsi_csrf!) });
+  check('عدد الأجهزة المتذكَّرة في الإعدادات', (await radSess.get('/auth/2fa/status')).json.trusted_devices === 1);
+  check('إلغاء تذكّر كل الأجهزة', (await radSess.post('/auth/2fa/forget-devices')).json.forgotten === 1);
+  check('بعد الإلغاء يُطلب الرمز على الجهاز نفسه', ((await (await loginWith(`hmsi_trusted=${trustedCookie}`)).json()) as { mfa_required?: boolean }).mfa_required === true);
+
   check('الإيقاف يتطلب كلمة المرور', (await rad.post('/auth/2fa/disable', { password: 'wrong' })).status === 403);
   check('الطبيب لا يعيد ضبط التحقق لغيره (403)', (await doctor.post('/users/u_radiology/2fa/reset')).status === 403);
   check('مدير مستشفى آخر لا يعيد الضبط (404)', (await admin2.post('/users/u_radiology/2fa/reset')).status === 404);

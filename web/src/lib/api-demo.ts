@@ -1104,6 +1104,9 @@ export const demoApi: Api = {
     throw new Error('غير متاح في وضع العرض التوضيحي');
   },
   async twofaDisable(): Promise<void> {},
+  async twofaForgetDevices() {
+    return { forgotten: 0 };
+  },
   async twofaRecoveryCodes(): Promise<{ recovery_codes: string[] }> {
     throw new Error('غير متاح في وضع العرض التوضيحي');
   },

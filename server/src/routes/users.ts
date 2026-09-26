@@ -8,6 +8,7 @@ import { clientIp } from '../config.js';
 import { hashPassword } from '../lib/password.js';
 import { setPassword } from '../repos/authRepo.js';
 import { db } from '../../db/index.js';
+import { forgetAllDevices } from '../lib/trustedDevice.js';
 
 export const userRoutes = new Hono();
 
@@ -66,6 +67,7 @@ userRoutes.post('/:id/password', requireAuth(), requirePermission('users.manage'
   if (String((rows.rows[0] as Record<string, unknown>).role) === 'super_admin') return c.json({ message: 'لا يمكن تعديل حساب المدير العام' }, 403);
   // كلمة مؤقتة: يغيّرها الموظف عند أول دخول
   await setPassword(id, await hashPassword(password), null, true);
+  await forgetAllDevices(id);
   await writeAudit({ actorId: session.user.id, action: 'password_reset', resourceType: 'user', resourceId: id, ip: clientIp(c) });
   return c.body(null, 204);
 });
