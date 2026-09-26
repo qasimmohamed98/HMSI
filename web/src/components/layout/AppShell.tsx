@@ -17,6 +17,7 @@ import { localName } from '@/lib/format';
 import { ForcePasswordChange } from '@/features/security/ForcePasswordChange';
 import { IdleLogout } from '@/features/security/IdleLogout';
 import { AlertCenter } from '@/features/alerts/AlertCenter';
+import { DeviceSetupBanner } from '@/features/alerts/DeviceSetupBanner';
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -130,6 +131,7 @@ export function AppShell() {
           <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-6 sm:py-6">
             <TrialBanner />
             <MfaHint />
+            <DeviceSetupBanner />
             {expired && location.pathname !== '/billing' ? <Navigate to="/billing" replace /> : <Outlet />}
           </div>
         </main>

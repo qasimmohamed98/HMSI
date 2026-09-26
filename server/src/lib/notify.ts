@@ -1,6 +1,7 @@
 import type { Role } from '@hmsi/shared';
 import { db, uuid } from '../../db/index.js';
 import { activeDoctorIds, activeNurseId } from './careTeam.js';
+import { pushToRoles, pushToUsers, type PushMessage } from './push.js';
 
 /**
  * إشعارات الجرس داخل النظام. تُنشأ عند الأحداث السريرية المهمة ولا تُفشل العملية الأصلية أبداً.
@@ -8,6 +9,16 @@ import { activeDoctorIds, activeNurseId } from './careTeam.js';
  */
 
 export type Severity = 'info' | 'warning' | 'critical';
+
+/** إرسالات الأجهزة الجارية — لا ننتظرها في الطلب، والاختبارات تنتظرها بـ flushPush() */
+const pending = new Set<Promise<unknown>>();
+export function trackPush(p: Promise<unknown>): void {
+  pending.add(p);
+  void p.finally(() => pending.delete(p));
+}
+export async function flushPush(): Promise<void> {
+  await Promise.all([...pending]);
+}
 
 export interface NotifyInput {
   hospitalId: string;
@@ -22,18 +33,25 @@ export interface NotifyInput {
   link?: string | null;
   admissionId?: string | null;
   createdById?: string | null;
+  /**
+   * نص إشعار الجهاز (يظهر على شاشة القفل): بلا اسم مريض. إن لم يُحدَّد يُرسل العنوان وحده —
+   * لأن body_ar قد يحمل اسم المريض.
+   */
+  pushBodyAr?: string | null;
+  pushBodyEn?: string | null;
 }
 
 export async function notify(n: NotifyInput): Promise<void> {
   if (!n.userId && !n.roles?.length) return;
   // لا يُشعَر المستخدم بما فعله بنفسه
   if (n.userId && n.userId === n.createdById) return;
+  const id = uuid('ntf');
   try {
     await db.execute({
       sql: `INSERT INTO notifications (id, hospital_id, target_user_id, target_roles, kind, severity, title_ar, title_en, body_ar, body_en, link, admission_id, created_by_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        uuid('ntf'),
+        id,
         n.hospitalId,
         n.userId ?? null,
         n.userId ? null : n.roles!.join(','),
@@ -51,7 +69,20 @@ export async function notify(n: NotifyInput): Promise<void> {
     });
   } catch (e) {
     console.error('[hmsi] notify failed', e instanceof Error ? e.message : e);
+    return;
   }
+  // إشعار الجهاز لا يؤخر الطلب ولا يُفشله
+  const m: PushMessage = {
+    tag: id,
+    kind: n.kind,
+    severity: n.severity ?? 'info',
+    titleAr: n.titleAr,
+    titleEn: n.titleEn,
+    bodyAr: n.pushBodyAr ?? null,
+    bodyEn: n.pushBodyEn ?? n.pushBodyAr ?? null,
+    link: n.link,
+  };
+  trackPush(n.userId ? pushToUsers([n.userId], m) : pushToRoles(n.hospitalId, n.roles!, m, n.createdById));
 }
 
 export interface AdmissionInfo {
@@ -110,6 +141,9 @@ export async function notifyAdmission(
     link: `/patients/${info.patientId}`,
     admissionId,
     createdById: o.createdById,
+    // على شاشة القفل: السرير والتفصيل فقط، بلا اسم المريض
+    pushBodyAr: [`سرير ${info.bedAr}`, o.bodyAr].filter(Boolean).join(' · '),
+    pushBodyEn: [`Bed ${info.bedAr}`, o.bodyEn ?? o.bodyAr].filter(Boolean).join(' · '),
   };
   const users = new Set<string>(o.userIds ?? []);
   if (o.toAttending) {

@@ -10,8 +10,11 @@ import { ToastProvider, ConfirmProvider, notifyError } from '@/components/ui';
 import { AuthProvider } from '@/lib/auth';
 import { router } from '@/app/router';
 import { installErrorReporter } from '@/lib/error-reporter';
+import { captureInstallPrompt } from '@/lib/push-client';
 
 installErrorReporter();
+// زر «تثبيت التطبيق»: المتصفح يرسل الحدث مبكراً فنلتقطه قبل رسم الواجهة
+captureInstallPrompt();
 
 const queryClient = new QueryClient({
   // أي عملية كتابة تفشل بدون معالج خاص تُظهر رسالة الخادم للمستخدم بدل الفشل الصامت

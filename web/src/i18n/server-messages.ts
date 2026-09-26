@@ -107,6 +107,8 @@ const EN: Record<string, string> = {
   'كلمة المرور 8 أحرف على الأقل': 'The password must be at least 8 characters',
   'كلمة المرور الجديدة مطابقة للحالية': 'The new password is the same as the current one',
   'كلمة المرور الحالية غير صحيحة': 'The current password is incorrect',
+  'رابط الاشتراك غير صالح': 'Invalid notification subscription',
+  'لم يصل الإشعار: هذا الحساب غير مشترك من أي جهاز': 'Not delivered: this account has no device subscribed to notifications',
   'كلمة المرور يجب أن تحتوي حروفاً وأرقاماً': 'The password must contain letters and digits',
   'لا تملك صلاحية كتابة هذا النوع من الملاحظات': 'You are not allowed to write this type of note',
   'لا تملك صلاحية لهذا الإجراء': 'You are not allowed to do this',

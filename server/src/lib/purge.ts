@@ -22,6 +22,8 @@ export async function purgeHospital(hospitalId: string, keepUserIds: string[] = 
       const r = await tx.execute({ sql, args });
       counts[label] = (counts[label] ?? 0) + r.rowsAffected;
     };
+    // أجهزة إشعارات الدفع
+    await run('push_subscriptions', `DELETE FROM push_subscriptions WHERE hospital_id = ? OR user_id IN (${USERS})`, [hospitalId, ...U]);
     // الإشعارات وقراءاتها
     await run('notification_reads', `DELETE FROM notification_reads WHERE notification_id IN (SELECT id FROM notifications WHERE hospital_id = ?) OR user_id IN (${USERS})`, [hospitalId, ...U]);
     await run('notifications', `DELETE FROM notifications WHERE hospital_id = ? OR target_user_id IN (${USERS})`, [hospitalId, ...U]);

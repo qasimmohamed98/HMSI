@@ -112,12 +112,18 @@ export function AlertCenter() {
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
     cleanupClaims();
+    // إشعار دفع وصل والنظام ظاهر: الـ Service Worker لا يعرضه ويطلب تحديث التنبيهات فوراً بدل انتظار الدورة
+    const onSw = (e: MessageEvent) => {
+      if ((e.data as { type?: string } | null)?.type === 'hmsi-push') void qc.invalidateQueries({ queryKey: ['notifications'] });
+    };
+    navigator.serviceWorker?.addEventListener('message', onSw);
     return () => {
+      navigator.serviceWorker?.removeEventListener('message', onSw);
       window.removeEventListener('hmsi:alert-prefs', onPrefs);
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown', unlock);
     };
-  }, [user?.id]);
+  }, [user?.id, qc]);
 
   const text = useCallback(
     (n: AppNotification) => {

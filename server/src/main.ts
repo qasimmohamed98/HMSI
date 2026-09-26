@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 import { api } from './app.js';
+import { startScheduleAlerts } from './lib/scheduleAlerts.js';
 
 /**
  * تشغيل الإنتاج على خادم خاص (Hostinger VPS): يستمع على 127.0.0.1 فقط،
@@ -15,4 +16,6 @@ if (!process.env.SESSION_SECRET) {
 
 serve({ fetch: api.fetch, port, hostname }, (info) => {
   console.log(`[hmsi] listening on http://${hostname}:${info.port}`);
+  // تنبيهات مواعيد الجرعات والعلامات الحيوية لأجهزة الممرضين (إشعارات الدفع)
+  startScheduleAlerts();
 });

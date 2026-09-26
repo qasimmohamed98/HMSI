@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { User } from '@hmsi/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { API } from './api';
+import { disablePush } from './push-client';
 
 type AuthStatus = 'loading' | 'authed' | 'guest';
 
@@ -78,6 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [qc]);
 
   const logout = useCallback(async () => {
+    // الجهاز قد يستخدمه موظف آخر بعد الخروج: لا تصله إشعارات صاحب الجلسة السابقة
+    await disablePush().catch(() => undefined);
     try {
       await API.logout();
     } catch {

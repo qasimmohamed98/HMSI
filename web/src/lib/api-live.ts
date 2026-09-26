@@ -474,6 +474,11 @@ export const liveApi: Api = {
   notificationCount: () => request('/notifications/count'),
   readNotification: (id) => request(`/notifications/${id}/read`, { method: 'POST', body: '{}' }),
   readAllNotifications: () => request('/notifications/read-all', { method: 'POST', body: '{}' }),
+  pushKey: () => request('/push/key'),
+  pushSubscribe: (input) => request('/push/subscribe', { method: 'POST', body: JSON.stringify(input) }),
+  pushStatus: (endpoint) => request('/push/status', { method: 'POST', body: JSON.stringify({ endpoint }) }),
+  pushUnsubscribe: (endpoint) => request('/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) }),
+  pushTest: () => request('/push/test', { method: 'POST', body: '{}' }),
 };
 
 export { HttpError, csrfToken };

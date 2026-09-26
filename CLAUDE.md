@@ -4,7 +4,7 @@
 حدّثه بعد كل مهمة (علّم البنود المنجزة وأضف سطراً في سجل التحديثات).
 
 - Monorepo: `web/` (React+Vite)، `server/` (Hono+libsql، الحزمة `@hmsi/api`)، `packages/shared/` (أنواع + Zod + RBAC).
-- النشر: Netlify (`netlify.toml` + `netlify/functions/hmsi.ts`).
+- النشر: خادم Hostinger (`deploy/`، التحديث: `ssh qvps "bash /opt/hmsi/app/deploy/deploy.sh"` بعد الدفع إلى main مع `[skip netlify]`). Netlify تحويل فقط.
 - قبل التسليم: `npm run typecheck && npm test && npm run build` — كلها يجب أن تنجح.
 - كل استعلام في `server/src/repos` مقيّد بـ `hospitalId` (عزل المستشفيات)؛ السجلات الطبية عبر `getAdmissionScope`.
 - لا تشغّل seed على قاعدة الإنتاج (`server/.env` يشير إلى Turso حقيقي). `npm test` يستخدم قاعدة مؤقتة.
@@ -17,4 +17,5 @@
 - CSP صارمة في `netlify.toml`: لا سكربت inline ولا `onclick` ولا مصادر خارجية (نوافذ الطباعة تُدار من الصفحة الأم).
 - كلمة مرور البيانات التجريبية `HmsiDemo2026`؛ الكلمات الشائعة تُفرض عليها تغيير إجباري.
 - الطبيب يرى مرضاه فقط (`server/src/lib/access.ts`): أي مسار جديد لبيانات مريض يمر عبر `getAdmissionScope` أو `assertPatientAccess`، وأي قائمة مرضى تستخدم `doctorAccessSql`. ممرض واحد فعّال لكل مريض (`care_team`).
+- الإشعارات: `notify()`/`notifyAdmission()` تُرسل للأجهزة أيضاً (Web Push). نص الجهاز يظهر على شاشة القفل: لا تضع فيه اسم المريض (`pushBodyAr/En`).
 - سكربت صور الدليل: `node scripts/capture-guide.mjs` (عربي) و`--en` (إنجليزي) على قاعدة `visual.db` بعد seed.

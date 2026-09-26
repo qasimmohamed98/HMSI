@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { TwoFactorCard } from '@/features/security/TwoFactorCard';
 import { AlertSettingsCard } from '@/features/alerts/AlertSettingsCard';
+import { DevicePushCard } from '@/features/alerts/DevicePushCard';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -89,6 +90,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      <DevicePushCard />
       <AlertSettingsCard />
       <ChangePasswordCard />
       <TwoFactorCard />

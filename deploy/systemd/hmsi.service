@@ -9,6 +9,8 @@ User=hmsi
 Group=hmsi
 WorkingDirectory=/opt/hmsi/app/server
 EnvironmentFile=/etc/hmsi/hmsi.env
+# مواعيد الأدوية الثابتة (8، 14، 20…) تُحسب بتوقيت العراق
+Environment=TZ=Asia/Baghdad
 ExecStart=/usr/bin/node dist/src/main.js
 Restart=always
 RestartSec=3

@@ -840,6 +840,92 @@ console.log('\n— تهيئة مستشفى جديد: أقسام وردهات و�
   check('لا يضيف سريراً في ردهة مستشفى آخر', (await a2.post('/org/beds', { ward_id: h1Ward, room: 'X', bed_no: 'X' })).status === 409);
 }
 
+console.log('\n— إشعارات الدفع (Web Push)');
+{
+  const { setPushTransport } = await import('../src/lib/push.js');
+  const { notify, notifyAdmission, flushPush } = await import('../src/lib/notify.js');
+  const { runScheduleAlerts } = await import('../src/lib/scheduleAlerts.js');
+  const { db } = await import('../db/index.js');
+  const sent: { endpoint: string; p: any }[] = [];
+  let fail: number | null = null;
+  setPushTransport(async (sub, payload) => {
+    if (fail) throw Object.assign(new Error('gone'), { statusCode: fail });
+    sent.push({ endpoint: sub.endpoint, p: JSON.parse(payload) });
+    return { statusCode: 201 };
+  });
+  const nurseP = client(await login('nurse'));
+  const doctorP = client(await login('doctor'));
+  const EP = 'https://push.example.test/nurse-device-1';
+  const keys = { p256dh: 'B'.repeat(87), auth: 'A'.repeat(22) };
+  const key = await nurseP.get('/push/key');
+  check('مفتاح VAPID العام متاح للمستخدم', key.status === 200 && typeof key.json.public_key === 'string' && key.json.public_key.length > 60);
+  check('مفتاح VAPID ثابت (لا يتولد كل مرة)', (await doctorP.get('/push/key')).json.public_key === key.json.public_key);
+  check('بدون جلسة: لا مفتاح (401)', (await client(null).get('/push/key')).status === 401);
+  check('رابط اشتراك غير https مرفوض', (await nurseP.post('/push/subscribe', { endpoint: 'http://x.test/a', keys })).status === 422);
+  check('/push/test بلا جهاز مشترك = 409', (await nurseP.post('/push/test')).status === 409);
+  check('الممرض يشترك من جهازه', (await nurseP.post('/push/subscribe', { endpoint: EP, keys, lang: 'ar', level: 'all', device: 'Android · Chrome' })).status === 200);
+  const st = await nurseP.post('/push/status', { endpoint: EP });
+  check('حالة الجهاز: مشترك', st.json.subscribed === true && st.json.level === 'all' && st.json.devices === 1);
+  check('الطبيب لا يرى اشتراك جهاز الممرض', (await doctorP.post('/push/status', { endpoint: EP })).json.subscribed === false);
+
+  const t = await nurseP.post('/push/test');
+  check('إشعار تجريبي يصل لجهاز الممرض', t.status === 200 && t.json.sent === 1 && sent.at(-1)?.p.title === 'إشعار تجريبي من Q VIREXA');
+
+  sent.length = 0;
+  await notify({ hospitalId: 'h-1', userId: 'u_nurse', kind: 'emergency_access', severity: 'warning', titleAr: 'وصول طارئ', bodyAr: 'أحمد محمد علي · سبب' });
+  await flushPush();
+  check('إشعار الجرس يُرسل للجهاز أيضاً', sent.length === 1 && sent[0]!.p.title === 'وصول طارئ' && typeof sent[0]!.p.tag === 'string' && sent[0]!.p.tag.startsWith('ntf'));
+  check('نص الجهاز لا يحمل اسم المريض (بلا pushBody = العنوان فقط)', sent[0]!.p.body === '');
+
+  sent.length = 0;
+  // مريض معيَّن حالياً للممرض (اختبارات التسليم السابقة غيّرت التعيينات)
+  const mine = (await db.execute(`SELECT ct.admission_id AS a, p.full_name_ar AS n FROM care_team ct JOIN admissions a ON a.id = ct.admission_id AND a.status = 'active' JOIN patients p ON p.id = a.patient_id WHERE ct.user_id = 'u_nurse' AND ct.role = 'nurse' AND ct.ended_at IS NULL LIMIT 1`)).rows[0] as any;
+  check('للممرض مريض معيَّن للاختبار', Boolean(mine));
+  const pname = String(mine.n);
+  await notifyAdmission(String(mine.a), { toNurse: true, kind: 'mews_high', severity: 'critical', titleAr: 'إنذار مبكر: MEWS = 8', bodyAr: 'يحتاج تقييماً عاجلاً' });
+  await flushPush();
+  check('إشعار المريض على الجهاز: السرير والتفصيل بلا اسم المريض', sent.length === 1 && sent[0]!.p.body.includes('سرير') && sent[0]!.p.body.includes('عاجلاً') && !sent[0]!.p.body.includes(pname) && sent[0]!.p.link.startsWith('/patients/'));
+  check('الإشعار الحرج يحمل الخطورة للجهاز', sent[0]!.p.severity === 'critical');
+
+  // المستوى: الحرجة فقط
+  await nurseP.post('/push/subscribe', { endpoint: EP, keys, lang: 'en', level: 'critical' });
+  sent.length = 0;
+  await notify({ hospitalId: 'h-1', userId: 'u_nurse', kind: 'x', severity: 'info', titleAr: 'عادي', titleEn: 'Routine' });
+  await notify({ hospitalId: 'h-1', userId: 'u_nurse', kind: 'x', severity: 'critical', titleAr: 'حرج', titleEn: 'Critical' });
+  await flushPush();
+  check('مستوى «الحرجة فقط» يمنع العادي ويمرر الحرج', sent.length === 1 && sent[0]!.p.title === 'Critical');
+  check('لغة الجهاز الإنجليزية تُحترم', sent[0]!.p.lang === 'en');
+
+  // الإشعار الموجّه لدور
+  sent.length = 0;
+  await nurseP.post('/push/subscribe', { endpoint: EP, keys, lang: 'ar', level: 'all' });
+  await notify({ hospitalId: 'h-1', roles: ['nurse'], kind: 'x', titleAr: 'لكل التمريض' });
+  await notify({ hospitalId: 'h-2', roles: ['nurse'], kind: 'x', titleAr: 'مستشفى آخر' });
+  await flushPush();
+  check('إشعار الدور يصل لممرض المستشفى فقط لا لمستشفى آخر', sent.length === 1 && sent[0]!.p.title === 'لكل التمريض');
+
+  // تنبيهات المواعيد من الخادم (والنظام مغلق)
+  sent.length = 0;
+  const first = await runScheduleAlerts(new Date());
+  check('تنبيهات مواعيد مرضى الممرض تُرسل لجهازه', first > 0 && sent.length > 0 && sent.every((x) => x.endpoint === EP));
+  check('تنبيه الموعد بلا اسم مريض', sent.every((x) => !x.p.body.includes(pname)));
+  sent.length = 0;
+  check('الموعد نفسه لا يتكرر في الدورة التالية', (await runScheduleAlerts(new Date())) === 0 && sent.length === 0);
+
+  // جهاز مشترك: موظف آخر يسجّل عليه → ينتقل الاشتراك
+  await doctorP.post('/push/subscribe', { endpoint: EP, keys });
+  check('الجهاز ينتقل لمن سجّل عليه أخيراً', (await nurseP.post('/push/status', { endpoint: EP })).json.subscribed === false && (await doctorP.post('/push/status', { endpoint: EP })).json.subscribed === true);
+  check('إلغاء الاشتراك من الجهاز', (await doctorP.post('/push/unsubscribe', { endpoint: EP })).status === 204 && (await doctorP.post('/push/status', { endpoint: EP })).json.subscribed === false);
+
+  // جهاز ألغى الإذن (410) → يُحذف تلقائياً
+  await nurseP.post('/push/subscribe', { endpoint: EP, keys });
+  fail = 410;
+  await nurseP.post('/push/test');
+  fail = null;
+  check('اشتراك منتهٍ (410) يُحذف تلقائياً', (await nurseP.post('/push/status', { endpoint: EP })).json.subscribed === false);
+  setPushTransport(null);
+}
+
 console.log('\n— حذف بيانات التجربة والمستشفيات (آخر الاختبارات: يمسح البيانات)');
 {
   const sa = client(await login('admin'));

@@ -100,6 +100,24 @@ export const GUIDE_AR: GuideContent = {
           ],
         },
         {
+          id: 'install-push',
+          title: 'ثبّت النظام وفعّل الإشعارات (حتى والنظام مغلق)',
+          intro: 'ثبّت Q VIREXA على الشاشة الرئيسية لهاتفك أو على سطح مكتب حاسوبك، ثم فعّل الإشعارات: تصلك مواعيد جرعات وقياسات مرضاك، والنتائج غير الطبيعية، والإنذار المبكر، وطلبات التسليم — حتى والنظام مغلق والهاتف مقفل.',
+          steps: [
+            'أندرويد: افتح النظام في Chrome ← القائمة ⋮ ← «تثبيت التطبيق» (أو اضغط «ثبّت الآن» في الشريط أعلى النظام).',
+            'آيفون وآيباد: افتح النظام في Safari ← زر المشاركة ⬆︎ ← «إضافة إلى الشاشة الرئيسية» ← «إضافة»، ثم افتحه من أيقونته. على آيفون لا تعمل الإشعارات إلا بهذه الطريقة (iOS 16.4 فأحدث).',
+            'الحاسوب (Chrome أو Edge): رمز التثبيت ⊕ في شريط العنوان، أو القائمة ⋮ ← «تثبيت Q VIREXA». يفتح بعدها في نافذته الخاصة كبرنامج.',
+            'بعد التثبيت: «الإعدادات» ← «هذا الجهاز: التثبيت والإشعارات» ← «فعّل الإشعارات» ← «السماح». ثم «أرسل إشعاراً تجريبياً» للتأكد.',
+            'اختر ما يصلك: كل التنبيهات، أو المهمة والحرجة، أو الحرجة فقط.',
+          ],
+          tips: [
+            'الإشعار على شاشة القفل لا يحمل اسم المريض — العنوان وموقع السرير فقط، والتفاصيل داخل النظام بعد الدخول.',
+            'الإشعارات مرتبطة بالموظف وجهازه: عند تسجيل الخروج تتوقف على ذلك الجهاز، ومن يسجّل عليه بعدك تصله إشعاراته هو.',
+            'مواعيد الجرعات والقياسات تصل للممرض المعيَّن على المريض فقط؛ بعد التسليم تنتقل للممرض المستلم.',
+            'بعض هواتف أندرويد توقف التطبيقات في الخلفية: اجعل Chrome أو Q VIREXA «بلا قيود» في إعدادات البطارية.',
+          ],
+        },
+        {
           id: 'security',
           title: 'حماية حسابك: التحقق بخطوتين والخروج التلقائي',
           steps: [
@@ -533,6 +551,24 @@ export const GUIDE_EN: GuideContent = {
             'Browsers block sound until the first click on the page — click anywhere after opening the system, or press "Turn on sound" if it appears.',
             'Turn on "Device notifications" to receive alerts even when the window is minimised or on your phone.',
             'Keep the computer sound on at the nursing station.',
+          ],
+        },
+        {
+          id: 'install-push',
+          title: 'Install the system and turn on notifications (even when it is closed)',
+          intro: 'Install Q VIREXA on your phone home screen or your computer desktop, then turn on notifications: dose and vitals times for your patients, abnormal results, early warnings and handover requests reach you even when the system is closed and the phone is locked.',
+          steps: [
+            'Android: open the system in Chrome → menu ⋮ → “Install app” (or press “Install now” in the bar at the top of the system).',
+            'iPhone and iPad: open the system in Safari → Share ⬆︎ → “Add to Home Screen” → “Add”, then open it from its icon. On iPhone, notifications work only this way (iOS 16.4 or later).',
+            'Computer (Chrome or Edge): the install icon ⊕ in the address bar, or menu ⋮ → “Install Q VIREXA”. It then opens in its own window like a program.',
+            'After installing: Settings → “This device: install and notifications” → “Turn on notifications” → “Allow”. Then “Send a test notification” to check.',
+            'Choose what reaches you: all alerts, important and critical, or critical only.',
+          ],
+          tips: [
+            'A lock-screen notification never shows the patient name — only the title and bed location; details stay inside the system after sign-in.',
+            'Notifications belong to the staff member and their device: signing out turns them off on that device, and whoever signs in next gets their own.',
+            'Dose and vitals times go only to the nurse assigned to the patient; after a handover they move to the receiving nurse.',
+            'Some Android phones stop background apps: set Chrome or Q VIREXA to “No restrictions” in the battery settings.',
           ],
         },
         {

@@ -726,7 +726,22 @@ export interface Api {
   notificationCount(): Promise<{ unread: number; top: 'info' | 'warning' | 'critical' }>;
   readNotification(id: string): Promise<void>;
   readAllNotifications(): Promise<void>;
+  // إشعارات الدفع لهذا الجهاز (تصل والنظام مغلق)
+  pushKey(): Promise<{ public_key: string }>;
+  pushSubscribe(input: PushSubscribeInput): Promise<{ subscribed: true; level: PushLevel }>;
+  pushStatus(endpoint: string): Promise<{ subscribed: boolean; level: PushLevel | null; devices: number }>;
+  pushUnsubscribe(endpoint: string): Promise<void>;
+  pushTest(): Promise<{ sent: number }>;
   familyTrack(code: string, pin: string): Promise<PublicTrackFamily>;
+}
+
+export type PushLevel = 'all' | 'important' | 'critical';
+export interface PushSubscribeInput {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  lang: 'ar' | 'en';
+  level: PushLevel;
+  device?: string | null;
 }
 
 export interface NewPatientInput {

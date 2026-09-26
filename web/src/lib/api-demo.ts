@@ -1254,6 +1254,20 @@ export const demoApi: Api = {
   },
   async readNotification(): Promise<void> {},
   async readAllNotifications(): Promise<void> {},
+  // إشعارات الدفع تحتاج الخادم الحقيقي
+  async pushKey(): Promise<{ public_key: string }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async pushSubscribe(): Promise<{ subscribed: true; level: 'all' }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async pushStatus() {
+    return { subscribed: false, level: null, devices: 0 };
+  },
+  async pushUnsubscribe(): Promise<void> {},
+  async pushTest(): Promise<{ sent: number }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
 
   async createUser(input: NewUserInput): Promise<User> {
     const u = requireUser();
