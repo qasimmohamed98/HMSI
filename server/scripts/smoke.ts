@@ -677,7 +677,7 @@ console.log('\n— الإشعارات');
   await labUser.patch(`/patients/adm1/labs/${order.json.id}`, { result: '121', unit: 'mmol/L', abnormal: true });
   const dn = await doctor.get('/notifications');
   const abn = dn.json.find((n: any) => n.kind === 'lab_abnormal');
-  check('النتيجة غير الطبيعية تصل للطبيب المعالج', abn?.severity === 'warning' && abn.link === '/patients/p1' && abn.body_ar.includes('121'));
+  check('النتيجة غير الطبيعية تصل للطبيب المعالج', abn?.severity === 'warning' && abn.link === '/patients/p1?tab=laboratory' && abn.body_ar.includes('121'));
   check('طبيب آخر لا يرى إشعار مريض غيره', !(await doc2.get('/notifications')).json.some((n: any) => n.id === abn.id));
   const cnt = await doctor.get('/notifications/count');
   check('عدّاد غير المقروء يعمل مع أعلى خطورة', cnt.json.unread >= 1 && ['warning', 'critical'].includes(cnt.json.top));
@@ -1103,6 +1103,54 @@ console.log('\n— إشعارات الدفع (Web Push)');
   check('اشتراك منتهٍ (410) يُحذف تلقائياً', (await nurseP.post('/push/status', { endpoint: EP })).json.subscribed === false);
   setPushTransport(null);
 }
+
+console.log('\n— إشعارات الأشعة (طلب ← تقرير) ومرفقات مرتبطة بالفحص');
+{
+  const { TERMS_VERSION } = await import('@hmsi/shared');
+  const { db } = await import('../db/index.js');
+  const mgr = client(await login('manager'));
+  const rx = client(await login('radiology'));
+  const rdoc = client(await login('radiodoc', 'Temp#Rad2026qa'));
+  await rdoc.post('/auth/password', { current_password: 'Temp#Rad2026qa', new_password: 'Radio#Doc2026zq' });
+  await rdoc.post('/auth/accept-terms', { accept: true, version: TERMS_VERSION });
+  const dep = (await db.execute(`SELECT id FROM departments WHERE hospital_id = 'h-1' LIMIT 1`)).rows[0] as any;
+  const np = await mgr.post('/patients', { full_name_ar: 'مريض إشعار الأشعة', gender: 'female', birth_date: '1990-02-02', blood_type: 'Unknown', allergies: [] });
+  const pid = np.json.id ?? np.json.patient?.id;
+  const enc = (await mgr.post('/admissions/encounter', { patient_id: pid, encounter_type: 'diagnostic', department_id: dep.id })).json.admission_id;
+  const ord = await mgr.post(`/patients/${enc}/radiology`, { admission_id: enc, study_type_ar: 'سونار بطن كامل' });
+  const titles = async (cl: any) => ((await cl.get('/notifications')).json as any[]);
+  check('طلب الأشعة يصل لفني الأشعة', (await titles(rx)).some((n) => n.kind === 'radiology_ordered' && n.title_ar.includes('سونار بطن كامل')));
+  check('طلب الأشعة يصل لطبيب الأشعة أيضاً', (await titles(rdoc)).some((n) => n.kind === 'radiology_ordered' && n.title_ar.includes('سونار بطن كامل')));
+  check('من طلب الفحص لا يُبلَّغ بطلبه هو', !(await titles(mgr)).some((n) => n.kind === 'radiology_ordered' && n.title_ar.includes('سونار بطن كامل')));
+  const stored = (await db.execute({ sql: `SELECT ordered_by_id FROM radiology_reports WHERE id = ?`, args: [ord.json.id] })).rows[0] as any;
+  check('يُحفظ من طلب الفحص', stored.ordered_by_id === 'u_manager');
+
+  // مرفق مرتبط بالفحص من فني الأشعة
+  const sx = await login('radiology');
+  const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 1, 2, 3, 4]);
+  const send = (fields: Record<string, string>, name = 'تقرير.pdf') => {
+    const fd = new FormData();
+    fd.append('file', new File([pdf], name, { type: 'application/pdf' }));
+    for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+    return api.request(`${BASE}/patients/${enc}/attachments`, { method: 'POST', headers: { cookie: sx.cookie, 'x-csrf-token': sx.csrf }, body: fd });
+  };
+  const okUp = await send({ record_type: 'radiology', record_id: ord.json.id });
+  const okJson = (await okUp.json()) as any;
+  check('فني الأشعة يرفق ملفاً بالفحص', okUp.status === 201 && okJson.record_type === 'radiology' && okJson.record_id === ord.json.id, okJson);
+  check('فحص من زيارة أخرى مرفوض (404)', (await send({ record_type: 'radiology', record_id: 'rd-not-here' })).status === 404);
+  check('نوع ربط غير صالح مرفوض (422)', (await send({ record_type: 'vitals', record_id: ord.json.id })).status === 422);
+  const ch = await mgr.get(`/patients/${pid}/chart`);
+  check('ملف المريض يذكر ارتباط المرفق بالفحص', ch.json.attachments?.some((a: any) => a.record_id === ord.json.id && a.record_type === 'radiology'));
+
+  // التقرير: يُبلَّغ من طلب الفحص رغم أنه ليس في فريق الرعاية
+  const done = await rx.patch(`/patients/${enc}/radiology/${ord.json.id}`, { report: 'كبد وطحال طبيعيان.' });
+  check('فني الأشعة يكتب التقرير', done.status === 200);
+  const back = (await titles(mgr)).find((n) => n.kind === 'radiology_reported');
+  check('اكتمال التقرير يصل لمن طلب الفحص', Boolean(back) && back.title_ar.includes('سونار بطن كامل'), await titles(mgr));
+  check('الإشعار يفتح تبويب الأشعة في ملف المريض', String(back?.link ?? '').includes(`/patients/${pid}?tab=radiology`));
+  check('طالب الفحص فقط يُبلَّغ (لا الفني نفسه)', !(await titles(rx)).some((n) => n.kind === 'radiology_reported' && n.title_ar.includes('سونار بطن كامل')));
+}
+
 
 console.log('\n— حذف بيانات التجربة والمستشفيات (آخر الاختبارات: يمسح البيانات)');
 {

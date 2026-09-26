@@ -8,6 +8,7 @@ import { API, type LabResultInput } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { fmtDateTime, localName } from '@/lib/format';
 import { AdmittedPatientCard, useAdmittedCharts } from '@/features/departments';
+import { RecordFiles } from '@/features/patient/sections/RecordFiles';
 
 export default function LaboratoryPage() {
   const { t } = useTranslation();
@@ -73,7 +74,7 @@ export default function LaboratoryPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {rows.map(({ patient, items }) => (
+          {rows.map(({ patient, chart, items }) => (
             <AdmittedPatientCard key={patient.id} patient={patient}>
               {items.length === 0 ? (
                 <p className="py-2 text-center text-sm font-medium text-ink/45">{t('laboratory.empty')}</p>
@@ -110,6 +111,9 @@ export default function LaboratoryPage() {
                             {t('laboratory.updateResult')}
                           </Button>
                         )}
+                      </div>
+                      <div className="basis-full">
+                        <RecordFiles chart={chart} recordType="lab" recordId={l.id} />
                       </div>
                     </li>
                   ))}

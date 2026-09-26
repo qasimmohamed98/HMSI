@@ -7,6 +7,7 @@ import { printLabReport } from '../printChart';
 import { useAuth } from '@/lib/auth';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
+import { RecordFiles } from './RecordFiles';
 import { CatalogSuggestions } from './CatalogSuggestions';
 import { API, type LabInput, type ChartData, type LabResultInput } from '@/lib/api';
 import { fmtDateTime, localName } from '@/lib/format';
@@ -150,6 +151,7 @@ export function LaboratorySection({ chart, canOrder, canResult, onNeedVisit, aut
                   )}
                 </div>
               )}
+              <RecordFiles chart={chart} recordType="lab" recordId={l.id} />
             </div>
           ))}
         </div>

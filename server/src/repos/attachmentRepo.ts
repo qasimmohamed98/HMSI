@@ -32,12 +32,14 @@ export async function insertAttachment(input: {
   /** محتوى base64 داخل القاعدة (الطريقة القديمة) أو null مع storageKey لملف على القرص */
   data: string | null;
   storageKey?: string;
+  recordType?: 'radiology' | 'lab' | null;
+  recordId?: string | null;
 }): Promise<Attachment> {
   const id = uuid('at');
   await db.execute({
-    sql: `INSERT INTO attachments (id, admission_id, uploaded_by, file_name, mime, size, storage_key, created_at, data)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, input.admission_id, input.uploaded_by, input.file_name, input.mime, input.size, input.storageKey ?? 'inline', new Date().toISOString(), input.data],
+    sql: `INSERT INTO attachments (id, admission_id, uploaded_by, file_name, mime, size, storage_key, created_at, data, record_type, record_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [id, input.admission_id, input.uploaded_by, input.file_name, input.mime, input.size, input.storageKey ?? 'inline', new Date().toISOString(), input.data, input.recordType ?? null, input.recordId ?? null],
   });
   return {
     id,
@@ -47,6 +49,8 @@ export async function insertAttachment(input: {
     mime: input.mime,
     size: input.size,
     created_at: new Date().toISOString(),
+    record_type: input.recordType ?? null,
+    record_id: input.recordId ?? null,
   };
 }
 

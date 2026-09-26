@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, ScanLine, PenLine, Trash2, Printer } from 'lucide-react';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
+import { RecordFiles } from './RecordFiles';
 import { CatalogSuggestions } from './CatalogSuggestions';
 import { printRadiologyReport } from '../printChart';
 import { useAuth } from '@/lib/auth';
@@ -131,6 +132,7 @@ export function RadiologySection({ chart, canOrder, canResult, onNeedVisit, auto
                   {r.performed_by && <p className="mt-1.5 text-xs text-ink/45">{t('radiology.performedBy')}: {r.performed_by}</p>}
                 </div>
               )}
+              <RecordFiles chart={chart} recordType="radiology" recordId={r.id} />
             </div>
           ))}
         </div>

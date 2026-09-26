@@ -6,6 +6,7 @@ import { insertAttachment, getAttachment, deleteAttachment } from '../repos/atta
 import { writeAudit } from '../lib/audit.js';
 import { HttpError } from '../lib/errors.js';
 import { clientIp } from '../config.js';
+import { db } from '../../db/index.js';
 import { filesDir, isFileKey, loadFile, maxFileSize, saveFile } from '../lib/fileStore.js';
 
 export const attachmentRoutes = new Hono();
@@ -73,6 +74,16 @@ attachmentRoutes.post('/:admissionId/attachments', requireAuth(), requirePermiss
   if (!(file instanceof File)) return c.json({ message: 'الملف مطلوب' }, 400);
   if (file.size === 0) return c.json({ message: 'الملف فارغ' }, 400);
   if (file.size > maxFileSize()) return c.json({ message: tooBig() }, 413);
+  // مرفق مرتبط بفحص محدد (تقرير أشعة أو نتيجة مختبر) من نفس الزيارة
+  const rt = String(form.get('record_type') ?? '');
+  const rid = String(form.get('record_id') ?? '');
+  let recordType: 'radiology' | 'lab' | null = null;
+  if (rt || rid) {
+    if ((rt !== 'radiology' && rt !== 'lab') || !rid) return c.json({ message: 'ربط المرفق بالفحص غير صالح' }, 422);
+    const owner = await db.execute({ sql: `SELECT 1 FROM ${rt === 'radiology' ? 'radiology_reports' : 'lab_results'} WHERE id = ? AND admission_id = ?`, args: [rid, admissionId] });
+    if (owner.rows.length === 0) return c.json({ message: 'الفحص غير موجود في هذه الزيارة' }, 404);
+    recordType = rt;
+  }
   const mime = file.type || 'application/octet-stream';
   if (!ALLOWED_MIME.test(mime)) return c.json({ message: 'نوع الملف غير مسموح (صور، PDF، نص، Word، Excel)' }, 415);
 
@@ -84,6 +95,8 @@ attachmentRoutes.post('/:admissionId/attachments', requireAuth(), requirePermiss
     file_name: file.name.slice(0, 200),
     mime,
     size: file.size,
+    recordType,
+    recordId: recordType ? rid : null,
     ...(filesDir() ? { data: null, storageKey: await saveFile(session.user.hospital_id, bytes) } : { data: Buffer.from(bytes).toString('base64') }),
   });
   await writeAudit({ actorId: session.user.id, action: 'attachment_uploaded', resourceType: 'attachment', resourceId: attachment.id, ip: clientIp(c) });

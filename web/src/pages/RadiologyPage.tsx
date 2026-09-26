@@ -8,6 +8,7 @@ import { API, type RadiologyInput, type RadiologyUpdateInput } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { fmtDateTime, localName } from '@/lib/format';
 import { AdmittedPatientCard, useAdmittedCharts } from '@/features/departments';
+import { RecordFiles } from '@/features/patient/sections/RecordFiles';
 
 export default function RadiologyPage() {
   const { t } = useTranslation();
@@ -107,6 +108,7 @@ export default function RadiologyPage() {
                           {t('actions.enterReport')}
                         </Button>
                       )}
+                      <RecordFiles chart={chart} recordType="radiology" recordId={r.id} />
                     </li>
                   ))}
                 </ul>

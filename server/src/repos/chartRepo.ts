@@ -102,7 +102,7 @@ export async function getChart(patientId: string, hospitalId: string, admissionI
     q<RadiologyReport>(`SELECT * FROM radiology_reports WHERE admission_id = ? ORDER BY ordered_at DESC LIMIT 100`),
     q<Consultation>(`SELECT * FROM consultations WHERE admission_id = ? ORDER BY requested_at DESC LIMIT 100`),
     q<Procedure>(`SELECT * FROM procedures WHERE admission_id = ? ORDER BY performed_at DESC LIMIT 100`),
-    q<Attachment>(`SELECT id, admission_id, uploaded_by, file_name, mime, size, created_at FROM attachments WHERE admission_id = ? ORDER BY created_at DESC LIMIT 100`),
+    q<Attachment>(`SELECT id, admission_id, uploaded_by, file_name, mime, size, created_at, record_type, record_id FROM attachments WHERE admission_id = ? ORDER BY created_at DESC LIMIT 100`),
     q<TimelineEvent>(`SELECT * FROM timeline_events WHERE admission_id = ? ORDER BY created_at DESC LIMIT 200`),
   ]);
 

@@ -108,7 +108,8 @@ export async function admissionInfo(admissionId: string): Promise<AdmissionInfo 
     patientAr: String(row.full_name_ar),
     patientEn: row.full_name_en ? String(row.full_name_en) : null,
     attendingId: row.attending_doctor_id ? String(row.attending_doctor_id) : null,
-    bedAr: `${String(row.room ?? '')}/${String(row.bed_no ?? '')}`,
+    // زيارة بلا تنويم: لا سرير
+    bedAr: row.room || row.bed_no ? `${String(row.room ?? '')}/${String(row.bed_no ?? '')}` : '',
   };
 }
 
@@ -124,6 +125,8 @@ export async function notifyAdmission(
     toAttending?: boolean;
     toNurse?: boolean;
     userIds?: string[];
+    /** تبويب ملف المريض الذي يفتحه الإشعار (radiology، laboratory…) */
+    tab?: string;
     bodyAr?: string;
     bodyEn?: string;
   },
@@ -138,19 +141,20 @@ export async function notifyAdmission(
     titleEn: o.titleEn,
     bodyAr: [info.patientAr, info.bedAr, o.bodyAr].filter(Boolean).join(' · '),
     bodyEn: [info.patientEn ?? info.patientAr, info.bedAr, o.bodyEn ?? o.bodyAr].filter(Boolean).join(' · '),
-    link: `/patients/${info.patientId}`,
+    link: `/patients/${info.patientId}${o.tab ? `?tab=${o.tab}` : ''}`,
     admissionId,
     createdById: o.createdById,
     // على شاشة القفل: السرير والتفصيل فقط، بلا اسم المريض
-    pushBodyAr: [`سرير ${info.bedAr}`, o.bodyAr].filter(Boolean).join(' · '),
-    pushBodyEn: [`Bed ${info.bedAr}`, o.bodyEn ?? o.bodyAr].filter(Boolean).join(' · '),
+    pushBodyAr: [info.bedAr ? `سرير ${info.bedAr}` : '', o.bodyAr].filter(Boolean).join(' · '),
+    pushBodyEn: [info.bedAr ? `Bed ${info.bedAr}` : '', o.bodyEn ?? o.bodyAr].filter(Boolean).join(' · '),
   };
   const users = new Set<string>(o.userIds ?? []);
   if (o.toAttending) {
     const docs = await activeDoctorIds(admissionId);
     if (!docs.length && info.attendingId) docs.push(info.attendingId);
     if (docs.length) docs.forEach((d) => users.add(d));
-    else await notify({ ...base, roles: ['admin'] });
+    // بلا طبيب في الفريق: من طلب الفحص إن وُجد، وإلا المديرون
+    else if (!o.userIds?.length) await notify({ ...base, roles: ['admin', 'super_admin'] });
   }
   if (o.toNurse) {
     const nurse = await activeNurseId(admissionId);

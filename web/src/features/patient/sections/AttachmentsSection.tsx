@@ -8,7 +8,7 @@ import { fmtBytes, fmtDateTime } from '@/lib/format';
 import { API, type ChartData } from '@/lib/api';
 import { useToast } from '@/components/ui';
 
-const MAX_SIZE = 4 * 1024 * 1024;
+const MAX_SIZE = 18 * 1024 * 1024; // الخادم يقرر الحد الفعلي (18 على القرص، 4 داخل القاعدة) ويرفض بالرسالة الصحيحة
 const ALLOWED_TYPES = [
   'image/png',
   'image/jpeg',

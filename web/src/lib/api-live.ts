@@ -326,9 +326,13 @@ export const liveApi: Api = {
     return request('/hospitals/me/logo', { method: 'POST', body: form });
   },
   removeHospitalLogo: () => request('/hospitals/me/logo', { method: 'DELETE' }),
-  uploadAttachment: (admissionId, file) => {
+  uploadAttachment: (admissionId, file, record) => {
     const form = new FormData();
     form.append('file', file);
+    if (record) {
+      form.append('record_type', record.type);
+      form.append('record_id', record.id);
+    }
     return request(`/patients/${admissionId}/attachments`, { method: 'POST', body: form });
   },
   deleteAttachment: (admissionId, attachmentId) => request(`/patients/${admissionId}/attachments/${attachmentId}`, { method: 'DELETE' }),

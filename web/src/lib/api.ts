@@ -733,7 +733,8 @@ export interface Api {
   createUser(input: NewUserInput): Promise<User>;
   updateUser(id: string, input: UpdateUserInput): Promise<User>;
   listDoctors(): Promise<PublicUser[]>;
-  uploadAttachment(admissionId: string, file: File): Promise<Attachment>;
+  /** record: ربط المرفق بفحص محدد (تقرير أشعة / نتيجة مختبر) */
+  uploadAttachment(admissionId: string, file: File, record?: { type: 'radiology' | 'lab'; id: string }): Promise<Attachment>;
   deleteAttachment(admissionId: string, attachmentId: string): Promise<void>;
   attachmentUrl(admissionId: string, attachmentId: string): string;
   reportsOverview(from: string, to: string): Promise<ReportOverview>;

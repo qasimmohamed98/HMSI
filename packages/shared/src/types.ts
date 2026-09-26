@@ -103,9 +103,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ],
   // الصيدلي يصرف الأدوية ولا يصفها
   pharmacist: ['patients.view', 'chart.view', 'medications.dispense', 'encounters.create', 'inventory.manage'],
-  lab: ['patients.view', 'chart.view', 'lab.order', 'lab.add_result', 'encounters.create', 'patients.create'],
-  radiology: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report', 'radiology.perform', 'encounters.create', 'patients.create'],
-  radiologist: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report', 'radiology.verify', 'reports.view'],
+  lab: ['patients.view', 'chart.view', 'lab.order', 'lab.add_result', 'encounters.create', 'patients.create', 'files.manage'],
+  radiology: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report', 'radiology.perform', 'encounters.create', 'patients.create', 'files.manage'],
+  radiologist: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report', 'radiology.verify', 'reports.view', 'files.manage'],
   storekeeper: ['inventory.manage', 'reports.view'],
   accountant: ['patients.view', 'billing.manage', 'services.manage', 'reports.view'],
   reception: ['patients.create', 'patients.update', 'patients.archive', 'patients.view', 'admissions.manage', 'encounters.create'],
@@ -476,6 +476,9 @@ export interface Attachment {
   size: number;
   uploaded_by: string;
   created_at: string;
+  /** مرتبط بفحص محدد (تقرير أشعة / نتيجة مختبر) */
+  record_type?: 'radiology' | 'lab' | null;
+  record_id?: string | null;
 }
 
 export interface TimelineEvent {

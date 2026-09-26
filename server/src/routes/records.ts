@@ -368,10 +368,10 @@ recordRoutes.post('/:admissionId/labs', requireAuth(), requirePermission('lab.or
   const id = uuid('lb');
   const at = new Date().toISOString();
   await db.execute({
-    sql: `INSERT INTO lab_results (id, admission_id, test_name_ar, test_name_en, category, ordered_by, ordered_at, result, unit, reference_range, status, resulted_by, resulted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO lab_results (id, admission_id, test_name_ar, test_name_en, category, ordered_by, ordered_by_id, ordered_at, result, unit, reference_range, status, resulted_by, resulted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
-      id, input.admission_id, input.test_name_ar, input.test_name_en ?? null, input.category ?? null, s.user.full_name_ar, at,
+      id, input.admission_id, input.test_name_ar, input.test_name_en ?? null, input.category ?? null, s.user.full_name_ar, s.user.id, at,
       withResult ? input.result!.trim() : null,
       input.unit ?? null,
       input.reference_range ?? null,
@@ -405,6 +405,8 @@ recordRoutes.patch('/:admissionId/labs/:id', requireAuth(), requirePermission('l
   await track(c, s, a.id, 'lab', 'إدخال نتيجة مختبر', 'Lab result entered', 'lab_result_updated', 'lab_result', id);
   await notifyAdmission(a.id, {
     toAttending: true,
+    userIds: lab.ordered_by_id ? [String(lab.ordered_by_id)] : [],
+    tab: 'laboratory',
     kind: input.abnormal ? 'lab_abnormal' : 'lab_resulted',
     severity: input.abnormal ? 'warning' : 'info',
     titleAr: `${input.abnormal ? 'نتيجة غير طبيعية' : 'نتيجة مختبر'}: ${String(lab.test_name_ar)}`,
@@ -428,10 +430,10 @@ recordRoutes.post('/:admissionId/radiology', requireAuth(), requirePermission('r
   const id = uuid('rd');
   const at = new Date().toISOString();
   await db.execute({
-    sql: `INSERT INTO radiology_reports (id, admission_id, study_type, study_type_ar, study_type_en, ordered_by, ordered_at, report, status, performed_by, performed_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO radiology_reports (id, admission_id, study_type, study_type_ar, study_type_en, ordered_by, ordered_by_id, ordered_at, report, status, performed_by, performed_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
-      id, input.admission_id, input.study_type_ar, input.study_type_ar, input.study_type_en ?? null, s.user.full_name_ar, at,
+      id, input.admission_id, input.study_type_ar, input.study_type_ar, input.study_type_en ?? null, s.user.full_name_ar, s.user.id, at,
       withReport ? input.report!.trim() : null,
       withReport ? 'resulted' : 'ordered',
       withReport ? s.user.full_name_ar : null,
@@ -442,8 +444,8 @@ recordRoutes.post('/:admissionId/radiology', requireAuth(), requirePermission('r
   await notifyAdmission(
     input.admission_id,
     withReport
-      ? { toAttending: true, kind: 'radiology_reported', titleAr: `تقرير أشعة: ${input.study_type_ar}`, titleEn: `Radiology report: ${input.study_type_en ?? input.study_type_ar}`, createdById: s.user.id }
-      : { roles: ['radiology'], kind: 'radiology_ordered', titleAr: `طلب أشعة جديد: ${input.study_type_ar}`, titleEn: `New imaging order: ${input.study_type_en ?? input.study_type_ar}`, createdById: s.user.id },
+      ? { toAttending: true, tab: 'radiology', kind: 'radiology_reported', titleAr: `تقرير أشعة: ${input.study_type_ar}`, titleEn: `Radiology report: ${input.study_type_en ?? input.study_type_ar}`, createdById: s.user.id }
+      : { roles: ['radiology', 'radiologist'], tab: 'radiology', kind: 'radiology_ordered', titleAr: `طلب أشعة جديد: ${input.study_type_ar}`, titleEn: `New imaging order: ${input.study_type_en ?? input.study_type_ar}`, createdById: s.user.id },
   );
   return c.json(await fetchRow('radiology_reports', id), 201);
 });
@@ -463,6 +465,9 @@ recordRoutes.patch('/:admissionId/radiology/:id', requireAuth(), requirePermissi
   await track(c, s, a.id, 'radiology', 'إعداد تقرير أشعة', 'Radiology report ready', 'radiology_report_updated', 'radiology_report', id);
   await notifyAdmission(a.id, {
     toAttending: true,
+    // من طلب الفحص يُبلَّغ دائماً (حتى لو لم يكن في فريق الرعاية، مثل زيارة «فحص فقط»)
+    userIds: study.ordered_by_id ? [String(study.ordered_by_id)] : [],
+    tab: 'radiology',
     kind: 'radiology_reported',
     titleAr: `تقرير أشعة جاهز: ${String(study.study_type_ar ?? study.study_type)}`,
     titleEn: `Radiology report ready: ${String(study.study_type_en ?? study.study_type_ar ?? study.study_type)}`,
