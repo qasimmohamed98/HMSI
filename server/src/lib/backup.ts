@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { db } from '../../db/index.js';
+import { isFileKey, loadFile } from './fileStore.js';
 
 /**
  * النسخ الاحتياطي المنطقي: كل الجداول كـ JSON مضغوط (ومشفّر إن وُجد BACKUP_KEY).
@@ -22,6 +23,8 @@ export interface BackupFile {
   migrations: string[];
   counts: Record<string, number>;
   tables: Record<string, Row[]>;
+  /** محتوى الملفات المخزّنة على القرص (المرفقات): storage_key → base64 — النسخة الكاملة فقط */
+  files?: Record<string, string>;
 }
 
 /** جداول مؤقتة أو أسرار جلسات: لا تُنسخ */
@@ -78,7 +81,20 @@ function finish(scope: BackupFile['scope'], tables: Record<string, Row[]>, migra
 export async function buildFullBackup(): Promise<BackupFile> {
   const tables: Record<string, Row[]> = {};
   for (const t of await listTables()) tables[t] = await dumpQuery(`SELECT * FROM ${t} ORDER BY rowid`);
-  return finish('full', tables, await migrationsList());
+  const b = finish('full', tables, await migrationsList());
+  // الملفات على القرص تُضمَّن في النسخة نفسها (مشفّرة معها) — الاستعادة خطوة واحدة
+  const files: Record<string, string> = {};
+  for (const row of tables.attachments ?? []) {
+    const key = String(row.storage_key ?? '');
+    if (!isFileKey(key)) continue;
+    const bytes = await loadFile(key);
+    if (bytes) files[key] = bytes.toString('base64');
+  }
+  if (Object.keys(files).length) {
+    b.files = files;
+    b.counts = { ...b.counts, files: Object.keys(files).length };
+  }
+  return b;
 }
 
 const ADMISSION_TABLES = ['vitals', 'medical_notes', 'diagnoses', 'medications', 'medication_administrations', 'lab_results', 'radiology_reports', 'consultations', 'procedures', 'fluid_entries', 'timeline_events'];
@@ -94,6 +110,8 @@ export async function buildHospitalExport(hospitalId: string): Promise<BackupFil
     hospitals: await dumpQuery(`SELECT * FROM hospitals WHERE id = ? ORDER BY rowid`, h),
     settings: await dumpQuery(`SELECT * FROM settings WHERE hospital_id = ? ORDER BY rowid`, h),
     departments: await dumpQuery(`SELECT * FROM departments WHERE hospital_id = ? ORDER BY rowid`, h),
+    department_units: await dumpQuery(`SELECT * FROM department_units WHERE hospital_id = ? ORDER BY rowid`, h),
+    services: await dumpQuery(`SELECT * FROM services WHERE hospital_id = ? ORDER BY rowid`, h),
     wards: await dumpQuery(`SELECT * FROM wards WHERE department_id IN (SELECT id FROM departments WHERE hospital_id = ?) ORDER BY rowid`, h),
     beds: await dumpQuery(
       `SELECT * FROM beds WHERE ward_id IN (SELECT w.id FROM wards w JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = ?) ORDER BY rowid`,

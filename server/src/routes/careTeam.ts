@@ -39,7 +39,7 @@ careTeamRoutes.get('/staff', requireAuth(), requirePermission('chart.view'), asy
   const r = await db.execute({
     sql: `SELECT u.id, u.full_name_ar, u.full_name_en,
                  (SELECT COUNT(*) FROM care_team ct JOIN admissions a ON a.id = ct.admission_id
-                  WHERE ct.user_id = u.id AND ct.ended_at IS NULL AND a.status = 'active') AS patients
+                  WHERE ct.user_id = u.id AND ct.ended_at IS NULL AND a.status = 'active' AND a.encounter_type IN ('inpatient','emergency')) AS patients
           FROM users u WHERE u.hospital_id = ? AND u.role = ? AND u.is_active = 1
           ORDER BY u.full_name_ar`,
     args: [s.user.hospital_id, role],

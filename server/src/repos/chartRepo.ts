@@ -61,7 +61,7 @@ export async function getChart(patientId: string, hospitalId: string, admissionI
 
   const chosen = admissionId
     ? admissions.find((a) => a.id === admissionId)
-    : (admissions.find((a) => a.status === 'active') ?? admissions[0]);
+    : (admissions.find((a) => a.status === 'active' && a.encounter_type === 'inpatient') ?? admissions.find((a) => a.status === 'active') ?? admissions[0]);
   if (admissionId && !chosen) return null;
 
   if (!chosen) {

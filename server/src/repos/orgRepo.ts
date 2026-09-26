@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { Department, Ward, Bed, UnassignedPatient } from '@hmsi/shared';
+import type { Department, DepartmentKind, DepartmentUnit, Ward, Bed, UnassignedPatient } from '@hmsi/shared';
 import { db, uuid, withTx } from '../../db/index.js';
 import { moveToTrash, type TrashActor } from '../lib/trash.js';
 import { HttpConflict } from '../lib/errors.js';
@@ -10,7 +10,9 @@ function mapDepartment(r: Record<string, unknown>): Department {
     hospital_id: String(r.hospital_id),
     name_ar: String(r.name_ar),
     name_en: String(r.name_en),
+    kind: (r.kind ? String(r.kind) : 'clinical') as DepartmentKind,
     ward_count: r.ward_count === undefined ? undefined : Number(r.ward_count),
+    unit_count: r.unit_count === undefined ? undefined : Number(r.unit_count),
   };
 }
 
@@ -21,7 +23,8 @@ export function generateBedCode(): string {
 
 export async function listDepartments(hospitalId: string): Promise<Department[]> {
   const rows = await db.execute({
-    sql: `SELECT d.*, (SELECT COUNT(*) FROM wards w WHERE w.department_id = d.id) AS ward_count
+    sql: `SELECT d.*, (SELECT COUNT(*) FROM wards w WHERE w.department_id = d.id) AS ward_count,
+                 (SELECT COUNT(*) FROM department_units u WHERE u.department_id = d.id) AS unit_count
           FROM departments d
           WHERE d.hospital_id = ?
           ORDER BY d.name_ar ASC`,
@@ -36,21 +39,21 @@ export async function getDepartment(id: string, hospitalId: string): Promise<Dep
   return mapDepartment(rows.rows[0] as Record<string, unknown>);
 }
 
-export async function createDepartment(input: { name_ar: string; name_en?: string | null }, hospitalId: string): Promise<Department> {
+export async function createDepartment(input: { name_ar: string; name_en?: string | null; kind?: DepartmentKind }, hospitalId: string): Promise<Department> {
   const id = uuid('dep');
   await db.execute({
-    sql: `INSERT INTO departments (id, hospital_id, name_ar, name_en) VALUES (?, ?, ?, ?)`,
-    args: [id, hospitalId, input.name_ar, input.name_en || input.name_ar],
+    sql: `INSERT INTO departments (id, hospital_id, name_ar, name_en, kind) VALUES (?, ?, ?, ?, ?)`,
+    args: [id, hospitalId, input.name_ar, input.name_en || input.name_ar, input.kind ?? 'clinical'],
   });
   return (await getDepartment(id, hospitalId))!;
 }
 
-export async function updateDepartment(id: string, hospitalId: string, input: { name_ar?: string; name_en?: string | null }): Promise<Department | null> {
+export async function updateDepartment(id: string, hospitalId: string, input: { name_ar?: string; name_en?: string | null; kind?: DepartmentKind }): Promise<Department | null> {
   const exists = await getDepartment(id, hospitalId);
   if (!exists) return null;
   await db.execute({
-    sql: `UPDATE departments SET name_ar = COALESCE(?, name_ar), name_en = COALESCE(?, name_en) WHERE id = ?`,
-    args: [input.name_ar ?? null, input.name_en ?? null, id],
+    sql: `UPDATE departments SET name_ar = COALESCE(?, name_ar), name_en = COALESCE(?, name_en), kind = COALESCE(?, kind) WHERE id = ?`,
+    args: [input.name_ar ?? null, input.name_en ?? null, input.kind ?? null, id],
   });
   return getDepartment(id, hospitalId);
 }
@@ -63,7 +66,7 @@ export async function deleteDepartment(id: string, hospitalId: string, actor: Tr
   }
   const adm = await db.execute({ sql: `SELECT COUNT(*) AS n FROM admissions WHERE department_id = ?`, args: [id] });
   if (Number((adm.rows[0] as Record<string, unknown>).n) > 0) {
-    throw new HttpConflict('لا يمكن حذف قسم له سجل تنويم — أولِه لتصفير البيانات');
+    throw new HttpConflict('لا يمكن حذف قسم له سجل تنويم أو زيارات — أولِه لتصفير البيانات');
   }
   const dep = await getDepartment(id, hospitalId);
   await moveToTrash({ table: 'departments', id, hospitalId, kind: 'department', label: dep?.name_ar ?? id, actor });
@@ -182,7 +185,7 @@ export async function listUnassigned(hospitalId: string): Promise<UnassignedPati
   const rows = await db.execute({
     sql: `SELECT a.id AS admission_id, a.patient_id, a.admitted_at, p.full_name_ar AS patient_name_ar
           FROM admissions a JOIN patients p ON p.id = a.patient_id
-          WHERE a.status = 'active' AND a.bed_id IS NULL AND p.hospital_id = ? AND p.archived_at IS NULL
+          WHERE a.status = 'active' AND a.encounter_type = 'inpatient' AND a.bed_id IS NULL AND p.hospital_id = ? AND p.archived_at IS NULL
           ORDER BY a.admitted_at ASC`,
     args: [hospitalId],
   });
@@ -202,12 +205,13 @@ export async function assignBed(bedId: string, admissionId: string, hospitalId: 
   if (!bed) throw new HttpConflict('السرير غير موجود');
   return withTx(async (tx) => {
     const adm = await tx.execute({
-      sql: `SELECT a.status, a.bed_id FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE a.id = ? AND p.hospital_id = ? LIMIT 1`,
+      sql: `SELECT a.status, a.bed_id, a.encounter_type FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE a.id = ? AND p.hospital_id = ? LIMIT 1`,
       args: [admissionId, hospitalId],
     });
     if (adm.rows.length === 0) throw new HttpConflict('التنويم غير موجود');
     const a = adm.rows[0] as Record<string, unknown>;
     if (String(a.status) !== 'active') throw new HttpConflict('التنويم غير نشط');
+    if (String(a.encounter_type ?? 'inpatient') !== 'inpatient') throw new HttpConflict('هذه زيارة بلا تنويم — نوّم المريض أولاً');
     if (a.bed_id) throw new HttpConflict('المريض لديه سرير بالفعل — استخدم النقل');
     const res = await tx.execute({ sql: `UPDATE beds SET status = 'occupied' WHERE id = ? AND status = 'free'`, args: [bedId] });
     if (res.rowsAffected !== 1) throw new HttpConflict('السرير مشغول');
@@ -246,4 +250,67 @@ export async function occupiedByPatient(bedId: string, hospitalId: string): Prom
   if (rows.rows.length === 0) return null;
   const r = rows.rows[0] as Record<string, unknown>;
   return { admission_id: String(r.admission_id), patient_id: String(r.patient_id), patient_name_ar: String(r.patient_name_ar) };
+}
+// ------------------------------ وحدات القسم (أجهزة وغرف)
+
+function mapUnit(r: Record<string, unknown>): DepartmentUnit {
+  const s = (v: unknown) => (v === null || v === undefined || v === '' ? null : String(v));
+  return {
+    id: String(r.id),
+    department_id: String(r.department_id),
+    kind: String(r.kind) === 'room' ? 'room' : 'device',
+    modality: s(r.modality) as DepartmentUnit['modality'],
+    name_ar: String(r.name_ar),
+    name_en: s(r.name_en),
+    status: String(r.status) as DepartmentUnit['status'],
+    notes: s(r.notes),
+  };
+}
+
+export async function listUnits(hospitalId: string, departmentId?: string): Promise<DepartmentUnit[]> {
+  const rows = await db.execute({
+    sql: `SELECT * FROM department_units WHERE hospital_id = ?${departmentId ? ' AND department_id = ?' : ''} ORDER BY modality, name_ar`,
+    args: departmentId ? [hospitalId, departmentId] : [hospitalId],
+  });
+  return rows.rows.map((r) => mapUnit(r as Record<string, unknown>));
+}
+
+export interface UnitInput {
+  kind: DepartmentUnit['kind'];
+  modality?: DepartmentUnit['modality'];
+  name_ar: string;
+  name_en?: string | null;
+  status: DepartmentUnit['status'];
+  notes?: string | null;
+}
+
+export async function createUnit(departmentId: string, hospitalId: string, input: UnitInput): Promise<DepartmentUnit> {
+  if (!(await getDepartment(departmentId, hospitalId))) throw new HttpConflict('القسم غير موجود');
+  const id = uuid('unit');
+  await db.execute({
+    sql: `INSERT INTO department_units (id, hospital_id, department_id, kind, modality, name_ar, name_en, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [id, hospitalId, departmentId, input.kind, input.modality ?? null, input.name_ar, input.name_en ?? null, input.status, input.notes ?? null, new Date().toISOString()],
+  });
+  return (await listUnits(hospitalId, departmentId)).find((u) => u.id === id)!;
+}
+
+export async function updateUnit(id: string, hospitalId: string, input: Partial<UnitInput>): Promise<DepartmentUnit | null> {
+  const r = await db.execute({
+    sql: `UPDATE department_units SET kind = COALESCE(?, kind), modality = CASE WHEN ? THEN ? ELSE modality END, name_ar = COALESCE(?, name_ar),
+            name_en = CASE WHEN ? THEN ? ELSE name_en END, status = COALESCE(?, status), notes = CASE WHEN ? THEN ? ELSE notes END
+          WHERE id = ? AND hospital_id = ?`,
+    args: [
+      input.kind ?? null, input.modality !== undefined ? 1 : 0, input.modality ?? null, input.name_ar ?? null,
+      input.name_en !== undefined ? 1 : 0, input.name_en ?? null, input.status ?? null, input.notes !== undefined ? 1 : 0, input.notes ?? null,
+      id, hospitalId,
+    ],
+  });
+  if (r.rowsAffected === 0) return null;
+  const row = await db.execute({ sql: `SELECT * FROM department_units WHERE id = ?`, args: [id] });
+  return mapUnit(row.rows[0] as Record<string, unknown>);
+}
+
+export async function deleteUnit(id: string, hospitalId: string): Promise<boolean> {
+  const r = await db.execute({ sql: `DELETE FROM department_units WHERE id = ? AND hospital_id = ?`, args: [id, hospitalId] });
+  return r.rowsAffected > 0;
 }

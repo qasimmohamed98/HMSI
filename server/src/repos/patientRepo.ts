@@ -15,7 +15,7 @@ export interface PatientListOptions {
 }
 
 /** أعمدة التنويم الموحّدة — تتطلب aliases: a (admissions)، d (departments)، w (wards) */
-export const ADMISSION_COLUMNS = `a.id AS admission_id, a.patient_id, a.department_id, a.ward_id, a.room,
+export const ADMISSION_COLUMNS = `a.id AS admission_id, a.patient_id, a.department_id, a.ward_id, a.room, a.encounter_type, a.referral_source, a.referring_doctor,
        a.bed_no, a.status, a.admitted_at, a.discharged_at, a.discharge_type, a.discharge_summary, a.reason, a.family_pin,
        a.family_share, a.family_message, a.family_message_by, a.family_message_at,
        d.name_ar AS department_name_ar, d.name_en AS department_name_en,
@@ -38,6 +38,9 @@ export function mapAdmission(r: Record<string, unknown>): AdmissionSummary | nul
   if (!r.admission_id) return null;
   return {
     id: String(r.admission_id),
+    encounter_type: (str(r.encounter_type) ?? 'inpatient') as AdmissionSummary['encounter_type'],
+    referral_source: str(r.referral_source),
+    referring_doctor: str(r.referring_doctor),
     department_id: String(r.department_id ?? ''),
     department_name_ar: String(r.department_name_ar ?? ''),
     department_name_en: String(r.department_name_en ?? ''),
@@ -97,7 +100,7 @@ export async function listPatients(hospitalId: string, opts: PatientListOptions 
     args.push(...acc.args);
   }
   if (opts.nurseId) {
-    where.push(`EXISTS (SELECT 1 FROM care_team ct JOIN admissions an ON an.id = ct.admission_id WHERE an.patient_id = p.id AND ct.user_id = ? AND ct.role = 'nurse' AND ct.ended_at IS NULL)`);
+    where.push(`EXISTS (SELECT 1 FROM care_team ct JOIN admissions an ON an.id = ct.admission_id WHERE an.patient_id = p.id AND an.encounter_type = 'inpatient' AND ct.user_id = ? AND ct.role = 'nurse' AND ct.ended_at IS NULL)`);
     args.push(opts.nurseId);
   }
   const search = opts.search?.trim();
@@ -107,7 +110,7 @@ export async function listPatients(hospitalId: string, opts: PatientListOptions 
     args.push(pat, pat, pat, pat, pat);
   }
   if (opts.admitted) {
-    where.push(`EXISTS (SELECT 1 FROM admissions a WHERE a.patient_id = p.id AND a.status = 'active')`);
+    where.push(`EXISTS (SELECT 1 FROM admissions a WHERE a.patient_id = p.id AND a.status = 'active' AND a.encounter_type = 'inpatient')`);
   }
   const patients = await db.execute({
     sql: `SELECT p.* FROM patients p WHERE ${where.join(' AND ')} ORDER BY p.created_at DESC LIMIT 200`,
@@ -123,7 +126,8 @@ export async function listPatients(hospitalId: string, opts: PatientListOptions 
             FROM admissions a
             LEFT JOIN departments d ON d.id = a.department_id
             LEFT JOIN wards w ON w.id = a.ward_id
-            WHERE a.patient_id IN (${placeholders}) AND a.status = 'active'`,
+            WHERE a.patient_id IN (${placeholders}) AND a.status = 'active'
+            ORDER BY (a.encounter_type = 'inpatient') ASC, a.admitted_at ASC`,
       args: ids,
     });
     for (const row of adm.rows) {
@@ -153,7 +157,7 @@ export async function getPatientById(id: string, hospitalId: string): Promise<Pa
           LEFT JOIN departments d ON d.id = a.department_id
           LEFT JOIN wards w ON w.id = a.ward_id
           WHERE a.patient_id = ? AND a.status = 'active'
-          ORDER BY a.admitted_at DESC LIMIT 1`,
+          ORDER BY (a.encounter_type = 'inpatient') DESC, a.admitted_at DESC LIMIT 1`,
     args: [id],
   });
   const admission = adm.rows.length > 0 ? mapAdmission(adm.rows[0] as Record<string, unknown>) : null;

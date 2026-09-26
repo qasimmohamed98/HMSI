@@ -1,4 +1,6 @@
 import type {
+  DepartmentUnit,
+  ServiceItem,
   User,
   Patient,
   Vitals,
@@ -532,6 +534,36 @@ export const demoApi: Api = {
     const created: Department = { id: uid(), hospital_id: store.hospital.id, name_ar: input.nameAr, name_en: input.nameEn ?? input.nameAr, ward_count: 0 };
     store.departments.push(created);
     return created;
+  },
+
+  // الأجهزة والكتالوج والزيارات تحتاج الخادم الحقيقي — العرض التوضيحي يعرضها فارغة
+  async listUnits() {
+    return [];
+  },
+  async createUnit(): Promise<DepartmentUnit> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async updateUnit(): Promise<DepartmentUnit> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async deleteUnit(): Promise<void> {},
+  async listServices() {
+    return [];
+  },
+  async createService(): Promise<ServiceItem> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async updateService(): Promise<ServiceItem> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async importDefaultServices(): Promise<{ added: number; total: number }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async createEncounter(): Promise<{ admission_id: string; patient_id: string }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async closeEncounter(): Promise<void> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
   },
 
   async updateDepartment(id: string, input: Partial<DepartmentInput>): Promise<Department> {

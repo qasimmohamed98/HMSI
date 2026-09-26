@@ -8,6 +8,7 @@ import {
   UpdateWardSchema,
   CreateBedSchema,
   UpdateBedSchema,
+  DepartmentUnitSchema,
 } from '@hmsi/shared/validate';
 import { getSession, requireAuth, requirePermission } from '../middleware/auth.js';
 import { parseBody } from '../lib/validate.js';
@@ -27,6 +28,10 @@ import {
   assignBed,
   freeBed,
   occupiedByPatient,
+  listUnits,
+  createUnit,
+  updateUnit,
+  deleteUnit,
 } from '../repos/orgRepo.js';
 import { HttpConflict } from '../lib/errors.js';
 import { clientIp } from '../config.js';
@@ -87,6 +92,39 @@ orgRoutes.delete('/departments/:id', requireAuth(), requirePermission('departmen
 });
 
 // ------------------------------ الردهات
+
+// ------------------------------ وحدات القسم (أجهزة وغرف)
+
+orgRoutes.get('/units', requireAuth(), requirePermission('patients.view'), async (c) => {
+  const session = getSession(c)!;
+  return c.json(await listUnits(session.user.hospital_id, c.req.query('department') || undefined));
+});
+
+orgRoutes.post('/departments/:id/units', requireAuth(), requirePermission('departments.manage'), async (c) => {
+  const parsed = await parseBody(c, DepartmentUnitSchema);
+  if (!parsed.ok) return parsed.json;
+  const session = getSession(c)!;
+  const unit = await createUnit(c.req.param('id')!, session.user.hospital_id, parsed.data as (typeof DepartmentUnitSchema)['_output']);
+  await writeAudit({ actorId: session.user.id, action: 'unit_created', resourceType: 'department_unit', resourceId: unit.id, ip: actorIp(c) });
+  return c.json(unit, 201);
+});
+
+orgRoutes.patch('/units/:id', requireAuth(), requirePermission('departments.manage'), async (c) => {
+  const parsed = await parseBody(c, DepartmentUnitSchema.partial());
+  if (!parsed.ok) return parsed.json;
+  const session = getSession(c)!;
+  const unit = await updateUnit(c.req.param('id')!, session.user.hospital_id, parsed.data as Partial<(typeof DepartmentUnitSchema)['_output']>);
+  if (!unit) return c.json({ message: 'الوحدة غير موجودة' }, 404);
+  await writeAudit({ actorId: session.user.id, action: 'unit_updated', resourceType: 'department_unit', resourceId: unit.id, meta: { status: unit.status }, ip: actorIp(c) });
+  return c.json(unit);
+});
+
+orgRoutes.delete('/units/:id', requireAuth(), requirePermission('departments.manage'), async (c) => {
+  const session = getSession(c)!;
+  if (!(await deleteUnit(c.req.param('id')!, session.user.hospital_id))) return c.json({ message: 'الوحدة غير موجودة' }, 404);
+  await writeAudit({ actorId: session.user.id, action: 'unit_deleted', resourceType: 'department_unit', resourceId: c.req.param('id')!, ip: actorIp(c) });
+  return c.body(null, 204);
+});
 
 orgRoutes.post('/wards', requireAuth(), requirePermission('wards.manage'), async (c) => {
   const parsed = await parseBody(c, CreateWardSchema);

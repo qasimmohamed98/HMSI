@@ -1,5 +1,13 @@
 import type {
   User,
+  Role,
+  DepartmentKind,
+  DepartmentUnit,
+  Modality,
+  ServiceKind,
+  ServiceItem,
+  EncounterType,
+  DischargeType,
   Patient,
   Vitals,
   MedicalNote,
@@ -238,6 +246,41 @@ export interface PatientUpdateInput {
 export interface DepartmentInput {
   nameAr: string;
   nameEn?: string | null;
+  kind?: DepartmentKind;
+}
+
+export interface UnitInput {
+  kind: 'device' | 'room';
+  modality?: Modality | null;
+  name_ar: string;
+  name_en?: string | null;
+  status?: DepartmentUnit['status'];
+  notes?: string | null;
+}
+
+export interface ServiceInput {
+  kind: ServiceKind;
+  code: string;
+  name_ar: string;
+  name_en?: string | null;
+  modality?: Modality | null;
+  body_part?: string | null;
+  department_id?: string | null;
+  price?: number | null;
+  prep_ar?: string | null;
+  prep_en?: string | null;
+  is_active?: boolean;
+}
+
+export interface EncounterInput {
+  patient_id: string;
+  encounter_type: Exclude<EncounterType, 'inpatient'>;
+  department_id: string;
+  attending_doctor_id?: string | null;
+  reason?: string | null;
+  referral_source?: string | null;
+  referring_doctor?: string | null;
+  referral_note?: string | null;
 }
 
 export interface WardInput {
@@ -264,14 +307,14 @@ export interface NewUserInput {
   fullNameAr: string;
   fullNameEn?: string;
   email?: string | null;
-  role: 'admin' | 'doctor' | 'nurse' | 'pharmacist' | 'lab' | 'radiology' | 'reception' | 'viewer';
+  role: Exclude<Role, 'super_admin'>;
 }
 
 export interface UpdateUserInput {
   fullNameAr?: string;
   fullNameEn?: string | null;
   email?: string | null;
-  role?: 'admin' | 'doctor' | 'nurse' | 'pharmacist' | 'lab' | 'radiology' | 'reception' | 'viewer';
+  role?: Exclude<Role, 'super_admin'>;
   isActive?: boolean;
 }
 
@@ -646,6 +689,19 @@ export interface Api {
   listDepartments(): Promise<Department[]>;
   createDepartment(input: DepartmentInput): Promise<Department>;
   updateDepartment(id: string, input: Partial<DepartmentInput>): Promise<Department>;
+  // وحدات القسم (أجهزة وغرف)
+  listUnits(departmentId?: string): Promise<DepartmentUnit[]>;
+  createUnit(departmentId: string, input: UnitInput): Promise<DepartmentUnit>;
+  updateUnit(id: string, input: Partial<UnitInput>): Promise<DepartmentUnit>;
+  deleteUnit(id: string): Promise<void>;
+  // كتالوج الخدمات والأسعار
+  listServices(filter?: { kind?: ServiceKind; modality?: Modality; q?: string; all?: boolean }): Promise<ServiceItem[]>;
+  createService(input: ServiceInput): Promise<ServiceItem>;
+  updateService(id: string, input: Partial<ServiceInput>): Promise<ServiceItem>;
+  importDefaultServices(): Promise<{ added: number; total: number }>;
+  // الزيارات بلا تنويم (مراجع، طوارئ، فحص فقط)
+  createEncounter(input: EncounterInput): Promise<{ admission_id: string; patient_id: string }>;
+  closeEncounter(admissionId: string, input: { outcome: DischargeType; summary?: string }): Promise<void>;
   deleteDepartment(id: string): Promise<void>;
   createWard(input: WardInput): Promise<Ward>;
   updateWard(id: string, input: Partial<Omit<WardInput, 'departmentId'>>): Promise<Ward>;

@@ -50,7 +50,7 @@ roundsRoutes.get('/', requireAuth(), requirePermission('medications.administer',
                  (SELECT ma.administered_by FROM medication_administrations ma WHERE ma.medication_id = m.id ORDER BY ma.administered_at DESC LIMIT 1) AS last_by,
                  ${NURSE_COLS}
           FROM medications m
-          JOIN admissions a ON a.id = m.admission_id AND a.status = 'active'
+          JOIN admissions a ON a.id = m.admission_id AND a.status = 'active' AND a.encounter_type IN ('inpatient','emergency')
           JOIN patients p ON p.id = a.patient_id
           LEFT JOIN wards w ON w.id = a.ward_id
           WHERE p.hospital_id = ? AND m.status = 'active'${f.sql}
@@ -81,7 +81,7 @@ roundsRoutes.get('/vitals', requireAuth(), requirePermission('chart.view'), asyn
           LEFT JOIN wards w ON w.id = a.ward_id
           LEFT JOIN care_plans cp ON cp.admission_id = a.id
           LEFT JOIN vitals v ON v.id = (SELECT id FROM vitals WHERE admission_id = a.id ORDER BY recorded_at DESC LIMIT 1)
-          WHERE p.hospital_id = ? AND a.status = 'active'${f.sql}
+          WHERE p.hospital_id = ? AND a.status = 'active' AND a.encounter_type IN ('inpatient','emergency')${f.sql}
           ORDER BY w.name_ar, a.room, a.bed_no`,
     args: [s.user.hospital_id, ...f.args],
   });

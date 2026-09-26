@@ -65,7 +65,7 @@ handoverRoutes.get('/', requireAuth(), requirePermission('chart.view'), async (c
           LEFT JOIN vitals v ON v.id = (SELECT id FROM vitals WHERE admission_id = a.id ORDER BY recorded_at DESC LIMIT 1)
           LEFT JOIN care_plans cp ON cp.admission_id = a.id
           LEFT JOIN handover_notes h ON h.id = (SELECT id FROM handover_notes WHERE admission_id = a.id ORDER BY created_at DESC LIMIT 1)
-          WHERE p.hospital_id = ? AND a.status = 'active' ${ward ? 'AND a.ward_id = ?' : ''}${extra.length ? ` AND ${extra.join(' AND ')}` : ''}
+          WHERE p.hospital_id = ? AND a.status = 'active' AND a.encounter_type IN ('inpatient','emergency') ${ward ? 'AND a.ward_id = ?' : ''}${extra.length ? ` AND ${extra.join(' AND ')}` : ''}
           ORDER BY w.name_ar, a.room, a.bed_no`,
     args: [since24, s.user.hospital_id, ...(ward ? [ward] : []), ...extraArgs],
   });

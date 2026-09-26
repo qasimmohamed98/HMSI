@@ -41,6 +41,8 @@ export async function purgeHospital(hospitalId: string, keepUserIds: string[] = 
     await run('patients', `DELETE FROM patients WHERE hospital_id = ?`, H);
     await run('beds', `DELETE FROM beds WHERE ward_id IN (SELECT w.id FROM wards w JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = ?)`, H);
     await run('wards', `DELETE FROM wards WHERE department_id IN (SELECT id FROM departments WHERE hospital_id = ?)`, H);
+    await run('services', `DELETE FROM services WHERE hospital_id = ?`, H);
+    await run('department_units', `DELETE FROM department_units WHERE hospital_id = ?`, H);
     await run('departments', `DELETE FROM departments WHERE hospital_id = ?`, H);
     await run('settings', `DELETE FROM settings WHERE hospital_id = ?`, H);
     // المستخدمون وما يرتبط بهم

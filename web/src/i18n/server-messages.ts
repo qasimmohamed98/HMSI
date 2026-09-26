@@ -92,6 +92,7 @@ const EN: Record<string, string> = {
   'جسم الطلب غير صالح': 'Invalid request body',
   'حجم الشعار يتجاوز 300 كيلوبايت': 'The logo exceeds 300 KB',
   'حجم الملف يتجاوز 4 ميجابايت': 'The file exceeds 4 MB',
+  'حجم الملف يتجاوز 18 ميجابايت': 'The file exceeds 18 MB',
   'حدث خطأ غير متوقع في الخادم': 'Unexpected server error',
   'حدد المدة أو التاريخ': 'Choose a period or a date',
   'رقم الهاتف غير صحيح': 'Invalid phone number',

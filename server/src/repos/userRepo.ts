@@ -1,5 +1,5 @@
 import { toUser } from './authRepo.js';
-import type { User } from '@hmsi/shared';
+import type { Role, User } from '@hmsi/shared';
 import { db, uuid } from '../../db/index.js';
 import { hashPassword } from '../lib/password.js';
 
@@ -20,7 +20,7 @@ export async function createUser(input: {
   full_name_ar: string;
   full_name_en?: string;
   email?: string | null;
-  role: 'admin' | 'doctor' | 'nurse' | 'pharmacist' | 'lab' | 'radiology' | 'reception' | 'viewer';
+  role: Exclude<Role, 'super_admin'>;
 }, hospitalId: string): Promise<User> {
   // اسم المستخدم فريد على مستوى النظام كله (كل المستشفيات)
   const username = input.username.toLowerCase();
@@ -59,7 +59,7 @@ export async function updateUser(
     full_name_ar?: string;
     full_name_en?: string | null;
     email?: string | null;
-    role?: 'admin' | 'doctor' | 'nurse' | 'pharmacist' | 'lab' | 'radiology' | 'reception' | 'viewer';
+    role?: Exclude<Role, 'super_admin'>;
     is_active?: boolean;
   },
 ): Promise<User | null> {

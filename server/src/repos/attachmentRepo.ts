@@ -2,9 +2,9 @@ import type { Attachment } from '@hmsi/shared';
 import { db, uuid } from '../../db/index.js';
 import { moveToTrash, type TrashActor } from '../lib/trash.js';
 
-export async function getAttachment(id: string): Promise<Attachment & { data: string | null } | null> {
+export async function getAttachment(id: string): Promise<Attachment & { data: string | null; storage_key: string } | null> {
   const rows = await db.execute({
-    sql: `SELECT id, admission_id, uploaded_by, file_name, mime, size, created_at, data
+    sql: `SELECT id, admission_id, uploaded_by, file_name, mime, size, created_at, data, storage_key
           FROM attachments WHERE id = ? LIMIT 1`,
     args: [id],
   });
@@ -19,6 +19,7 @@ export async function getAttachment(id: string): Promise<Attachment & { data: st
     size: Number(r.size ?? 0),
     created_at: String(r.created_at),
     data: r.data ? String(r.data) : null,
+    storage_key: String(r.storage_key ?? 'inline'),
   };
 }
 
@@ -28,13 +29,15 @@ export async function insertAttachment(input: {
   file_name: string;
   mime: string;
   size: number;
-  data: string;
+  /** محتوى base64 داخل القاعدة (الطريقة القديمة) أو null مع storageKey لملف على القرص */
+  data: string | null;
+  storageKey?: string;
 }): Promise<Attachment> {
   const id = uuid('at');
   await db.execute({
     sql: `INSERT INTO attachments (id, admission_id, uploaded_by, file_name, mime, size, storage_key, created_at, data)
-          VALUES (?, ?, ?, ?, ?, ?, 'inline', ?, ?)`,
-    args: [id, input.admission_id, input.uploaded_by, input.file_name, input.mime, input.size, new Date().toISOString(), input.data],
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [id, input.admission_id, input.uploaded_by, input.file_name, input.mime, input.size, input.storageKey ?? 'inline', new Date().toISOString(), input.data],
   });
   return {
     id,

@@ -12,6 +12,9 @@ import {
   FLUID_KINDS,
   ADMINISTRATION_STATUSES,
   FAMILY_SHARE_CATEGORIES,
+  DEPARTMENT_KINDS,
+  MODALITIES,
+  SERVICE_KINDS,
 } from './types.js';
 
 const id = z.string().min(1).max(64);
@@ -37,7 +40,7 @@ export const CreateUserSchema = z.object({
   full_name_ar: z.string().min(2).max(100),
   full_name_en: z.string().min(2).max(100).optional(),
   email: z.string().email().optional().nullable(),
-  role: z.enum(['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'reception', 'viewer']),
+  role: z.enum(['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'radiologist', 'storekeeper', 'accountant', 'reception', 'viewer']),
 });
 
 export const CreatePatientSchema = z.object({
@@ -58,6 +61,23 @@ export const AdmitPatientSchema = z.object({
   department_id: id,
   attending_doctor_id: id.nullable().optional(),
   reason: z.string().max(500).optional(),
+});
+
+/** زيارة بلا تنويم: مراجع، طوارئ، أو فحص فقط (أشعة/مختبر بتحويل من خارج المستشفى) */
+export const EncounterSchema = z.object({
+  patient_id: id,
+  encounter_type: z.enum(['outpatient', 'emergency', 'diagnostic']),
+  department_id: id,
+  attending_doctor_id: id.nullable().optional(),
+  reason: z.string().trim().max(500).optional().nullable(),
+  referral_source: z.string().trim().max(160).optional().nullable(),
+  referring_doctor: z.string().trim().max(120).optional().nullable(),
+  referral_note: z.string().trim().max(1000).optional().nullable(),
+});
+
+export const CloseEncounterSchema = z.object({
+  outcome: z.enum(DISCHARGE_TYPES).default('home'),
+  summary: z.string().max(2000).optional(),
 });
 
 export const DischargeSchema = z.object({
@@ -211,13 +231,37 @@ export const UpdateUserSchema = z.object({
   full_name_ar: z.string().min(2).max(100).optional(),
   full_name_en: z.string().min(2).max(100).optional().nullable(),
   email: z.string().email().optional().nullable(),
-  role: z.enum(['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'reception', 'viewer']).optional(),
+  role: z.enum(['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'radiologist', 'storekeeper', 'accountant', 'reception', 'viewer']).optional(),
   is_active: z.boolean().optional(),
 });
 
 export const CreateDepartmentSchema = z.object({
   name_ar: z.string().min(2).max(120),
   name_en: z.string().min(2).max(120).nullable().optional(),
+  kind: z.enum(DEPARTMENT_KINDS).optional(),
+});
+
+export const DepartmentUnitSchema = z.object({
+  kind: z.enum(['device', 'room']).default('device'),
+  modality: z.enum(MODALITIES).nullable().optional(),
+  name_ar: z.string().trim().min(1).max(120),
+  name_en: z.string().trim().max(120).nullable().optional(),
+  status: z.enum(['active', 'maintenance', 'out_of_service']).default('active'),
+  notes: z.string().max(500).nullable().optional(),
+});
+
+export const ServiceSchema = z.object({
+  kind: z.enum(SERVICE_KINDS),
+  code: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9._-]+$/, 'الرمز: أحرف إنجليزية وأرقام فقط'),
+  name_ar: z.string().trim().min(2).max(200),
+  name_en: z.string().trim().max(200).nullable().optional(),
+  modality: z.enum(MODALITIES).nullable().optional(),
+  body_part: z.string().trim().max(80).nullable().optional(),
+  department_id: id.nullable().optional(),
+  price: z.number().int().min(0).max(1_000_000_000).nullable().optional(),
+  prep_ar: z.string().max(1000).nullable().optional(),
+  prep_en: z.string().max(1000).nullable().optional(),
+  is_active: z.boolean().optional(),
 });
 
 export const UpdateDepartmentSchema = CreateDepartmentSchema.partial();

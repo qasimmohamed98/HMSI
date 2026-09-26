@@ -10,7 +10,7 @@ export async function getDashboard(hospitalId: string, doctorId?: string): Promi
   const accArgs = acc ? acc.args : [];
   const [totalPatients, activeAdmissions, critical, pendingLabs] = await Promise.all([
     db.execute({ sql: `SELECT COUNT(*) AS n FROM patients WHERE hospital_id = ?`, args: [hospitalId] }),
-    db.execute({ sql: `SELECT COUNT(*) AS n FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = ? AND a.status = 'active'`, args: [hospitalId] }),
+    db.execute({ sql: `SELECT COUNT(*) AS n FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = ? AND a.status = 'active' AND a.encounter_type = 'inpatient'`, args: [hospitalId] }),
     db.execute({
       sql: `SELECT COUNT(*) AS n FROM patients
             WHERE hospital_id = ? AND status = 'active'
@@ -28,7 +28,7 @@ export async function getDashboard(hospitalId: string, doctorId?: string): Promi
 
   const dischargedToday = await db.execute({
     sql: `SELECT COUNT(*) AS n FROM admissions a JOIN patients p ON p.id = a.patient_id
-          WHERE p.hospital_id = ? AND a.status = 'discharged' AND date(a.discharged_at) = date('now')`,
+          WHERE p.hospital_id = ? AND a.status = 'discharged' AND a.encounter_type = 'inpatient' AND date(a.discharged_at) = date('now')`,
     args: [hospitalId],
   });
 
@@ -54,6 +54,7 @@ export async function getDashboard(hospitalId: string, doctorId?: string): Promi
           SELECT d AS day, COUNT(a.id) AS count
           FROM days
           LEFT JOIN admissions a ON date(a.admitted_at) = days.d
+            AND a.encounter_type = 'inpatient'
             AND a.id IN (SELECT a2.id FROM admissions a2 JOIN patients p ON p.id = a2.patient_id WHERE p.hospital_id = ?)
           GROUP BY d
           ORDER BY d`,
@@ -77,7 +78,7 @@ export async function getDashboard(hospitalId: string, doctorId?: string): Promi
           JOIN patients p ON p.id = a.patient_id
           LEFT JOIN wards w ON w.id = a.ward_id
           JOIN vitals v ON v.id = (SELECT id FROM vitals WHERE admission_id = a.id ORDER BY recorded_at DESC LIMIT 1)
-          WHERE p.hospital_id = ? AND a.status = 'active' AND v.recorded_at >= ?${accSql}`,
+          WHERE p.hospital_id = ? AND a.status = 'active' AND a.encounter_type IN ('inpatient','emergency') AND v.recorded_at >= ?${accSql}`,
     args: [hospitalId, new Date(Date.now() - 24 * 3600_000).toISOString(), ...accArgs],
   });
   const mewsAlerts: MewsAlert[] = [];

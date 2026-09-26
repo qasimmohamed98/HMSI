@@ -32,7 +32,7 @@ async function collect(now: Date): Promise<Event[]> {
                  (SELECT ma.administered_at FROM medication_administrations ma WHERE ma.medication_id = m.id ORDER BY ma.administered_at DESC LIMIT 1) AS last_at,
                  ${nurseCol} AS nurse_id
           FROM medications m
-          JOIN admissions a ON a.id = m.admission_id AND a.status = 'active'
+          JOIN admissions a ON a.id = m.admission_id AND a.status = 'active' AND a.encounter_type IN ('inpatient','emergency')
           WHERE m.status = 'active' AND ${nurseCol} IS NOT NULL`,
     args: [],
   });
@@ -68,7 +68,7 @@ async function collect(now: Date): Promise<Event[]> {
           JOIN patients p ON p.id = a.patient_id
           LEFT JOIN care_plans cp ON cp.admission_id = a.id
           LEFT JOIN vitals v ON v.id = (SELECT id FROM vitals WHERE admission_id = a.id ORDER BY recorded_at DESC LIMIT 1)
-          WHERE a.status = 'active' AND ${nurseCol} IS NOT NULL`,
+          WHERE a.status = 'active' AND a.encounter_type IN ('inpatient','emergency') AND ${nurseCol} IS NOT NULL`,
     args: [],
   });
   for (const row of vit.rows) {

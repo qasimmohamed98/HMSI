@@ -1,4 +1,4 @@
-import type { PublicUser, DischargeType } from '@hmsi/shared';
+import type { PublicUser, DischargeType, EncounterType } from '@hmsi/shared';
 import type { Transaction } from '@libsql/client';
 import { db, uuid, withTx, generateFamilyPin } from '../../db/index.js';
 import { HttpConflict } from '../lib/errors.js';
@@ -39,7 +39,7 @@ export async function admitPatient(input: {
     if (patientRows.rows.length === 0) throw new HttpConflict('المريض غير موجود');
 
     const activeRows = await tx.execute({
-      sql: `SELECT id FROM admissions WHERE patient_id = ? AND status = 'active' LIMIT 1`,
+      sql: `SELECT id FROM admissions WHERE patient_id = ? AND status = 'active' AND encounter_type = 'inpatient' LIMIT 1`,
       args: [input.patient_id],
     });
     if (activeRows.rows.length > 0) throw new HttpConflict('المريض منوّم بالفعل');
@@ -75,11 +75,12 @@ export async function admitPatient(input: {
 export async function transferAdmission(admissionId: string, bedId: string, hospitalId: string): Promise<{ admission_id: string; bed_id: string }> {
   return withTx(async (tx) => {
     const rows = await tx.execute({
-      sql: `SELECT a.status, a.bed_id FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE a.id = ? AND p.hospital_id = ? LIMIT 1`,
+      sql: `SELECT a.status, a.bed_id, a.encounter_type FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE a.id = ? AND p.hospital_id = ? LIMIT 1`,
       args: [admissionId, hospitalId],
     });
     const scope = rows.rows[0] as Row | undefined;
     if (!scope || String(scope.status) !== 'active') throw new HttpConflict('التنويم غير نشط');
+    if (String(scope.encounter_type ?? 'inpatient') !== 'inpatient') throw new HttpConflict('هذه زيارة بلا تنويم — نوّم المريض أولاً');
     if (scope.bed_id && String(scope.bed_id) === bedId) throw new HttpConflict('المريض في هذا السرير بالفعل');
 
     const bed = await getBedInHospital(tx, bedId, hospitalId);
@@ -102,7 +103,7 @@ export async function dischargeAdmission(
 ): Promise<{ dischargedAt: string }> {
   return withTx(async (tx) => {
     const rows = await tx.execute({
-      sql: `SELECT a.status, a.bed_id, a.patient_id FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE a.id = ? AND p.hospital_id = ? LIMIT 1`,
+      sql: `SELECT a.status, a.bed_id, a.patient_id, a.encounter_type FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE a.id = ? AND p.hospital_id = ? LIMIT 1`,
       args: [admissionId, hospitalId],
     });
     const a = rows.rows[0] as Row | undefined;
@@ -115,7 +116,10 @@ export async function dischargeAdmission(
       sql: `UPDATE admissions SET status = 'discharged', discharge_type = ?, discharged_at = ?, discharge_summary = ?, bed_id = NULL, family_pin = NULL WHERE id = ?`,
       args: [input.discharge_type, dischargedAt, input.summary ?? null, admissionId],
     });
-    await tx.execute({ sql: `UPDATE patients SET status = 'discharged' WHERE id = ?`, args: [String(a.patient_id)] });
+    // حالة المريض تتبع التنويم فقط: إغلاق زيارة مراجع/فحص لا يغيّرها
+    if (String(a.encounter_type ?? 'inpatient') === 'inpatient') {
+      await tx.execute({ sql: `UPDATE patients SET status = 'discharged' WHERE id = ?`, args: [String(a.patient_id)] });
+    }
     if (a.bed_id) await tx.execute({ sql: `UPDATE beds SET status = 'free' WHERE id = ?`, args: [String(a.bed_id)] });
     return { dischargedAt };
   });
@@ -148,5 +152,51 @@ export async function listDoctors(hospitalId: string): Promise<PublicUser[]> {
       full_name_en: r.full_name_en ? String(r.full_name_en) : '',
       role: String(r.role) as PublicUser['role'],
     };
+  });
+}
+
+/**
+ * زيارة بلا تنويم: مراجع عيادة، طوارئ، أو «فحص فقط» (أشعة/مختبر بتحويل).
+ * تستخدم جدول التنويم نفسه (encounter_type) فتعمل معها كل السجلات الطبية والطلبات دون تغيير.
+ */
+export async function createEncounter(
+  input: {
+    patient_id: string;
+    encounter_type: Exclude<EncounterType, 'inpatient'>;
+    department_id: string;
+    attending_doctor_id?: string | null;
+    reason?: string | null;
+    referral_source?: string | null;
+    referring_doctor?: string | null;
+    referral_note?: string | null;
+  },
+  hospitalId: string,
+  createdById: string,
+): Promise<{ admission_id: string; patient_id: string }> {
+  return withTx(async (tx) => {
+    const patientRows = await tx.execute({
+      sql: `SELECT id FROM patients WHERE id = ? AND hospital_id = ? AND archived_at IS NULL LIMIT 1`,
+      args: [input.patient_id, hospitalId],
+    });
+    if (patientRows.rows.length === 0) throw new HttpConflict('المريض غير موجود');
+    const dept = await tx.execute({ sql: `SELECT id FROM departments WHERE id = ? AND hospital_id = ? LIMIT 1`, args: [input.department_id, hospitalId] });
+    if (dept.rows.length === 0) throw new HttpConflict('القسم غير موجود');
+    if (input.attending_doctor_id) {
+      const doc = await tx.execute({
+        sql: `SELECT id FROM users WHERE id = ? AND hospital_id = ? AND role IN ('doctor','admin','radiologist') AND is_active = 1 LIMIT 1`,
+        args: [input.attending_doctor_id, hospitalId],
+      });
+      if (doc.rows.length === 0) throw new HttpConflict('الطبيب المعالج غير موجود');
+    }
+    const id = uuid('adm');
+    await tx.execute({
+      sql: `INSERT INTO admissions (id, patient_id, department_id, attending_doctor_id, admitted_at, status, reason, encounter_type, referral_source, referring_doctor, referral_note, created_by_id)
+            VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
+      args: [
+        id, input.patient_id, input.department_id, input.attending_doctor_id ?? null, new Date().toISOString(), input.reason ?? null,
+        input.encounter_type, input.referral_source ?? null, input.referring_doctor ?? null, input.referral_note ?? null, createdById,
+      ],
+    });
+    return { admission_id: id, patient_id: input.patient_id };
   });
 }

@@ -161,9 +161,19 @@ export const liveApi: Api = {
   wards: () => request('/wards'),
   listDepartments: () => request('/org/departments'),
   createDepartment: (input) =>
-    request('/org/departments', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null }) }),
+    request('/org/departments', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, kind: input.kind }) }),
   updateDepartment: (id, input) =>
-    request(`/org/departments/${id}`, { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null }) }),
+    request(`/org/departments/${id}`, { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, kind: input.kind }) }),
+  listUnits: (departmentId) => request(`/org/units${qs({ department: departmentId })}`),
+  createUnit: (departmentId, input) => request(`/org/departments/${departmentId}/units`, { method: 'POST', body: JSON.stringify(input) }),
+  updateUnit: (id, input) => request(`/org/units/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deleteUnit: (id) => request(`/org/units/${id}`, { method: 'DELETE' }),
+  listServices: (f = {}) => request(`/services${qs({ kind: f.kind, modality: f.modality, q: f.q, all: f.all ? '1' : undefined })}`),
+  createService: (input) => request('/services', { method: 'POST', body: JSON.stringify(input) }),
+  updateService: (id, input) => request(`/services/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  importDefaultServices: () => request('/services/import-defaults', { method: 'POST', body: '{}' }),
+  createEncounter: (input) => request('/admissions/encounter', { method: 'POST', body: JSON.stringify(input) }),
+  closeEncounter: (admissionId, input) => request(`/admissions/${admissionId}/close`, { method: 'POST', body: JSON.stringify(input) }),
   deleteDepartment: (id) => request(`/org/departments/${id}`, { method: 'DELETE' }),
   createWard: (input) =>
     request('/org/wards', { method: 'POST', body: JSON.stringify({ department_id: input.departmentId, name_ar: input.nameAr, name_en: input.nameEn ?? null, ward_type: input.wardType }) }),

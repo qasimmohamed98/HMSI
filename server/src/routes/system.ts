@@ -37,7 +37,7 @@ systemRoutes.get('/health', requireAuth(), requirePermission('hospitals.manage')
     count(`SELECT COUNT(*) AS n FROM hospitals`),
     count(`SELECT COUNT(*) AS n FROM users WHERE is_active = 1`),
     count(`SELECT COUNT(*) AS n FROM patients`),
-    count(`SELECT COUNT(*) AS n FROM admissions WHERE status = 'active'`),
+    count(`SELECT COUNT(*) AS n FROM admissions WHERE status = 'active' AND encounter_type = 'inpatient'`),
     count(`SELECT COUNT(*) AS n FROM sessions WHERE expires_at > datetime('now') AND last_seen_at > ?`, [new Date(Date.now() - 30 * 60_000).toISOString()]),
     count(`SELECT COALESCE(SUM(count), 0) AS n FROM error_events WHERE last_seen_at > ?`, [since]),
     count(`SELECT COUNT(*) AS n FROM error_events`),

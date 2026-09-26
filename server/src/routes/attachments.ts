@@ -6,14 +6,16 @@ import { insertAttachment, getAttachment, deleteAttachment } from '../repos/atta
 import { writeAudit } from '../lib/audit.js';
 import { HttpError } from '../lib/errors.js';
 import { clientIp } from '../config.js';
+import { filesDir, isFileKey, loadFile, maxFileSize, saveFile } from '../lib/fileStore.js';
 
 export const attachmentRoutes = new Hono();
 
 /**
- * المرفقات تُخزَّن داخل قاعدة البيانات (base64).
- * حد Netlify Functions لجسم الطلب 6MB — لذلك الحد 4MB للملف مع هامش لترميز multipart.
+ * المرفقات على قرص الخادم (lib/fileStore.ts، حتى 18 ميغابايت) أو — دون FILES_DIR — داخل القاعدة (base64، 4 ميغابايت).
+ * القديمة داخل القاعدة تبقى مقروءة.
  */
 export const MAX_ATTACHMENT_SIZE = 4 * 1024 * 1024;
+const tooBig = () => `حجم الملف يتجاوز ${Math.round(maxFileSize() / 1048576)} ميجابايت`;
 
 const ALLOWED_MIME = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/plain|application\/(msword|vnd\.openxmlformats-officedocument\.[\w.]+|vnd\.ms-excel))$/;
 
@@ -64,13 +66,13 @@ attachmentRoutes.post('/:admissionId/attachments', requireAuth(), requirePermiss
   const session = getSession(c)!;
 
   const declared = Number(c.req.header('content-length') ?? 0);
-  if (declared > MAX_ATTACHMENT_SIZE + 64 * 1024) return c.json({ message: 'حجم الملف يتجاوز 4 ميجابايت' }, 413);
+  if (declared > maxFileSize() + 64 * 1024) return c.json({ message: tooBig() }, 413);
 
   const form = await c.req.formData();
   const file = form.get('file');
   if (!(file instanceof File)) return c.json({ message: 'الملف مطلوب' }, 400);
   if (file.size === 0) return c.json({ message: 'الملف فارغ' }, 400);
-  if (file.size > MAX_ATTACHMENT_SIZE) return c.json({ message: 'حجم الملف يتجاوز 4 ميجابايت' }, 413);
+  if (file.size > maxFileSize()) return c.json({ message: tooBig() }, 413);
   const mime = file.type || 'application/octet-stream';
   if (!ALLOWED_MIME.test(mime)) return c.json({ message: 'نوع الملف غير مسموح (صور، PDF، نص، Word، Excel)' }, 415);
 
@@ -82,7 +84,7 @@ attachmentRoutes.post('/:admissionId/attachments', requireAuth(), requirePermiss
     file_name: file.name.slice(0, 200),
     mime,
     size: file.size,
-    data: Buffer.from(bytes).toString('base64'),
+    ...(filesDir() ? { data: null, storageKey: await saveFile(session.user.hospital_id, bytes) } : { data: Buffer.from(bytes).toString('base64') }),
   });
   await writeAudit({ actorId: session.user.id, action: 'attachment_uploaded', resourceType: 'attachment', resourceId: attachment.id, ip: clientIp(c) });
   return c.json(attachment, 201);
@@ -93,10 +95,11 @@ attachmentRoutes.get('/:admissionId/attachments/:id', requireAuth(), requirePerm
   const session = getSession(c)!;
   const id = c.req.param('id');
   const attachment = await getAttachment(id);
-  if (!attachment || attachment.admission_id !== admissionId || !attachment.data) return c.json({ message: 'الملف غير موجود' }, 404);
+  if (!attachment || attachment.admission_id !== admissionId) return c.json({ message: 'الملف غير موجود' }, 404);
+  const body = isFileKey(attachment.storage_key) ? await loadFile(attachment.storage_key) : attachment.data ? Buffer.from(attachment.data, 'base64') : null;
+  if (!body) return c.json({ message: 'الملف غير موجود' }, 404);
   await writeAudit({ actorId: session.user.id, action: 'attachment_downloaded', resourceType: 'attachment', resourceId: id, ip: clientIp(c) });
-  const body = Buffer.from(attachment.data, 'base64');
-  return c.body(body, 200, {
+  return c.body(Buffer.from(body), 200, {
     // لا نعرض الملف داخل الصفحة أبداً (حماية من XSS عبر ملفات HTML/SVG)
     'Content-Type': ALLOWED_MIME.test(attachment.mime) ? attachment.mime : 'application/octet-stream',
     'Content-Disposition': contentDisposition(attachment.file_name),

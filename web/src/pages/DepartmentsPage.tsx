@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Network, Plus, Pencil, Trash2, Building2 } from 'lucide-react';
-import { Card, CardContent, Skeleton, EmptyState, Badge, Button, Dialog, Input, ConfirmDialog } from '@/components/ui';
+import { Network, Plus, Pencil, Trash2, Building2, MonitorCog } from 'lucide-react';
+import { Card, CardContent, Skeleton, EmptyState, Badge, Button, Dialog, Input, ConfirmDialog, Select } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API, type DepartmentInput } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
-import type { Department } from '@hmsi/shared';
+import { DEPARTMENT_KINDS, type Department, type DepartmentKind } from '@hmsi/shared';
+import { UnitsDialog } from '@/features/org/UnitsDialog';
 import { localName } from '@/lib/format';
 
 export default function DepartmentsPage() {
@@ -19,6 +20,7 @@ export default function DepartmentsPage() {
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['departments'], queryFn: API.listDepartments });
   const [dialog, setDialog] = useState<{ dept: Department | null } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
+  const [unitsFor, setUnitsFor] = useState<Department | null>(null);
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['departments'] });
@@ -73,14 +75,19 @@ export default function DepartmentsPage() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate font-bold text-ink">{localName(d, 'name')}</p>
-                    <p className="truncate text-xs text-ink/50">{d.name_en}</p>
+                    <p className="truncate text-xs text-ink/50">{t(`org.kinds.${d.kind ?? 'clinical'}`)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">
-                    <Building2 className="me-1 h-3 w-3" />
-                    {t('departments.wardCount', { count: d.ward_count ?? 0 })}
-                  </Badge>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {(d.kind ?? 'clinical') === 'clinical' || (d.ward_count ?? 0) > 0 ? (
+                    <Badge variant="outline">
+                      <Building2 className="me-1 h-3 w-3" />
+                      {t('departments.wardCount', { count: d.ward_count ?? 0 })}
+                    </Badge>
+                  ) : null}
+                  <Button size="sm" variant="outline" icon={<MonitorCog className="h-3.5 w-3.5" />} onClick={() => setUnitsFor(d)}>
+                    {t('org.unitCount', { count: d.unit_count ?? 0 })}
+                  </Button>
                   <Button size="icon-sm" variant="ghost" aria-label={t('common.edit')} onClick={() => setDialog({ dept: d })}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -97,6 +104,7 @@ export default function DepartmentsPage() {
       {dialog && (
         <DepartmentDialog open onClose={() => setDialog(null)} dept={dialog.dept} onSubmit={(input) => dialog.dept ? updateMut.mutate({ id: dialog.dept.id, input }) : createMut.mutate(input)} busy={createMut.isPending || updateMut.isPending} />
       )}
+      {unitsFor && <UnitsDialog dept={unitsFor} onClose={() => setUnitsFor(null)} />}
       {deleteTarget && (
         <ConfirmDialog
           open
@@ -133,11 +141,12 @@ function DepartmentDialog({
   const { t } = useTranslation();
   const [nameAr, setNameAr] = useState(dept?.name_ar ?? '');
   const [nameEn, setNameEn] = useState(dept?.name_en ?? '');
+  const [kind, setKind] = useState<DepartmentKind>(dept?.kind ?? 'clinical');
   const [error, setError] = useState('');
 
   const submit = () => {
     if (nameAr.trim().length < 2) { setError(t('errors.required')); return; }
-    onSubmit({ nameAr, nameEn: nameEn || null });
+    onSubmit({ nameAr, nameEn: nameEn || null, kind });
     onClose();
   };
 
@@ -157,6 +166,7 @@ function DepartmentDialog({
         {error && <p className="text-sm font-semibold text-danger-600">{error}</p>}
         <Input label={t('departments.nameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder={t('examples.department')} />
         <Input label={t('departments.nameEn')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="Internal Medicine" dir="ltr" />
+        <Select label={t('org.kindLabel')} value={kind} onChange={(e) => setKind(e.target.value as DepartmentKind)} options={DEPARTMENT_KINDS.map((k) => ({ value: k, label: t(`org.kinds.${k}`) }))} />
       </div>
     </Dialog>
   );

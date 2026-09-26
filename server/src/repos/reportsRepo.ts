@@ -19,14 +19,14 @@ export async function getReportOverview(from: string, to: string, hospitalId: st
     db.execute({
       sql: `SELECT
               (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id
-                WHERE p.hospital_id = ? AND date(a.admitted_at) BETWEEN date(?) AND date(?)) AS admissions,
+                WHERE p.hospital_id = ? AND a.encounter_type = 'inpatient' AND date(a.admitted_at) BETWEEN date(?) AND date(?)) AS admissions,
               (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id
-                WHERE p.hospital_id = ? AND a.status = 'discharged' AND date(a.discharged_at) BETWEEN date(?) AND date(?)) AS discharges`,
+                WHERE p.hospital_id = ? AND a.encounter_type = 'inpatient' AND a.status = 'discharged' AND date(a.discharged_at) BETWEEN date(?) AND date(?)) AS discharges`,
       args: [hospitalId, from, to, hospitalId, from, to],
     }),
     db.execute({
       sql: `SELECT
-              (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = ? AND a.status = 'active') AS active,
+              (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = ? AND a.status = 'active' AND a.encounter_type = 'inpatient') AS active,
               (SELECT COUNT(*) FROM patients WHERE hospital_id = ? AND status = 'active' AND critical_alerts_json != '[]' AND critical_alerts_json IS NOT NULL) AS critical,
               (SELECT COUNT(*) FROM lab_results lr JOIN admissions a ON a.id = lr.admission_id JOIN patients p ON p.id = a.patient_id
                 WHERE p.hospital_id = ? AND lr.status IN ('ordered', 'in_progress')) AS pending`,
@@ -40,7 +40,7 @@ export async function getReportOverview(from: string, to: string, hospitalId: st
             )
             SELECT d AS day, COUNT(a.id) AS count
             FROM days
-            LEFT JOIN admissions a ON date(a.admitted_at) = days.d
+            LEFT JOIN admissions a ON date(a.admitted_at) = days.d AND a.encounter_type = 'inpatient'
               AND a.id IN (SELECT a2.id FROM admissions a2 JOIN patients p ON p.id = a2.patient_id WHERE p.hospital_id = ?)
             GROUP BY d ORDER BY d`,
       args: [from, to, hospitalId],
@@ -53,7 +53,7 @@ export async function getReportOverview(from: string, to: string, hospitalId: st
             )
             SELECT d AS day, COUNT(a.id) AS count
             FROM days
-            LEFT JOIN admissions a ON a.status = 'discharged' AND date(a.discharged_at) = days.d
+            LEFT JOIN admissions a ON a.status = 'discharged' AND a.encounter_type = 'inpatient' AND date(a.discharged_at) = days.d
               AND a.id IN (SELECT a2.id FROM admissions a2 JOIN patients p ON p.id = a2.patient_id WHERE p.hospital_id = ?)
             GROUP BY d ORDER BY d`,
       args: [from, to, hospitalId],

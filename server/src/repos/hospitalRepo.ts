@@ -47,7 +47,7 @@ export async function listHospitals(): Promise<HospitalListItem[]> {
     sql: `SELECT h.*,
             (SELECT COUNT(*) FROM users u WHERE u.hospital_id = h.id) AS users_count,
             (SELECT COUNT(*) FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = h.id) AS beds_count,
-            (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = h.id AND a.status = 'active') AS active_admissions,
+            (SELECT COUNT(*) FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = h.id AND a.status = 'active' AND a.encounter_type = 'inpatient') AS active_admissions,
             (SELECT COUNT(*) FROM payment_notices n WHERE n.hospital_id = h.id AND n.status = 'pending') AS pending_payments
           FROM hospitals h ORDER BY h.created_at ASC`,
     args: [],

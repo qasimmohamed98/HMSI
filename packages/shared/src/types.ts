@@ -5,7 +5,14 @@ export const ROLES = [
   'nurse',
   'pharmacist',
   'lab',
+  /** فني الأشعة: يستقبل المريض وينفّذ الفحص ويكتب تقريراً مبدئياً */
   'radiology',
+  /** طبيب الأشعة: يكتب التقرير ويعتمده */
+  'radiologist',
+  /** أمين المخزن / المذخر */
+  'storekeeper',
+  /** المحاسب / الصندوق */
+  'accountant',
   'reception',
   'viewer',
 ] as const;
@@ -40,6 +47,18 @@ export const PERMISSIONS = [
   'trash.manage',
   'reports.view',
   'files.manage',
+  /** فتح زيارة مراجع/طوارئ/فحص فقط (بلا تنويم) */
+  'encounters.create',
+  /** كتالوج الخدمات والأسعار */
+  'services.manage',
+  /** تنفيذ فحص الأشعة (الفني) */
+  'radiology.perform',
+  /** اعتماد تقرير الأشعة (طبيب الأشعة) */
+  'radiology.verify',
+  /** المخزون والمذخر */
+  'inventory.manage',
+  /** الفوترة والصندوق */
+  'billing.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -70,6 +89,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'discharge.approve',
     'reports.view',
     'files.manage',
+    'encounters.create',
   ],
   nurse: [
     'patients.view',
@@ -82,10 +102,13 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'files.manage',
   ],
   // الصيدلي يصرف الأدوية ولا يصفها
-  pharmacist: ['patients.view', 'chart.view', 'medications.dispense'],
-  lab: ['patients.view', 'chart.view', 'lab.order', 'lab.add_result'],
-  radiology: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report'],
-  reception: ['patients.create', 'patients.update', 'patients.archive', 'patients.view', 'admissions.manage'],
+  pharmacist: ['patients.view', 'chart.view', 'medications.dispense', 'encounters.create', 'inventory.manage'],
+  lab: ['patients.view', 'chart.view', 'lab.order', 'lab.add_result', 'encounters.create', 'patients.create'],
+  radiology: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report', 'radiology.perform', 'encounters.create', 'patients.create'],
+  radiologist: ['patients.view', 'chart.view', 'radiology.order', 'radiology.add_report', 'radiology.verify', 'reports.view'],
+  storekeeper: ['inventory.manage', 'reports.view'],
+  accountant: ['patients.view', 'billing.manage', 'services.manage', 'reports.view'],
+  reception: ['patients.create', 'patients.update', 'patients.archive', 'patients.view', 'admissions.manage', 'encounters.create'],
   viewer: ['patients.view', 'chart.view'],
 };
 
@@ -104,6 +127,20 @@ export const PATIENT_STATUSES = ['active', 'discharged', 'transferred'] as const
 export type PatientStatus = (typeof PATIENT_STATUSES)[number];
 
 export const ADMISSION_STATUSES = ['active', 'discharged'] as const;
+
+/** نوع الزيارة: التنويم أحدها؛ الصفحات الخاصة بالمنوَّمين (الأسرة، الجولات، الإشغال) تعرض inpatient فقط */
+export const ENCOUNTER_TYPES = ['inpatient', 'outpatient', 'emergency', 'diagnostic'] as const;
+export type EncounterType = (typeof ENCOUNTER_TYPES)[number];
+
+export const DEPARTMENT_KINDS = ['clinical', 'radiology', 'lab', 'pharmacy', 'store', 'operating', 'emergency', 'outpatient', 'dialysis', 'physio', 'icu', 'admin', 'other'] as const;
+export type DepartmentKind = (typeof DEPARTMENT_KINDS)[number];
+
+/** أنواع أجهزة الأشعة */
+export const MODALITIES = ['XR', 'CT', 'MR', 'US', 'MG', 'RF', 'DXA', 'IR', 'NM'] as const;
+export type Modality = (typeof MODALITIES)[number];
+
+export const SERVICE_KINDS = ['lab', 'imaging', 'procedure', 'consultation', 'bed', 'other'] as const;
+export type ServiceKind = (typeof SERVICE_KINDS)[number];
 export type AdmissionStatus = (typeof ADMISSION_STATUSES)[number];
 
 export const WARD_TYPES = ['male', 'female', 'mixed'] as const;
@@ -242,6 +279,10 @@ export interface Patient {
 
 export interface AdmissionSummary {
   id: string;
+  /** نوع الزيارة: inpatient = تنويم على سرير */
+  encounter_type?: EncounterType;
+  referral_source?: string | null;
+  referring_doctor?: string | null;
   department_id: string;
   department_name_ar: string;
   department_name_en: string;
@@ -558,7 +599,38 @@ export interface Department {
   hospital_id: string;
   name_ar: string;
   name_en: string;
+  /** نوع القسم (سريري، أشعة، مختبر، صيدلية، مخزن…) */
+  kind?: DepartmentKind;
   ward_count?: number;
+  unit_count?: number;
+}
+
+/** وحدة داخل القسم: جهاز (مفراس 1، رنين 1.5T) أو غرفة (سونار غرفة 3) */
+export interface DepartmentUnit {
+  id: string;
+  department_id: string;
+  kind: 'device' | 'room';
+  modality: Modality | null;
+  name_ar: string;
+  name_en: string | null;
+  status: 'active' | 'maintenance' | 'out_of_service';
+  notes: string | null;
+}
+
+/** بند في كتالوج الخدمات والأسعار */
+export interface ServiceItem {
+  id: string;
+  kind: ServiceKind;
+  code: string;
+  name_ar: string;
+  name_en: string | null;
+  modality: Modality | null;
+  body_part: string | null;
+  department_id: string | null;
+  price: number | null;
+  prep_ar: string | null;
+  prep_en: string | null;
+  is_active: boolean;
 }
 
 export interface UnassignedPatient {

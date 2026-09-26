@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
-import { DischargeSchema, AdmitPatientSchema, TransferPatientSchema, FamilyShareSchema } from '@hmsi/shared/validate';
+import { DischargeSchema, AdmitPatientSchema, TransferPatientSchema, FamilyShareSchema, EncounterSchema, CloseEncounterSchema } from '@hmsi/shared/validate';
 import { FAMILY_SHARE_CATEGORIES, FAMILY_SHARE_DOCTOR_ONLY, type FamilyShareCategory } from '@hmsi/shared';
 import { getSession, requireAuth, requirePermission, sessionHas } from '../middleware/auth.js';
 import { getAdmissionScope } from '../repos/chartRepo.js';
 import { HttpError } from '../lib/errors.js';
 import { db } from '../../db/index.js';
-import { admitPatient, transferAdmission, dischargeAdmission, regenerateFamilyPin } from '../repos/admissionRepo.js';
+import { admitPatient, transferAdmission, dischargeAdmission, regenerateFamilyPin, createEncounter } from '../repos/admissionRepo.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit, addTimeline } from '../lib/audit.js';
 import { clientIp } from '../config.js';
@@ -37,6 +37,47 @@ admissionRoutes.post('/', requireAuth(), requirePermission('admissions.manage'),
   });
   await writeAudit({ actorId: session.user.id, action: 'patient_admitted', resourceType: 'admission', resourceId: result.admission_id, meta: { bed_id: input.bed_id }, ip: clientIp(c) });
   return c.json(result, 201);
+});
+
+const ENCOUNTER_AR: Record<string, [string, string]> = {
+  outpatient: ['فتح زيارة مراجع', 'Outpatient visit opened'],
+  emergency: ['استقبال في الطوارئ', 'Emergency visit opened'],
+  diagnostic: ['زيارة فحص (أشعة/مختبر)', 'Diagnostic visit opened'],
+};
+
+/** فتح زيارة بلا تنويم — الاستقبال والطبيب والأشعة والمختبر والصيدلية */
+admissionRoutes.post('/encounter', requireAuth(), requirePermission('encounters.create'), async (c) => {
+  const parsed = await parseBody(c, EncounterSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof EncounterSchema)['_output'];
+  const session = getSession(c)!;
+  const result = await createEncounter(input, session.user.hospital_id, session.user.id);
+  // الطبيب يرى مرضاه فقط: الطبيب المعالج (أو الطبيب الذي فتح الزيارة) يُضاف لفريق الرعاية
+  if (input.attending_doctor_id) await addMember(db, { admissionId: result.admission_id, userId: input.attending_doctor_id, role: 'doctor', primary: true, byId: session.user.id });
+  if ((session.user.role === 'doctor' || session.user.role === 'radiologist') && session.user.id !== input.attending_doctor_id) {
+    await addMember(db, { admissionId: result.admission_id, userId: session.user.id, role: 'doctor', primary: !input.attending_doctor_id, byId: session.user.id });
+  }
+  const [ar, en] = ENCOUNTER_AR[input.encounter_type]!;
+  await addTimeline({ admissionId: result.admission_id, actor: session.user.full_name_ar, actorId: session.user.id, type: 'admission', titleAr: ar, titleEn: en });
+  await writeAudit({ actorId: session.user.id, action: 'encounter_opened', resourceType: 'admission', resourceId: result.admission_id, meta: { type: input.encounter_type, referral: input.referral_source ?? null }, ip: clientIp(c) });
+  return c.json(result, 201);
+});
+
+/** إغلاق زيارة بلا تنويم (التنويم يُغلق بالخروج الطبي /discharge) */
+admissionRoutes.post('/:id/close', requireAuth(), requirePermission('encounters.create'), async (c) => {
+  const parsed = await parseBody(c, CloseEncounterSchema);
+  if (!parsed.ok) return parsed.json;
+  const { outcome, summary } = parsed.data as (typeof CloseEncounterSchema)['_output'];
+  const admissionId = c.req.param('id');
+  const session = getSession(c)!;
+  const scope = await getAdmissionScope(admissionId, session.user.hospital_id);
+  if (!scope) throw new HttpError('التنويم غير موجود', 404);
+  if ((scope.admission.encounter_type ?? 'inpatient') === 'inpatient') throw new HttpError('التنويم يُغلق بتسجيل الخروج الطبي', 409);
+  const { dischargedAt } = await dischargeAdmission(admissionId, session.user.hospital_id, { discharge_type: outcome, summary });
+  await endMembers(db, admissionId, 'discharge');
+  await addTimeline({ admissionId, actor: session.user.full_name_ar, actorId: session.user.id, type: 'discharge', titleAr: 'إغلاق الزيارة', titleEn: 'Visit closed' }, dischargedAt);
+  await writeAudit({ actorId: session.user.id, action: 'encounter_closed', resourceType: 'admission', resourceId: admissionId, meta: { outcome }, ip: clientIp(c) });
+  return c.body(null, 204);
 });
 
 admissionRoutes.post('/:id/transfer', requireAuth(), requirePermission('admissions.manage'), async (c) => {

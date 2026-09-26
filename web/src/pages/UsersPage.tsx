@@ -23,7 +23,7 @@ const roleTone = (role: string) =>
     viewer: 'neutral',
   })[role] as 'danger' | 'warning' | 'brand' | 'success' | 'info' | 'neutral';
 
-const CREATABLE_ROLES: Role[] = ['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'reception', 'viewer'];
+const CREATABLE_ROLES: Role[] = ['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'radiologist', 'storekeeper', 'accountant', 'reception', 'viewer'];
 
 export default function UsersPage() {
   const { t } = useTranslation();

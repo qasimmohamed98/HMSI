@@ -841,6 +841,101 @@ console.log('\n— تهيئة مستشفى جديد: أقسام وردهات و�
   check('لا يضيف سريراً في ردهة مستشفى آخر', (await a2.post('/org/beds', { ward_id: h1Ward, room: 'X', bed_no: 'X' })).status === 409);
 }
 
+console.log('\n— الأساس المشترك: الزيارات، أنواع الأقسام والأجهزة، كتالوج الخدمات، الملفات على القرص');
+{
+  const { db } = await import('../db/index.js');
+  const mgr = client(await login('manager'));
+  const recep = client(await login('reception'));
+  const n = async (sql: string, args: string[] = []) => Number((await db.execute({ sql, args })).rows[0]!.n);
+
+  // أدوار جديدة
+  const rx = await mgr.post('/users', { username: 'radiodoc', password: 'Temp#Rad2026qa', full_name_ar: 'طبيب أشعة', role: 'radiologist' });
+  check('إنشاء طبيب أشعة (دور جديد)', rx.status === 201 && rx.json.role === 'radiologist');
+  check('إنشاء أمين مخزن ومحاسب', (await mgr.post('/users', { username: 'storekeep', password: 'Temp#Store2026q', full_name_ar: 'أمين المخزن', role: 'storekeeper' })).status === 201
+    && (await mgr.post('/users', { username: 'cashier1', password: 'Temp#Cash2026qz', full_name_ar: 'المحاسب', role: 'accountant' })).status === 201);
+
+  // أنواع الأقسام والأجهزة
+  const dep = await mgr.post('/org/departments', { name_ar: 'قسم الأشعة', name_en: 'Radiology', kind: 'radiology' });
+  check('قسم بنوع «أشعة»', dep.status === 201 && dep.json.kind === 'radiology');
+  const ct = await mgr.post(`/org/departments/${dep.json.id}/units`, { kind: 'device', modality: 'CT', name_ar: 'مفراس 1', name_en: 'CT 1' });
+  check('إضافة جهاز مفراس للقسم', ct.status === 201 && ct.json.modality === 'CT' && ct.json.status === 'active');
+  check('نوع جهاز غير معروف مرفوض', (await mgr.post(`/org/departments/${dep.json.id}/units`, { modality: 'XYZ', name_ar: 'x' })).status === 422);
+  const maint = await mgr.patch(`/org/units/${ct.json.id}`, { status: 'maintenance', notes: 'عطل الأنبوب' });
+  check('الجهاز إلى الصيانة', maint.status === 200 && maint.json.status === 'maintenance' && maint.json.notes === 'عطل الأنبوب');
+  check('قائمة أجهزة القسم', (await mgr.get(`/org/units?department=${dep.json.id}`)).json.length === 1);
+  check('مستشفى آخر لا يعدّل الجهاز (404)', (await admin2.patch(`/org/units/${ct.json.id}`, { status: 'active' })).status === 404);
+  check('الممرض لا يضيف أجهزة (403)', (await nurse.post(`/org/departments/${dep.json.id}/units`, { name_ar: 'x' })).status === 403);
+
+  // كتالوج الخدمات
+  const imp = await mgr.post('/services/import-defaults');
+  check('استيراد الكتالوج الجاهز', imp.status === 200 && imp.json.added > 90 && imp.json.added === imp.json.total);
+  check('الاستيراد مرة ثانية لا يكرر', (await mgr.post('/services/import-defaults')).json.added === 0);
+  const cts = await doctor.get('/services?kind=imaging&modality=CT');
+  check('فحوص المفراس في الكتالوج مع التحضير', cts.status === 200 && cts.json.length >= 8 && cts.json.some((x: any) => x.code === 'CT-ABD-PEL-C' && x.prep_ar?.includes('Creatinine')));
+  const svc = await mgr.post('/services', { kind: 'imaging', modality: 'US', code: 'us-fetal-echo', name_ar: 'إيكو قلب الجنين', price: 50000 });
+  check('إضافة خدمة بسعر (الرمز بأحرف كبيرة)', svc.status === 201 && svc.json.code === 'US-FETAL-ECHO' && svc.json.price === 50000);
+  check('رمز مكرر مرفوض (409)', (await mgr.post('/services', { kind: 'imaging', code: 'US-FETAL-ECHO', name_ar: 'مكرر' })).status === 409);
+  const upd = await mgr.patch(`/services/${svc.json.id}`, { price: 60000 });
+  const aud = await db.execute({ sql: `SELECT meta_json FROM audit_logs WHERE action = 'service_updated' AND resource_id = ? ORDER BY rowid DESC LIMIT 1`, args: [svc.json.id] });
+  check('تعديل السعر يُسجَّل بقيمتيه في التدقيق', upd.json.price === 60000 && String(aud.rows[0]?.meta_json ?? '').includes('"price_from":50000'));
+  check('الطبيب لا يعدّل الأسعار (403)', (await doctor.patch(`/services/${svc.json.id}`, { price: 1 })).status === 403);
+  check('المحاسب يعدّل الأسعار', (await client(await login('cashier1', 'Temp#Cash2026qz')).get('/auth/me')).status === 200);
+  check('مستشفى آخر لا يرى كتالوج غيره', (await admin2.get('/services?kind=imaging')).json.every((x: any) => x.id !== svc.json.id));
+
+  // الزيارات بلا تنويم
+  const inpatientBefore = await n(`SELECT COUNT(*) AS n FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = 'h-1' AND a.status = 'active' AND a.encounter_type = 'inpatient'`);
+  const dashBefore = (await mgr.get('/dashboard')).json;
+  const np = await recep.post('/patients', { full_name_ar: 'مراجع أشعة', gender: 'male', birth_date: '1980-01-01', blood_type: 'Unknown', allergies: [] });
+  const pid = np.json.id ?? np.json.patient?.id;
+  check('الاستقبال يسجّل مراجعاً جديداً', np.status === 201 && Boolean(pid), np.json);
+  const enc = await recep.post('/admissions/encounter', { patient_id: pid, encounter_type: 'diagnostic', department_id: dep.json.id, referral_source: 'عيادة خاصة', referring_doctor: 'د. سامر' });
+  check('فتح زيارة «فحص فقط» بتحويل خارجي', enc.status === 201 && Boolean(enc.json.admission_id));
+  const encId = enc.json.admission_id;
+  check('نوع زيارة غير صالح مرفوض', (await recep.post('/admissions/encounter', { patient_id: pid, encounter_type: 'inpatient', department_id: dep.json.id })).status === 422);
+  check('الممرض لا يفتح زيارة (403)', (await nurse.post('/admissions/encounter', { patient_id: pid, encounter_type: 'outpatient', department_id: dep.json.id })).status === 403);
+  const order = await client(await login('radiology')).post(`/patients/${encId}/radiology`, { admission_id: encId, study_type_ar: 'مفراس رأس بدون صبغة' });
+  check('طلب أشعة على زيارة الفحص', order.status === 201, order.json);
+  const pat = await recep.get(`/patients/${pid}`);
+  check('المريض يظهر بزيارته الحالية ونوعها', pat.json.activeAdmission?.encounter_type === 'diagnostic' && pat.json.activeAdmission?.referral_source === 'عيادة خاصة', pat.json.activeAdmission);
+  const dashAfter = (await mgr.get('/dashboard')).json;
+  check('لوحة التحكم: عدد المنوّمين لم يتغير', JSON.stringify(dashAfter.active_admissions ?? dashAfter.activeAdmissions ?? null) === JSON.stringify(dashBefore.active_admissions ?? dashBefore.activeAdmissions ?? null)
+    && inpatientBefore === (await n(`SELECT COUNT(*) AS n FROM admissions a JOIN patients p ON p.id = a.patient_id WHERE p.hospital_id = 'h-1' AND a.status = 'active' AND a.encounter_type = 'inpatient'`)));
+  check('قائمة «بلا سرير» لا تضم زيارات بلا تنويم', (await mgr.get('/org/unassigned')).json.every((x: any) => x.admission_id !== encId));
+  check('فلتر «المنوّمون» لا يضم المراجع', (await recep.get('/patients?admitted=1')).json.every((x: any) => x.id !== pid));
+  const freeBed = (await db.execute(`SELECT b.id FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = 'h-1' AND b.status = 'free' LIMIT 1`)).rows[0] as any;
+  check('لا سرير لزيارة بلا تنويم (409)', (await mgr.post(`/org/beds/${freeBed.id}/assign`, { admission_id: encId })).status === 409);
+  check('الجولة التمريضية لا تضم زيارة الفحص', (await nurse.get('/medication-rounds/vitals')).json.every((x: any) => x.admission_id !== encId));
+  check('إغلاق التنويم عبر /close مرفوض (409)', (await recep.post('/admissions/adm2/close', {})).status === 409);
+  const cl = await recep.post(`/admissions/${encId}/close`, { outcome: 'home' });
+  check('إغلاق زيارة الفحص', cl.status === 204 && (await n(`SELECT COUNT(*) AS n FROM admissions WHERE id = ? AND status = 'discharged'`, [encId])) === 1);
+  check('إغلاق الزيارة لا يغيّر حالة المريض', (await n(`SELECT COUNT(*) AS n FROM patients WHERE id = ? AND status = 'discharged'`, [pid])) === 0);
+
+  // الملفات على القرص
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'hmsi-files-'));
+  process.env.FILES_DIR = dir;
+  const s = await login('doctor');
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5]);
+  const fd = new FormData();
+  fd.append('file', new File([png], 'صورة.png', { type: 'image/png' }));
+  const up = await api.request(`${BASE}/patients/adm2/attachments`, { method: 'POST', headers: { cookie: s.cookie, 'x-csrf-token': s.csrf }, body: fd });
+  const upJson = (await up.json()) as { id: string };
+  const row = (await db.execute({ sql: `SELECT storage_key, data FROM attachments WHERE id = ?`, args: [upJson.id] })).rows[0] as any;
+  check('المرفق يُحفظ على القرص لا في القاعدة', up.status === 201 && String(row.storage_key).startsWith('fs:') && row.data === null);
+  const dl = await api.request(`${BASE}/patients/adm2/attachments/${upJson.id}`, { headers: { cookie: s.cookie } });
+  const got = new Uint8Array(await dl.arrayBuffer());
+  check('تنزيل الملف من القرص بمحتواه نفسه', dl.status === 200 && got.length === png.length && got.every((b, i) => b === png[i]));
+  const { buildFullBackup } = await import('../src/lib/backup.js');
+  const bk = await buildFullBackup();
+  check('النسخة الاحتياطية تتضمن ملفات القرص', Boolean(bk.files?.[String(row.storage_key)]));
+  delete process.env.FILES_DIR;
+  const legacy = await api.request(`${BASE}/patients/adm2/attachments`, { headers: { cookie: s.cookie } });
+  check('المرفقات القديمة داخل القاعدة ما زالت تُقرأ', legacy.status !== 500);
+  rmSync(dir, { recursive: true, force: true });
+}
+
 console.log('\n— الموافقة على شروط الاستخدام وسياسة الخصوصية');
 {
   const { TERMS_VERSION } = await import('@hmsi/shared');

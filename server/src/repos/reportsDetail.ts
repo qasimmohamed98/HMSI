@@ -70,7 +70,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     case 'admissions': {
       const rows = await q(
         `SELECT a.admitted_at, ${PATIENT}, ${PLACE}, a.reason, a.status, a.discharged_at, ${LOS} AS los_days, a.discharge_type
-         ${FROM_ADM} WHERE p.hospital_id = ? AND ${inRange('a.admitted_at')}${dept}${doc} ORDER BY a.admitted_at DESC`,
+         ${FROM_ADM} WHERE p.hospital_id = ? AND a.encounter_type = 'inpatient' AND ${inRange('a.admitted_at')}${dept}${doc} ORDER BY a.admitted_at DESC`,
         [hospitalId, f.from, f.to, ...extra],
       );
       const still = rows.filter((r) => r.status === 'active').length;
@@ -92,7 +92,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     case 'discharges': {
       const rows = await q(
         `SELECT a.discharged_at, ${PATIENT}, ${PLACE}, a.admitted_at, ${LOS} AS los_days, a.discharge_type, a.discharge_summary
-         ${FROM_ADM} WHERE p.hospital_id = ? AND a.status = 'discharged' AND ${inRange('a.discharged_at')}${dept}${doc} ORDER BY a.discharged_at DESC`,
+         ${FROM_ADM} WHERE p.hospital_id = ? AND a.status = 'discharged' AND a.encounter_type = 'inpatient' AND ${inRange('a.discharged_at')}${dept}${doc} ORDER BY a.discharged_at DESC`,
         [hospitalId, f.from, f.to, ...extra],
       );
       const by = (t: string) => rows.filter((r) => r.discharge_type === t).length;
@@ -115,7 +115,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
       const rows = await q(
         `SELECT ${PATIENT}, ${PLACE}, a.admitted_at, ${LOS} AS los_days, a.reason,
                 p.allergies_json AS allergies, p.critical_alerts_json AS alerts
-         ${FROM_ADM} WHERE p.hospital_id = ? AND a.status = 'active'${dept}${doc} ORDER BY w.name_ar, a.room, a.bed_no`,
+         ${FROM_ADM} WHERE p.hospital_id = ? AND a.status = 'active' AND a.encounter_type = 'inpatient'${dept}${doc} ORDER BY w.name_ar, a.room, a.bed_no`,
         [hospitalId, ...extra],
       );
       const list = (v: unknown) => {
@@ -147,7 +147,7 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
         `SELECT d.name_ar AS department, d.name_en AS department_en, w.name_ar AS ward, w.name_en AS ward_en,
                 COUNT(b.id) AS beds,
                 SUM(CASE WHEN b.status = 'occupied' THEN 1 ELSE 0 END) AS occupied,
-                (SELECT COUNT(*) FROM admissions a WHERE a.ward_id = w.id AND ${inRange('a.admitted_at')}) AS admissions_in_range,
+                (SELECT COUNT(*) FROM admissions a WHERE a.ward_id = w.id AND a.encounter_type = 'inpatient' AND ${inRange('a.admitted_at')}) AS admissions_in_range,
                 (SELECT ROUND(AVG(julianday(a.discharged_at) - julianday(a.admitted_at)), 1) FROM admissions a
                    WHERE a.ward_id = w.id AND a.status = 'discharged' AND ${inRange('a.discharged_at')}) AS avg_los
          FROM wards w JOIN departments d ON d.id = w.department_id LEFT JOIN beds b ON b.ward_id = w.id
@@ -282,9 +282,9 @@ export async function getDetailedReport(type: ReportType, hospitalId: string, f:
     case 'doctors': {
       const rows = await q(
         `SELECT u.full_name_ar AS doctor, u.full_name_en AS doctor_en,
-                (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND ${inRange('a.admitted_at')}) AS admissions_in_range,
-                (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND a.status = 'active') AS current_patients,
-                (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND a.status = 'discharged' AND ${inRange('a.discharged_at')}) AS discharges,
+                (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND a.encounter_type = 'inpatient' AND ${inRange('a.admitted_at')}) AS admissions_in_range,
+                (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND a.status = 'active' AND a.encounter_type = 'inpatient') AS current_patients,
+                (SELECT COUNT(*) FROM admissions a WHERE a.attending_doctor_id = u.id AND a.status = 'discharged' AND a.encounter_type = 'inpatient' AND ${inRange('a.discharged_at')}) AS discharges,
                 (SELECT COUNT(*) FROM medical_notes n WHERE n.author_id = u.id AND ${inRange('n.recorded_at')}) AS notes,
                 (SELECT COUNT(*) FROM lab_results lr WHERE lr.ordered_by = u.full_name_ar AND ${inRange('lr.ordered_at')}) AS lab_orders,
                 (SELECT COUNT(*) FROM medications m WHERE m.prescribed_by = u.full_name_ar AND ${inRange('m.created_at')}) AS prescriptions
