@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Plus, FlaskConical, PenLine, Trash2, Tag, Printer } from 'lucide-react';
@@ -7,12 +7,16 @@ import { printLabReport } from '../printChart';
 import { useAuth } from '@/lib/auth';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
+import { CatalogSuggestions } from './CatalogSuggestions';
 import { API, type LabInput, type ChartData, type LabResultInput } from '@/lib/api';
 import { fmtDateTime, localName } from '@/lib/format';
 import { useToast, useConfirm } from '@/components/ui';
 
 /** canOrder: طلب فحص (الطبيب) — canResult: إدخال النتائج (فني المختبر) */
-export function LaboratorySection({ chart, canOrder, canResult }: { chart: ChartData; canOrder: boolean; canResult: boolean }) {
+/**
+ * onNeedVisit: لا زيارة مفتوحة → يفتح «زيارة جديدة» (فحص فقط) ثم نافذة الطلب مباشرة (autoOpen).
+ */
+export function LaboratorySection({ chart, canOrder, canResult, onNeedVisit, autoOpen }: { chart: ChartData; canOrder: boolean; canResult: boolean; onNeedVisit?: () => void; autoOpen?: boolean }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -22,6 +26,10 @@ export function LaboratorySection({ chart, canOrder, canResult }: { chart: Chart
   const [editLab, setEditLab] = useState<(typeof chart.labs)[number] | null>(null);
 
   const canAdd = (canOrder || canResult) && chart.patient.admission?.status === 'active';
+  // بعد فتح الزيارة من هذا القسم: نافذة الطلب تُفتح مباشرة
+  useEffect(() => {
+    if (autoOpen && canAdd && chart.admissionId) setOpen(true);
+  }, [autoOpen, canAdd, chart.admissionId]);
 
   const mut = useMutation({
     mutationFn: API.addLabResult,
@@ -60,6 +68,11 @@ export function LaboratorySection({ chart, canOrder, canResult }: { chart: Chart
           {chart.labs.some((l) => l.result) && (
             <Button size="sm" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => printLabReport(chart, t, user)}>
               {t('print.labReport')}
+            </Button>
+          )}
+          {!canAdd && (canOrder || canResult) && onNeedVisit && (
+            <Button size="sm" variant="secondary" onClick={onNeedVisit} icon={<Plus className="h-4 w-4" />}>
+              {t('orders.labOrder')}
             </Button>
           )}
           {canAdd && chart.admissionId && (
@@ -192,7 +205,8 @@ function AddLabDialog({ open, onClose, admissionId, withResult, onSubmit, busy }
       }
     >
       <div className="space-y-4">
-        <Input label={t('laboratory.test')} value={testNameAr} onChange={(e) => setTestNameAr(e.target.value)} autoFocus placeholder={t('examples.labTest')} />
+        <Input label={t('laboratory.test')} value={testNameAr} onChange={(e) => setTestNameAr(e.target.value)} autoFocus placeholder={t('examples.labTest')} list="catalog-lab" hint={t('orders.catalogHint')} />
+        <CatalogSuggestions id="catalog-lab" kind="lab" />
         <Input label={t('orders.category')} value={category} onChange={(e) => setCategory(e.target.value)} />
         {withResult && (
           <>

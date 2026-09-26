@@ -12,6 +12,8 @@ import { PrintMenu } from '@/features/patient/PrintMenu';
 import { fmtDate, fmtDateTime, localName } from '@/lib/format';
 import { PatientHeader } from '@/features/patient/PatientHeader';
 import { CloseEncounterButton } from '@/features/patients/CloseEncounterButton';
+import { EncounterDialog } from '@/features/patients/EncounterDialog';
+import { NoVisitBanner } from '@/features/patients/NoVisitBanner';
 import { OverviewSection } from '@/features/patient/sections/OverviewSection';
 import { VitalsSection } from '@/features/patient/sections/VitalsSection';
 import { NotesSection } from '@/features/patient/sections/NotesSection';
@@ -59,6 +61,9 @@ export default function PatientChartPage() {
   });
   // التنويم المعروض: undefined = الحالي/الأحدث
   const [admissionId, setAdmissionId] = useState<string | undefined>(undefined);
+  // «طلب أشعة/تحليل» بلا زيارة: نافتح زيارة «فحص فقط» ثم نافذة الطلب
+  const [visitFor, setVisitFor] = useState<ChartSection | 'banner' | null>(null);
+  const [autoOpen, setAutoOpen] = useState<ChartSection | null>(null);
 
   const { data: chart, isLoading, error, refetch } = useQuery({
     // المفتاح الأول ['chart', id] يبقى ثابتاً حتى تعمل invalidateQueries في الأقسام
@@ -147,9 +152,9 @@ export default function PatientChartPage() {
       case 'medications':
         return <MedicationsSection chart={chart} canWrite={canWrite.medication} canAdminister={canWrite.administer} />;
       case 'laboratory':
-        return <LaboratorySection chart={chart} canOrder={canWrite.labOrder} canResult={canWrite.labResult} />;
+        return <LaboratorySection chart={chart} canOrder={canWrite.labOrder} canResult={canWrite.labResult} onNeedVisit={can('encounters.create') ? () => setVisitFor('laboratory') : undefined} autoOpen={autoOpen === 'laboratory'} />;
       case 'radiology':
-        return <RadiologySection chart={chart} canOrder={canWrite.radOrder} canResult={canWrite.radResult} />;
+        return <RadiologySection chart={chart} canOrder={canWrite.radOrder} canResult={canWrite.radResult} onNeedVisit={can('encounters.create') ? () => setVisitFor('radiology') : undefined} autoOpen={autoOpen === 'radiology'} />;
       case 'consultations':
         return <ConsultationsSection chart={chart} canWrite={canWrite.consultation} />;
       case 'procedures':
@@ -188,6 +193,26 @@ export default function PatientChartPage() {
         </div>
       )}
       {viewingPast && <Alert variant="info">{t('history.viewingPast')}</Alert>}
+      {!viewingPast && chart.patient.admission?.status !== 'active' && (
+        <NoVisitBanner patient={chart.patient} canVisit={can('encounters.create')} canAdmit={can('admissions.manage')} onVisit={() => setVisitFor('banner')} />
+      )}
+      {visitFor && (
+        <EncounterDialog
+          patient={chart.patient}
+          defaultType={visitFor === 'banner' ? 'outpatient' : 'diagnostic'}
+          onClose={() => setVisitFor(null)}
+          onDone={async () => {
+            const target = visitFor;
+            setVisitFor(null);
+            setAdmissionId(undefined);
+            await refetch();
+            if (target !== 'banner') {
+              setSection(target);
+              setAutoOpen(target);
+            }
+          }}
+        />
+      )}
       {chart.admissionId && !viewingPast && active && chart.patient.admission?.encounter_type !== 'diagnostic' && <CareTeamCard chart={chart} />}
 
       <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
@@ -220,7 +245,10 @@ export default function PatientChartPage() {
               role="tab"
               aria-selected={active}
               type="button"
-              onClick={() => setSection(value)}
+              onClick={() => {
+                setSection(value);
+                setAutoOpen(null);
+              }}
               className={cn(
                 'shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors',
                 active

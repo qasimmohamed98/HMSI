@@ -20,12 +20,12 @@ const TYPES: { id: VisitType; icon: typeof Stethoscope }[] = [
 const SUGGEST: Record<VisitType, string[]> = { outpatient: ['outpatient', 'clinical'], emergency: ['emergency'], diagnostic: ['radiology', 'lab'] };
 
 /** فتح زيارة بلا تنويم: مراجع، طوارئ، أو فحص فقط بتحويل */
-export function EncounterDialog({ patient, onClose, onDone }: { patient: Patient; onClose: () => void; onDone: (admissionId: string) => void }) {
+export function EncounterDialog({ patient, onClose, onDone, defaultType = 'diagnostic' }: { patient: Patient; onClose: () => void; onDone: (admissionId: string) => void; defaultType?: VisitType }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: API.listDepartments });
   const { data: doctors } = useQuery({ queryKey: ['doctors'], queryFn: API.listDoctors });
-  const [type, setType] = useState<VisitType>('diagnostic');
+  const [type, setType] = useState<VisitType>(defaultType);
   const [f, setF] = useState({ department_id: '', attending_doctor_id: '', reason: '', referral_source: '', referring_doctor: '', referral_note: '' });
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
 

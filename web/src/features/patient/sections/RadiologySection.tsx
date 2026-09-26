@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Plus, ScanLine, PenLine, Trash2, Printer } from 'lucide-react';
 import { Button, Dialog, Input, Textarea, Badge } from '@/components/ui';
 import { SectionCard, EmptyLine } from './SectionCard';
+import { CatalogSuggestions } from './CatalogSuggestions';
 import { printRadiologyReport } from '../printChart';
 import { useAuth } from '@/lib/auth';
 import { API, type RadiologyInput, type RadiologyUpdateInput, type ChartData } from '@/lib/api';
@@ -11,7 +12,10 @@ import { fmtDateTime, localName } from '@/lib/format';
 import { useToast, useConfirm } from '@/components/ui';
 
 /** canOrder: طلب أشعة (الطبيب) — canResult: كتابة التقرير (فني الأشعة) */
-export function RadiologySection({ chart, canOrder, canResult }: { chart: ChartData; canOrder: boolean; canResult: boolean }) {
+/**
+ * onNeedVisit: لا زيارة مفتوحة → يفتح «زيارة جديدة» (فحص فقط) ثم نافذة الطلب مباشرة (autoOpen).
+ */
+export function RadiologySection({ chart, canOrder, canResult, onNeedVisit, autoOpen }: { chart: ChartData; canOrder: boolean; canResult: boolean; onNeedVisit?: () => void; autoOpen?: boolean }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -21,6 +25,10 @@ export function RadiologySection({ chart, canOrder, canResult }: { chart: ChartD
   const [editRad, setEditRad] = useState<(typeof chart.radiology)[number] | null>(null);
 
   const canAdd = (canOrder || canResult) && chart.patient.admission?.status === 'active';
+  // بعد فتح الزيارة من هذا القسم: نافذة الطلب تُفتح مباشرة
+  useEffect(() => {
+    if (autoOpen && canAdd && chart.admissionId) setOpen(true);
+  }, [autoOpen, canAdd, chart.admissionId]);
 
   const mut = useMutation({
     mutationFn: API.addRadiology,
@@ -56,6 +64,11 @@ export function RadiologySection({ chart, canOrder, canResult }: { chart: ChartD
           {chart.radiology.some((r) => r.report) && (
             <Button size="sm" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => printRadiologyReport(chart, t, user)}>
               {t('print.radReport')}
+            </Button>
+          )}
+          {!canAdd && (canOrder || canResult) && onNeedVisit && (
+            <Button size="sm" variant="secondary" onClick={onNeedVisit} icon={<Plus className="h-4 w-4" />}>
+              {t('orders.radOrder')}
             </Button>
           )}
           {canAdd && chart.admissionId && (
@@ -206,7 +219,8 @@ function AddRadiologyDialog({ open, onClose, admissionId, withReport, onSubmit, 
       }
     >
       <div className="space-y-4">
-        <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder={t('examples.radiology')} />
+        <Input label={t('radiology.studyType')} value={studyTypeAr} onChange={(e) => setStudyTypeAr(e.target.value)} autoFocus placeholder={t('examples.radiology')} list="catalog-imaging" hint={t('orders.catalogHint')} />
+        <CatalogSuggestions id="catalog-imaging" kind="imaging" />
         {withReport && <Textarea label={t('orders.reportOptional')} rows={4} value={report} onChange={(e) => setReport(e.target.value)} />}
       </div>
     </Dialog>

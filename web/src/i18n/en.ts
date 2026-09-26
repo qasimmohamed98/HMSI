@@ -862,6 +862,7 @@ export const en: Dict = {
     dischargedAt: 'Discharged on',
   },
   orders: {
+    catalogHint: 'Type part of the name to see exams from “Services & prices”, or type one that is not listed.',
     labOrder: 'Order test',
     radOrder: 'Order imaging',
     abnormal: 'Abnormal result',
@@ -1248,6 +1249,8 @@ export const en: Dict = {
     closed: 'Visit closed',
     referredBy: 'Referred from {{source}}',
     date: 'Visit date',
+    noneTitle: 'This patient has no open visit.',
+    noneHint: 'To order imaging or lab tests or prescribe, open a visit (outpatient, emergency or test only) or admit them to a bed.',
     status: { active: 'Open visit', discharged: 'Closed' },
   },
   devices: {
