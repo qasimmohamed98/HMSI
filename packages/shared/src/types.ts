@@ -164,7 +164,16 @@ export interface User {
   must_change_password?: boolean;
   /** التحقق بخطوتين مفعّل */
   totp_enabled?: boolean;
+  /** لم يوافق على الإصدار الحالي من شروط الاستخدام وسياسة الخصوصية: لا شيء قبل الموافقة */
+  terms_required?: boolean;
 }
+
+/**
+ * إصدار شروط الاستخدام وسياسة الخصوصية (web/src/i18n/content/legal.ts).
+ * ارفعه عند تغيير جوهري فقط: كل الموظفين يُطلب منهم الموافقة من جديد.
+ */
+export const TERMS_VERSION = 1;
+export const TERMS_UPDATED = '2026-09-26';
 
 /**
  * اشتراك المستشفى: unlimited = مستشفى أنشأه المدير العام بلا حد زمني؛ trial = فترة تجريبية؛

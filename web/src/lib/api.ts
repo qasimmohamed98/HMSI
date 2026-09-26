@@ -322,6 +322,8 @@ export interface SignupInput {
   password: string;
   formToken?: string;
   website?: string;
+  /** موافقة صريحة على شروط الاستخدام وسياسة الخصوصية */
+  acceptTerms: boolean;
 }
 
 export interface BillingOverview {
@@ -726,6 +728,8 @@ export interface Api {
   notificationCount(): Promise<{ unread: number; top: 'info' | 'warning' | 'critical' }>;
   readNotification(id: string): Promise<void>;
   readAllNotifications(): Promise<void>;
+  /** موافقة الموظف على شروط الاستخدام وسياسة الخصوصية (الإصدار المعروض) */
+  acceptTerms(version: number): Promise<User>;
   // إشعارات الدفع لهذا الجهاز (تصل والنظام مغلق)
   pushKey(): Promise<{ public_key: string }>;
   pushSubscribe(input: PushSubscribeInput): Promise<{ subscribed: true; level: PushLevel }>;

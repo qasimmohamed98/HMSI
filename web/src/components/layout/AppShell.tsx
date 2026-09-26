@@ -18,6 +18,7 @@ import { ForcePasswordChange } from '@/features/security/ForcePasswordChange';
 import { IdleLogout } from '@/features/security/IdleLogout';
 import { AlertCenter } from '@/features/alerts/AlertCenter';
 import { DeviceSetupBanner } from '@/features/alerts/DeviceSetupBanner';
+import { TermsGate } from '@/features/legal/TermsGate';
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -52,6 +53,14 @@ export function AppShell() {
       <>
         <IdleLogout />
         <ForcePasswordChange />
+      </>
+    );
+  // الموافقة على شروط الاستخدام وسياسة الخصوصية قبل أي عمل
+  if (user?.terms_required)
+    return (
+      <>
+        <IdleLogout />
+        <TermsGate />
       </>
     );
 

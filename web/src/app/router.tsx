@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { Logo } from '@/components/layout/Logo';
 
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
+const LegalPage = lazy(() => import('@/pages/LegalPage'));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const PatientsPage = lazy(() => import('@/pages/PatientsPage'));
 const PatientChartPage = lazy(() => import('@/pages/PatientChartPage'));
@@ -77,6 +78,8 @@ export const router = createBrowserRouter([
       { path: '/about', element: withSuspense(<AboutPage />) },
       { path: '/system', element: withSuspense(<SystemPage />) },
       { path: '/guide', element: withSuspense(<GuidePage />) },
+      { path: '/privacy', element: withSuspense(<LegalPage doc="privacy" />) },
+      { path: '/terms', element: withSuspense(<LegalPage doc="terms" />) },
       {
         path: '/signup',
         element: <GuestOnly>{withSuspense(<SignupPage />)}</GuestOnly>,

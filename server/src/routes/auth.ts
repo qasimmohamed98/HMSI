@@ -1,4 +1,7 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
+import { TERMS_VERSION } from '@hmsi/shared';
+import { db } from '../../db/index.js';
 import { LoginSchema, ChangePasswordSchema } from '@hmsi/shared/validate';
 import { findUserByUsername, getUserById, getPasswordHash, setPassword, flagMustChangePassword } from '../repos/authRepo.js';
 import { verifyPassword, hashPassword, isWeakPassword } from '../lib/password.js';
@@ -64,6 +67,20 @@ authRoutes.post('/logout', requireAuth(), async (c) => {
 });
 
 authRoutes.get('/me', (c) => c.json(getSession(c)?.user ?? null, 200));
+
+/** موافقة الموظف على شروط الاستخدام وسياسة الخصوصية (الإصدار الحالي) — تُسجَّل في التدقيق */
+authRoutes.post('/accept-terms', requireAuth(), async (c) => {
+  const parsed = await parseBody(c, z.object({ accept: z.literal(true, { errorMap: () => ({ message: 'يجب الموافقة على شروط الاستخدام وسياسة الخصوصية' }) }), version: z.number().int() }));
+  if (!parsed.ok) return parsed.json;
+  const { version } = parsed.data as { version: number };
+  // الواجهة القديمة (قبل تحديث الشروط) لا تُحسب موافقة على نص لم يُعرض
+  if (version !== TERMS_VERSION) return c.json({ message: 'نص الشروط تغيّر — أعد تحميل الصفحة', code: 'terms_outdated' }, 409);
+  const s = getSession(c)!;
+  const at = new Date().toISOString();
+  await db.execute({ sql: `UPDATE users SET terms_version = ?, terms_accepted_at = ? WHERE id = ?`, args: [TERMS_VERSION, at, s.user.id] });
+  await writeAudit({ actorId: s.user.id, action: 'terms_accepted', resourceType: 'user', resourceId: s.user.id, meta: { version: TERMS_VERSION }, ip: clientIp(c) });
+  return c.json(await getUserById(s.user.id));
+});
 
 /** تغيير كلمة المرور الخاصة — يُنهي كل الجلسات الأخرى للمستخدم */
 authRoutes.post('/password', requireAuth(), async (c) => {

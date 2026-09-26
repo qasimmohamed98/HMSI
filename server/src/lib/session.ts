@@ -5,7 +5,7 @@ import { db } from '../../db/index.js';
 import { logoUrl } from './logo.js';
 import { computeSubscription } from './subscription.js';
 import { COOKIE_CSRF, COOKIE_SESSION, HEADER_CSRF, SESSION_TTL_MS, env, isHttps, isSameOrigin } from '../config.js';
-import type { User } from '@hmsi/shared';
+import { TERMS_VERSION, type User } from '@hmsi/shared';
 
 export function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -86,7 +86,7 @@ export async function currentSession(ctx: Context): Promise<SessionUser | null> 
   // hospital_id الفعّال = المستشفى الذي اختاره المدير العام (active_hospital_id) أو مستشفى المستخدم الأصلي
   const rows = await db.execute({
     sql: `SELECT s.id AS session_id, s.csrf_token,
-                 s.last_seen_at, u.must_change_password, u.totp_enabled,
+                 s.last_seen_at, u.must_change_password, u.totp_enabled, u.terms_version,
                  u.id, u.hospital_id AS home_hospital_id, u.username, u.full_name_ar, u.full_name_en, u.email, u.role, u.is_active, u.created_at,
                  h.id AS hospital_id, h.name_ar AS hospital_name_ar, h.name_en AS hospital_name_en, h.is_active AS hospital_active, h.logo_updated_at AS hospital_logo_updated_at,
                  h.trial_ends_at AS hospital_trial_ends_at, h.subscription_ends_at AS hospital_subscription_ends_at
@@ -127,6 +127,7 @@ export async function currentSession(ctx: Context): Promise<SessionUser | null> 
       subscription: computeSubscription(r.hospital_trial_ends_at, r.hospital_subscription_ends_at),
       must_change_password: Boolean(Number(r.must_change_password ?? 0)),
       totp_enabled: Boolean(Number(r.totp_enabled ?? 0)),
+      terms_required: Number(r.terms_version ?? 0) < TERMS_VERSION,
     },
   };
 }

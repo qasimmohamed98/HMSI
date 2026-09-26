@@ -682,4 +682,16 @@ CREATE TABLE IF NOT EXISTS schedule_alerts_sent (
 CREATE INDEX IF NOT EXISTS idx_schedule_alerts_sent_at ON schedule_alerts_sent(sent_at);
 `,
   },
+  {
+    id: "021_consent.sql",
+    sql: `-- 021 — الموافقة على شروط الاستخدام وسياسة الخصوصية
+-- كل موظف يوافق عند أول دخول (وعند كل تغيير جوهري: رقم الإصدار TERMS_VERSION في packages/shared)
+ALTER TABLE users ADD COLUMN terms_version INTEGER;
+ALTER TABLE users ADD COLUMN terms_accepted_at TEXT;
+-- المستشفى المسجَّل ذاتياً: موافقة من سجّله نيابة عنه
+ALTER TABLE hospitals ADD COLUMN terms_version INTEGER;
+ALTER TABLE hospitals ADD COLUMN terms_accepted_at TEXT;
+ALTER TABLE hospitals ADD COLUMN terms_accepted_by TEXT;
+`,
+  },
 ];

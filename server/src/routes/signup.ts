@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { SignupSchema } from '@hmsi/shared/validate';
+import { TERMS_VERSION } from '@hmsi/shared';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit } from '../lib/audit.js';
 import { HttpConflict } from '../lib/errors.js';
@@ -90,6 +91,10 @@ signupRoutes.post('/signup', async (c) => {
     await db.execute({ sql: `DELETE FROM hospitals WHERE id = ?`, args: [hospital.id] });
     throw e;
   }
+  // الموافقة على الشروط عند التسجيل: للمستشفى (من سجّله ومتى) وللمدير نفسه
+  const agreed = new Date().toISOString();
+  await db.execute({ sql: `UPDATE hospitals SET terms_version = ?, terms_accepted_at = ?, terms_accepted_by = ? WHERE id = ?`, args: [TERMS_VERSION, agreed, adminId, hospital.id] });
+  await db.execute({ sql: `UPDATE users SET terms_version = ?, terms_accepted_at = ? WHERE id = ?`, args: [TERMS_VERSION, agreed, adminId] });
   await createSession(c, adminId, ip, c.req.header('user-agent') ?? null);
   await writeAudit({ actorId: adminId, action: 'hospital_signup', resourceType: 'hospital', resourceId: hospital.id, ip, meta: { name: input.hospital_name_ar, phone: input.contact_phone } });
   return c.json(await getUserById(adminId), 201);

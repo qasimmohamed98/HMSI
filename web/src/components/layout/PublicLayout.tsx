@@ -18,6 +18,8 @@ export function PublicLayout({ children }: { children: ReactNode }) {
     { to: '/guide', label: t('nav.guide') },
     { to: '/system', label: t('nav.aboutSystem') },
     { to: '/about', label: t('nav.about') },
+    { to: '/privacy', label: t('legal.privacy') },
+    { to: '/terms', label: t('legal.terms') },
   ];
   return (
     <div className="min-h-dvh bg-surface">

@@ -1254,6 +1254,9 @@ export const demoApi: Api = {
   },
   async readNotification(): Promise<void> {},
   async readAllNotifications(): Promise<void> {},
+  async acceptTerms(): Promise<User> {
+    return requireUser();
+  },
   // إشعارات الدفع تحتاج الخادم الحقيقي
   async pushKey(): Promise<{ public_key: string }> {
     throw new Error('غير متاح في وضع العرض التوضيحي');

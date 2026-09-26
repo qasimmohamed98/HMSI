@@ -41,7 +41,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // انتهى اشتراك المستشفى: حدّث المستخدم ليُحوَّل إلى صفحة الدفع
     window.dispatchEvent(new Event('hmsi:subscription-expired'));
   }
-  if (res.status === 403 && res.headers.get('X-Hmsi-Reason') === 'password_change_required') {
+  if (res.status === 403 && (res.headers.get('X-Hmsi-Reason') === 'password_change_required' || res.headers.get('X-Hmsi-Reason') === 'terms_required')) {
     // كلمة مرور مؤقتة/ضعيفة: حدّث المستخدم لتظهر شاشة التغيير الإجباري
     window.dispatchEvent(new Event('hmsi:subscription-expired'));
   }
@@ -414,6 +414,7 @@ export const liveApi: Api = {
         password: input.password,
         form_token: input.formToken,
         website: input.website || undefined,
+        accept_terms: input.acceptTerms || undefined,
       }),
     }),
   signupToken: () => request('/public/signup-token'),
@@ -474,6 +475,7 @@ export const liveApi: Api = {
   notificationCount: () => request('/notifications/count'),
   readNotification: (id) => request(`/notifications/${id}/read`, { method: 'POST', body: '{}' }),
   readAllNotifications: () => request('/notifications/read-all', { method: 'POST', body: '{}' }),
+  acceptTerms: (version) => request('/auth/accept-terms', { method: 'POST', body: JSON.stringify({ accept: true, version }) }),
   pushKey: () => request('/push/key'),
   pushSubscribe: (input) => request('/push/subscribe', { method: 'POST', body: JSON.stringify(input) }),
   pushStatus: (endpoint) => request('/push/status', { method: 'POST', body: JSON.stringify({ endpoint }) }),

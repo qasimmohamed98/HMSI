@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [form, setForm] = useState({ hospitalNameAr: '', hospitalNameEn: '', city: '', contactPhone: '', fullNameAr: '', email: '', username: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [agree, setAgree] = useState(false);
   // حماية من البرامج الآلية: رمز نموذج من الخادم + حقل مخفي يبقى فارغاً عند الإنسان
   const formToken = useQuery({ queryKey: ['signupToken'], queryFn: API.signupToken, staleTime: Infinity, retry: false });
   const trap = useRef<HTMLInputElement>(null);
@@ -28,6 +29,7 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
     if (form.password !== form.confirm) return setError(t('signup.mismatch'));
+    if (!agree) return setError(t('legal.mustAgree'));
     setBusy(true);
     try {
       await API.signup({
@@ -41,6 +43,7 @@ export default function SignupPage() {
         password: form.password,
         formToken: formToken.data?.token,
         website: trap.current?.value,
+        acceptTerms: agree,
       });
       await refresh();
       navigate('/', { replace: true });
@@ -115,10 +118,23 @@ export default function SignupPage() {
                   </div>
                 </fieldset>
 
-                <Button type="submit" size="lg" className="w-full" loading={busy} icon={<BadgeCheck className="h-5 w-5" />}>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-ink/12 p-3 text-sm dark:border-white/15">
+                  <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" />
+                  <span className="text-ink/80">
+                    {t('legal.signupAgree1')}{' '}
+                    <Link to="/terms" target="_blank" className="font-semibold text-brand-700 hover:underline dark:text-brand-300">
+                      {t('legal.terms')}
+                    </Link>
+                    {t('legal.and')}
+                    <Link to="/privacy" target="_blank" className="font-semibold text-brand-700 hover:underline dark:text-brand-300">
+                      {t('legal.privacy')}
+                    </Link>
+                    {t('legal.signupAgree2')}
+                  </span>
+                </label>
+                <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!agree} icon={<BadgeCheck className="h-5 w-5" />}>
                   {t('signup.submit', { days: trialDays })}
                 </Button>
-                <p className="text-center text-xs text-ink/50">{t('signup.terms')}</p>
               </form>
             </CardContent>
           </Card>

@@ -327,6 +327,8 @@ export const SignupSchema = z.object({
   form_token: z.string().max(200).optional(),
   /** حقل مخفي (فخ للبرامج الآلية): يجب أن يبقى فارغاً */
   website: z.string().max(300).optional().nullable(),
+  /** موافقة صريحة على شروط الاستخدام وسياسة الخصوصية */
+  accept_terms: z.literal(true, { errorMap: () => ({ message: 'يجب الموافقة على شروط الاستخدام وسياسة الخصوصية' }) }),
 });
 
 export const PaymentInfoSchema = z.object({

@@ -101,6 +101,8 @@ export default function LoginPage() {
           <Link to="/guide" className="hover:text-white">{t('nav.guide')}</Link>
           <Link to="/system" className="hover:text-white">{t('nav.aboutSystem')}</Link>
           <Link to="/about" className="hover:text-white">{t('nav.about')}</Link>
+          <Link to="/privacy" className="hover:text-white">{t('legal.privacy')}</Link>
+          <Link to="/terms" className="hover:text-white">{t('legal.terms')}</Link>
           <ProductsLink source="login-panel" className="text-[var(--q-b-light,#3CE0C3)] hover:text-white" />
           <Link to="/about" className="font-bold tracking-wide text-white/75 hover:text-white" dir="ltr">
             DEVELOPED BY {DEVELOPER.nameEn.toUpperCase()}
@@ -200,6 +202,10 @@ export default function LoginPage() {
               <Link to="/guide" className="hover:underline">{t('nav.guide')}</Link>
               <Link to="/system" className="hover:underline">{t('nav.aboutSystem')}</Link>
               <Link to="/about" className="hover:underline">{t('nav.about')}</Link>
+            </p>
+            <p className="mt-2 flex justify-center gap-4 text-xs text-ink/45 lg:hidden">
+              <Link to="/privacy" className="hover:underline">{t('legal.privacy')}</Link>
+              <Link to="/terms" className="hover:underline">{t('legal.terms')}</Link>
             </p>
             <p className="mt-2 text-center text-xs lg:hidden">
               <ProductsLink source="login-mobile" className="text-brand-700 dark:text-brand-300" />

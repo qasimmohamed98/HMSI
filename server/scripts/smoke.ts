@@ -393,7 +393,8 @@ console.log('\n— التسجيل الذاتي والفترة التجريبية
   check('معلومات الدفع عامة مع مدة التجربة', info.status === 200 && info.json.bank_name === 'مصرف الرافدين' && info.json.trial_days === 14);
   process.env.SIGNUP_MIN_MS = '0';
   const formToken = (await anon.get('/public/signup-token')).json.token as string;
-  const signupBody = { hospital_name_ar: 'مستشفى التسجيل الذاتي', contact_phone: '07701234567', full_name_ar: 'مدير جديد', username: 'selfadmin', password: 'Trial2026x', city: 'بغداد', form_token: formToken };
+  const signupBody = { hospital_name_ar: 'مستشفى التسجيل الذاتي', contact_phone: '07701234567', full_name_ar: 'مدير جديد', username: 'selfadmin', password: 'Trial2026x', city: 'بغداد', form_token: formToken, accept_terms: true };
+  check('التسجيل بلا موافقة على الشروط مرفوض', (await anon.post('/public/signup', { ...signupBody, accept_terms: undefined })).status === 422);
   check('التسجيل بلا رمز نموذج مرفوض', (await anon.post('/public/signup', { ...signupBody, form_token: undefined })).json?.code === 'form_expired');
   check('رمز نموذج مزوّر مرفوض', (await anon.post('/public/signup', { ...signupBody, form_token: `${Date.now() - 60_000}.forged` })).status === 422);
   check('الحقل المخفي (فخ البرامج الآلية) يرفض التسجيل', (await anon.post('/public/signup', { ...signupBody, website: 'http://spam.example' })).status === 422);
@@ -838,6 +839,28 @@ console.log('\n— تهيئة مستشفى جديد: أقسام وردهات و�
   check('يعدّل القسم', (await a2.patch(`/org/departments/${dep.json.id}`, { name_en: 'Emergency Dept' })).status === 200);
   const h1Ward = (await manager.get('/wards')).json[0].id;
   check('لا يضيف سريراً في ردهة مستشفى آخر', (await a2.post('/org/beds', { ward_id: h1Ward, room: 'X', bed_no: 'X' })).status === 409);
+}
+
+console.log('\n— الموافقة على شروط الاستخدام وسياسة الخصوصية');
+{
+  const { TERMS_VERSION } = await import('@hmsi/shared');
+  const { db } = await import('../db/index.js');
+  const created = await manager.post('/users', { username: 'termsnurse', password: 'Temp#Ward2026q', full_name_ar: 'ممرضة جديدة', role: 'nurse' });
+  check('المدير ينشئ موظفاً جديداً', created.status === 201, created.json);
+  const s = client(await login('termsnurse', 'Temp#Ward2026q'));
+  const me0 = await s.get('/auth/me');
+  if (me0.json?.must_change_password) await s.post('/auth/password', { current_password: 'Temp#Ward2026q', new_password: 'Nurse#Shift2026z' });
+  const me = await s.get('/auth/me');
+  check('الموظف الجديد مطالَب بالموافقة على الشروط', me.json?.terms_required === true);
+  const blocked = await s.get('/patients');
+  check('لا بيانات مرضى قبل الموافقة (403 terms_required)', blocked.status === 403 && blocked.json?.code === 'terms_required');
+  check('الموافقة بلا تأشير مرفوضة', (await s.post('/auth/accept-terms', { accept: false, version: TERMS_VERSION })).status === 422);
+  check('الموافقة على إصدار قديم مرفوضة (409)', (await s.post('/auth/accept-terms', { accept: true, version: TERMS_VERSION - 1 })).status === 409);
+  const ok = await s.post('/auth/accept-terms', { accept: true, version: TERMS_VERSION });
+  check('الموافقة تُسجَّل وتفتح النظام', ok.status === 200 && ok.json.terms_required === false && (await s.get('/patients')).status === 200);
+  const aud = await db.execute({ sql: `SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'terms_accepted' AND actor_id = ?`, args: [created.json.id] });
+  check('الموافقة مسجّلة في سجل التدقيق', Number(aud.rows[0]!.n) === 1);
+  check('حسابات التجربة وافقت مسبقاً', (await nurse.get('/auth/me')).json.terms_required === false);
 }
 
 console.log('\n— إشعارات الدفع (Web Push)');

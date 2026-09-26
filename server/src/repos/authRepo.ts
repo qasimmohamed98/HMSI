@@ -1,4 +1,4 @@
-import type { User } from '@hmsi/shared';
+import { TERMS_VERSION, type User } from '@hmsi/shared';
 import { db } from '../../db/index.js';
 import { logoUrl } from '../lib/logo.js';
 import { computeSubscription } from '../lib/subscription.js';
@@ -21,6 +21,7 @@ export function toUser(r: Record<string, unknown>): User {
     subscription: computeSubscription(r.hospital_trial_ends_at, r.hospital_subscription_ends_at),
     must_change_password: Boolean(Number(r.must_change_password ?? 0)),
     totp_enabled: Boolean(Number(r.totp_enabled ?? 0)),
+    terms_required: Number(r.terms_version ?? 0) < TERMS_VERSION,
   };
 }
 

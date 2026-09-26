@@ -1,4 +1,5 @@
 import { hash } from '@node-rs/argon2';
+import { TERMS_VERSION } from '@hmsi/shared';
 import { db, uuid, generateFamilyPin } from '../../db/index.js';
 import { generateBedCode } from '../repos/orgRepo.js';
 
@@ -96,6 +97,8 @@ export async function runSeed(): Promise<{ users: number; patients: number }> {
     { id: H2, name_ar: 'مستشفى النور العام', name_en: 'Alnoor General Hospital', code: 'ANH-002', settings_json: '{}' },
   ]);
   await insert('users', users);
+  // حسابات التجربة وافقت على الشروط مسبقاً (الموظف الجديد يُطلب منه ذلك عند أول دخول)
+  await db.execute({ sql: `UPDATE users SET terms_version = ?, terms_accepted_at = ?`, args: [TERMS_VERSION, new Date().toISOString()] });
   await insert('departments', departments);
   await insert('wards', wards);
   await insert('beds', beds);

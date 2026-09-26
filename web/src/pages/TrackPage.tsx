@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Activity, BedDouble, Building2, CalendarClock, FlaskConical, HeartPulse, Languages, Lock, MessageSquareText, Pill, RefreshCw, ScanLine, ShieldCheck, Stethoscope, UserRound } from 'lucide-react';
 import type { PublicTrackFamily } from '@hmsi/shared';
@@ -292,6 +292,12 @@ export default function TrackPage() {
         </p>
         <p className="text-center text-xs text-ink/55">
           <ProductsLink source="track" className="text-brand-700 dark:text-brand-300" />
+        </p>
+        <p className="text-center text-xs text-ink/50">
+          {t('legal.trackNotice')}{' '}
+          <Link to="/privacy" className="font-semibold text-brand-700 hover:underline dark:text-brand-300">
+            {t('legal.privacy')}
+          </Link>
         </p>
 
         <p className="flex items-start gap-2 text-xs leading-relaxed text-ink/50">

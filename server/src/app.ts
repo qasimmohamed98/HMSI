@@ -55,6 +55,10 @@ api.use('*', async (c, next) => {
   if (s?.user.must_change_password && !path.startsWith('/api/auth/') && path !== '/api/health') {
     return c.json({ message: 'يجب تغيير كلمة المرور قبل المتابعة', code: 'password_change_required' }, 403, { 'X-Hmsi-Reason': 'password_change_required' });
   }
+  // لم يوافق على شروط الاستخدام وسياسة الخصوصية (الإصدار الحالي): لا بيانات قبل الموافقة
+  if (s?.user.terms_required && !path.startsWith('/api/auth/') && path !== '/api/health') {
+    return c.json({ message: 'يجب الموافقة على شروط الاستخدام وسياسة الخصوصية قبل المتابعة', code: 'terms_required' }, 403, { 'X-Hmsi-Reason': 'terms_required' });
+  }
   return next();
 });
 
