@@ -35,6 +35,7 @@ import { serviceRoutes } from './routes/services.js';
 import { roundsRoutes } from './routes/rounds.js';
 import { handoverRoutes } from './routes/handover.js';
 import { careTeamRoutes } from './routes/careTeam.js';
+import { sessionRoutes } from './routes/sessions.js';
 
 export const api = new Hono();
 
@@ -64,6 +65,7 @@ api.use('*', async (c, next) => {
 });
 
 api.route('/api/auth/2fa', twofaRoutes);
+api.route('/api/auth/sessions', sessionRoutes);
 api.route('/api/auth', authRoutes);
 api.route('/api/dashboard', dashboardRoutes);
 api.route('/api/patients', patientRoutes);

@@ -633,6 +633,22 @@ console.log('\n— التحقق بخطوتين');
   check('إلغاء تذكّر كل الأجهزة', (await radSess.post('/auth/2fa/forget-devices')).json.forgotten === 1);
   check('بعد الإلغاء يُطلب الرمز على الجهاز نفسه', ((await (await loginWith(`hmsi_trusted=${trustedCookie}`)).json()) as { mfa_required?: boolean }).mfa_required === true);
 
+  // الأجهزة وتسجيلات الدخول
+  const d1 = client(await login('pharmacist'));
+  const d2 = client(await login('pharmacist'));
+  const list = await d1.get('/auth/sessions');
+  check('قائمة الجلسات تُظهر الأجهزة والحالية', list.status === 200 && list.json.sessions.length >= 2 && list.json.sessions.filter((x: any) => x.current).length === 1);
+  check('سجل الدخول فيه الجهاز', list.json.history.some((h: any) => h.action === 'login' && typeof h.device === 'string'));
+  check('ممرض لا يحذف جلسات غيره (404)', (await nurse.del(`/auth/sessions/${list.json.sessions[0].id}`)).status === 404);
+  const other = list.json.sessions.find((x: any) => !x.current);
+  check('الخروج من جلسة أخرى', (await d1.del(`/auth/sessions/${other.id}`)).status === 204);
+  check('الجلسة المُخرَجة لم تعد تعمل', (await d2.get('/auth/me')).json === null || (await d2.get('/patients')).status === 401);
+  await login('pharmacist');
+  const rev = await d1.post('/auth/sessions/revoke-others');
+  check('الخروج من كل الأجهزة الأخرى يبقي هذا الجهاز', rev.json.revoked >= 1 && (await d1.get('/auth/me')).json?.username === 'pharmacist');
+  const failed = await anon.post('/auth/login', { username: 'pharmacist', password: 'wrong-password-x' });
+  check('محاولة دخول فاشلة تظهر في السجل', failed.status === 401 && (await d1.get('/auth/sessions')).json.history.some((h: any) => h.action === 'login_failed'));
+
   check('الإيقاف يتطلب كلمة المرور', (await rad.post('/auth/2fa/disable', { password: 'wrong' })).status === 403);
   check('الطبيب لا يعيد ضبط التحقق لغيره (403)', (await doctor.post('/users/u_radiology/2fa/reset')).status === 403);
   check('مدير مستشفى آخر لا يعيد الضبط (404)', (await admin2.post('/users/u_radiology/2fa/reset')).status === 404);

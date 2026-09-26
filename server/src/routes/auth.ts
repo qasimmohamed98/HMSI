@@ -13,6 +13,7 @@ import { parseBody } from '../lib/validate.js';
 import { clientIp } from '../config.js';
 import { createMfaChallenge, isTotpEnabled } from './twofa.js';
 import { forgetAllDevices, isTrustedDevice } from '../lib/trustedDevice.js';
+import { deviceLabel } from '../lib/device.js';
 
 export const authRoutes = new Hono();
 
@@ -40,7 +41,7 @@ authRoutes.post('/login', async (c) => {
   }
   if (!user || !valid) {
     await recordLoginAttempt(username, ip, false);
-    await writeAudit({ actorId: null, action: 'login_failed', resourceType: 'user', resourceId: username, ip });
+    await writeAudit({ actorId: null, action: 'login_failed', resourceType: 'user', resourceId: username, ip, meta: { device: deviceLabel(c.req.header('user-agent')) } });
     return c.json({ message: 'اسم المستخدم أو كلمة المرور غير صحيحة' }, 401);
   }
 
@@ -59,7 +60,7 @@ authRoutes.post('/login', async (c) => {
 
   await purgeExpired().catch(() => undefined);
   await createSession(c, full.id, ip, c.req.header('user-agent') ?? null);
-  await writeAudit({ actorId: full.id, action: 'login', resourceType: 'user', resourceId: full.id, ip, ...(trusted ? { meta: { mfa: 'trusted_device' } } : {}) });
+  await writeAudit({ actorId: full.id, action: 'login', resourceType: 'user', resourceId: full.id, ip, meta: { device: deviceLabel(c.req.header('user-agent')), ...(trusted ? { mfa: 'trusted_device' } : {}) } });
   return c.json(full, 200);
 });
 

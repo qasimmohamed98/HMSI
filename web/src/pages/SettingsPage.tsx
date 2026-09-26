@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { TwoFactorCard } from '@/features/security/TwoFactorCard';
 import { AlertSettingsCard } from '@/features/alerts/AlertSettingsCard';
 import { DevicePushCard } from '@/features/alerts/DevicePushCard';
+import { DevicesCard } from '@/features/security/DevicesCard';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -94,6 +95,7 @@ export default function SettingsPage() {
       <AlertSettingsCard />
       <ChangePasswordCard />
       <TwoFactorCard />
+      <DevicesCard />
 
       {user?.role === 'super_admin' && <PaymentInfoCard />}
       {user?.role === 'super_admin' && <AboutEditorCard />}

@@ -4,6 +4,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { db, uuid } from '../../db/index.js';
 import { isHttps } from '../config.js';
 import { sha256 } from './session.js';
+import { deviceLabel } from './device.js';
 
 /**
  * «تذكّر هذا الجهاز»: بعد إدخال رمز التحقق بخطوتين مع اختيار التذكّر، لا يُطلب الرمز على المتصفح نفسه 30 يوماً.
@@ -14,13 +15,6 @@ import { sha256 } from './session.js';
 const COOKIE = 'hmsi_trusted';
 export const TRUST_DAYS = 30;
 
-function label(ua: string | null): string {
-  const u = ua ?? '';
-  const os = /android/i.test(u) ? 'Android' : /iphone|ipad/i.test(u) ? 'iOS' : /windows/i.test(u) ? 'Windows' : /mac os/i.test(u) ? 'macOS' : /linux/i.test(u) ? 'Linux' : '—';
-  const br = /edg\//i.test(u) ? 'Edge' : /firefox/i.test(u) ? 'Firefox' : /chrome|crios/i.test(u) ? 'Chrome' : /safari/i.test(u) ? 'Safari' : '—';
-  return `${os} · ${br}`;
-}
-
 export async function trustThisDevice(c: Context, userId: string): Promise<void> {
   const token = randomBytes(32).toString('base64url');
   const now = new Date();
@@ -30,7 +24,7 @@ export async function trustThisDevice(c: Context, userId: string): Promise<void>
   if (old) await db.execute({ sql: `DELETE FROM trusted_devices WHERE token_hash = ?`, args: [sha256(old)] });
   await db.execute({
     sql: `INSERT INTO trusted_devices (id, user_id, token_hash, label, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    args: [uuid('trd'), userId, sha256(token), label(c.req.header('user-agent') ?? null), now.toISOString(), expires.toISOString()],
+    args: [uuid('trd'), userId, sha256(token), deviceLabel(c.req.header('user-agent')), now.toISOString(), expires.toISOString()],
   });
   setCookie(c, COOKIE, token, { httpOnly: true, secure: isHttps(c), sameSite: 'Strict', path: '/api/auth', maxAge: TRUST_DAYS * 86_400 });
 }

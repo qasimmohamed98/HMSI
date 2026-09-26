@@ -13,6 +13,7 @@ import { getPasswordHash, getUserById } from '../repos/authRepo.js';
 import { createSession } from '../lib/session.js';
 import { consumeRecoveryCode, newRecoveryCodes, newTotpSecret, openSecret, otpauthUrl, sealSecret, verifyTotp } from '../lib/totp.js';
 import { countTrustedDevices, forgetAllDevices, trustThisDevice } from '../lib/trustedDevice.js';
+import { deviceLabel } from '../lib/device.js';
 
 /**
  * التحقق بخطوتين (اختياري لكل مستخدم، ويُنصح به للمدراء):
@@ -101,7 +102,7 @@ twofaRoutes.post('/login', async (c) => {
   const how = row ? await checkCode(userId, row, code) : null;
   if (!how) {
     await recordLoginAttempt(`mfa:${userId}`, ip, false);
-    await writeAudit({ actorId: userId, action: 'mfa_failed', resourceType: 'user', resourceId: userId, ip });
+    await writeAudit({ actorId: userId, action: 'mfa_failed', resourceType: 'user', resourceId: userId, ip, meta: { device: deviceLabel(c.req.header('user-agent')) } });
     return c.json({ message: 'رمز التحقق غير صحيح' }, 401);
   }
   await db.execute({ sql: `DELETE FROM mfa_challenges WHERE id = ?`, args: [ch.id] });
@@ -109,7 +110,7 @@ twofaRoutes.post('/login', async (c) => {
   if (!full) return c.json({ message: 'تعذر تحميل المستخدم' }, 500);
   await createSession(c, userId, ip, c.req.header('user-agent') ?? null);
   if (remember) await trustThisDevice(c, userId);
-  await writeAudit({ actorId: userId, action: 'login', resourceType: 'user', resourceId: userId, ip, meta: { mfa: how, remember: Boolean(remember) } });
+  await writeAudit({ actorId: userId, action: 'login', resourceType: 'user', resourceId: userId, ip, meta: { mfa: how, remember: Boolean(remember), device: deviceLabel(c.req.header('user-agent')) } });
   return c.json(full, 200);
 });
 

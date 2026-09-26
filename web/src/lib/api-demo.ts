@@ -1107,6 +1107,14 @@ export const demoApi: Api = {
   async twofaForgetDevices() {
     return { forgotten: 0 };
   },
+  async listMySessions() {
+    return { sessions: [{ id: 'demo', device: 'Demo · Browser', ip: null, created_at: new Date().toISOString(), last_seen_at: null, current: true }], trusted: [], history: [] };
+  },
+  async revokeSession(): Promise<void> {},
+  async revokeOtherSessions() {
+    return { revoked: 0 };
+  },
+  async forgetTrustedDevice(): Promise<void> {},
   async twofaRecoveryCodes(): Promise<{ recovery_codes: string[] }> {
     throw new Error('غير متاح في وضع العرض التوضيحي');
   },

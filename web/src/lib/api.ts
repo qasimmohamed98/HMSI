@@ -630,6 +630,11 @@ export interface Api {
   login(username: string, password: string): Promise<User | { mfa_required: true; mfa_token: string }>;
   loginMfa(mfaToken: string, code: string, remember?: boolean): Promise<User>;
   twofaStatus(): Promise<{ enabled: boolean; recovery_codes_left: number; trusted_devices?: number }>;
+  /** الأجهزة وتسجيلات الدخول (الإعدادات) */
+  listMySessions(): Promise<MySessions>;
+  revokeSession(id: string): Promise<void>;
+  revokeOtherSessions(): Promise<{ revoked: number }>;
+  forgetTrustedDevice(id: string): Promise<void>;
   /** إلغاء «تذكّر هذا الجهاز» لكل الأجهزة */
   twofaForgetDevices(): Promise<{ forgotten: number }>;
   twofaSetup(): Promise<{ secret: string; otpauth_url: string }>;
@@ -795,6 +800,12 @@ export interface Api {
   pushUnsubscribe(endpoint: string): Promise<void>;
   pushTest(): Promise<{ sent: number }>;
   familyTrack(code: string, pin: string): Promise<PublicTrackFamily>;
+}
+
+export interface MySessions {
+  sessions: { id: string; device: string; ip: string | null; created_at: string; last_seen_at: string | null; current: boolean }[];
+  trusted: { id: string; device: string; created_at: string; last_used_at: string | null; expires_at: string }[];
+  history: { action: string; ip: string | null; device: string | null; via: string | null; at: string }[];
 }
 
 export type PushLevel = 'all' | 'important' | 'critical';
