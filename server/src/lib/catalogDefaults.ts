@@ -13,6 +13,8 @@ export interface DefaultService {
   body_part?: string;
   prep_ar?: string;
   prep_en?: string;
+  /** فحص بصبغة */
+  contrast?: boolean;
 }
 
 const CONTRAST_AR = 'فحص بصبغة: صيام 4 ساعات، وتحليل وظائف الكلى (Creatinine) خلال آخر شهر، وأخبر الطاقم عن أي حساسية أو حمل أو مرض السكري (دواء الميتفورمين).';
@@ -45,19 +47,19 @@ export const DEFAULT_SERVICES: DefaultService[] = [
   { kind: 'imaging', modality: 'XR', code: 'XR-HAND', ar: 'أشعة اليد', en: 'Hand X-ray', body_part: 'hand' },
   // ——— المفراس
   { kind: 'imaging', modality: 'CT', code: 'CT-HEAD', ar: 'مفراس رأس بدون صبغة', en: 'CT head without contrast', body_part: 'head' },
-  { kind: 'imaging', modality: 'CT', code: 'CT-HEAD-C', ar: 'مفراس رأس مع صبغة', en: 'CT head with contrast', body_part: 'head', prep_ar: CONTRAST_AR, prep_en: CONTRAST_EN },
+  { kind: 'imaging', modality: 'CT', code: 'CT-HEAD-C', ar: 'مفراس رأس مع صبغة', en: 'CT head with contrast', body_part: 'head', prep_ar: CONTRAST_AR, prep_en: CONTRAST_EN, contrast: true },
   { kind: 'imaging', modality: 'CT', code: 'CT-SINUS', ar: 'مفراس الجيوب الأنفية', en: 'CT sinuses', body_part: 'head' },
   { kind: 'imaging', modality: 'CT', code: 'CT-CHEST', ar: 'مفراس صدر', en: 'CT chest', body_part: 'chest' },
   { kind: 'imaging', modality: 'CT', code: 'CT-CHEST-HR', ar: 'مفراس صدر عالي الدقة (HRCT)', en: 'High-resolution CT chest', body_part: 'chest' },
-  { kind: 'imaging', modality: 'CT', code: 'CT-ABD-PEL-C', ar: 'مفراس بطن وحوض مع صبغة', en: 'CT abdomen and pelvis with contrast', body_part: 'abdomen', prep_ar: CONTRAST_AR, prep_en: CONTRAST_EN },
+  { kind: 'imaging', modality: 'CT', code: 'CT-ABD-PEL-C', ar: 'مفراس بطن وحوض مع صبغة', en: 'CT abdomen and pelvis with contrast', body_part: 'abdomen', prep_ar: CONTRAST_AR, prep_en: CONTRAST_EN, contrast: true },
   { kind: 'imaging', modality: 'CT', code: 'CT-KUB', ar: 'مفراس المسالك البولية بدون صبغة (حصى)', en: 'CT KUB (stone protocol)', body_part: 'abdomen' },
   { kind: 'imaging', modality: 'CT', code: 'CT-CSPINE', ar: 'مفراس الفقرات العنقية', en: 'CT cervical spine', body_part: 'spine' },
   { kind: 'imaging', modality: 'CT', code: 'CT-LSPINE', ar: 'مفراس الفقرات القطنية', en: 'CT lumbar spine', body_part: 'spine' },
-  { kind: 'imaging', modality: 'CT', code: 'CTA-PULM', ar: 'مفراس الشرايين الرئوية (CTPA)', en: 'CT pulmonary angiography', body_part: 'chest', prep_ar: CONTRAST_AR, prep_en: CONTRAST_EN },
-  { kind: 'imaging', modality: 'CT', code: 'CTA-BRAIN', ar: 'مفراس شرايين الدماغ', en: 'CT angiography of the brain', body_part: 'head', prep_ar: CONTRAST_AR, prep_en: CONTRAST_EN },
+  { kind: 'imaging', modality: 'CT', code: 'CTA-PULM', ar: 'مفراس الشرايين الرئوية (CTPA)', en: 'CT pulmonary angiography', body_part: 'chest', prep_ar: CONTRAST_AR, prep_en: CONTRAST_EN, contrast: true },
+  { kind: 'imaging', modality: 'CT', code: 'CTA-BRAIN', ar: 'مفراس شرايين الدماغ', en: 'CT angiography of the brain', body_part: 'head', prep_ar: CONTRAST_AR, prep_en: CONTRAST_EN, contrast: true },
   // ——— الرنين
   { kind: 'imaging', modality: 'MR', code: 'MR-BRAIN', ar: 'رنين الدماغ', en: 'MRI brain', body_part: 'head', prep_ar: MR_AR, prep_en: MR_EN },
-  { kind: 'imaging', modality: 'MR', code: 'MR-BRAIN-C', ar: 'رنين الدماغ مع صبغة', en: 'MRI brain with contrast', body_part: 'head', prep_ar: `${MR_AR} ${CONTRAST_AR}`, prep_en: `${MR_EN} ${CONTRAST_EN}` },
+  { kind: 'imaging', modality: 'MR', code: 'MR-BRAIN-C', ar: 'رنين الدماغ مع صبغة', en: 'MRI brain with contrast', body_part: 'head', prep_ar: `${MR_AR} ${CONTRAST_AR}`, prep_en: `${MR_EN} ${CONTRAST_EN}`, contrast: true },
   { kind: 'imaging', modality: 'MR', code: 'MR-CSPINE', ar: 'رنين الفقرات العنقية', en: 'MRI cervical spine', body_part: 'spine', prep_ar: MR_AR, prep_en: MR_EN },
   { kind: 'imaging', modality: 'MR', code: 'MR-LSPINE', ar: 'رنين الفقرات القطنية', en: 'MRI lumbar spine', body_part: 'spine', prep_ar: MR_AR, prep_en: MR_EN },
   { kind: 'imaging', modality: 'MR', code: 'MR-KNEE', ar: 'رنين الركبة', en: 'MRI knee', body_part: 'knee', prep_ar: MR_AR, prep_en: MR_EN },

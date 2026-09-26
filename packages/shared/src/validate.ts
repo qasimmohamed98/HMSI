@@ -15,6 +15,7 @@ import {
   DEPARTMENT_KINDS,
   MODALITIES,
   SERVICE_KINDS,
+  IMAGING_PRIORITIES,
 } from './types.js';
 
 const id = z.string().min(1).max(64);
@@ -178,11 +179,27 @@ export const UpdateLabResultSchema = z.object({
   abnormal: z.boolean().optional(),
 });
 
-export const RadiologyReportSchema = z.object({
+export const RadiologyReportSchema = z
+  .object({
   admission_id: id,
-  study_type_ar: z.string().min(2).max(120),
+  /** مطلوب إلا إن اختير الفحص من الكتالوج (service_id) */
+  study_type_ar: z.string().min(2).max(120).optional(),
   study_type_en: z.string().max(120).optional().nullable(),
   report: z.string().max(4000).optional().nullable(),
+  /** فحص من كتالوج الخدمات: يحدد نوع الجهاز والصبغة */
+  service_id: id.optional().nullable(),
+  priority: z.enum(IMAGING_PRIORITIES).default('routine'),
+  /** سبب الطلب (الاستطباب السريري) */
+  indication: z.string().trim().max(500).optional().nullable(),
+  safety: z.record(z.string().max(40), z.enum(['yes', 'no'])).optional().nullable(),
+  })
+  .refine((v) => Boolean(v.service_id) || Boolean(v.study_type_ar), { message: 'اسم الفحص مطلوب', path: ['study_type_ar'] });
+
+export const PerformImagingSchema = z.object({
+  unit_id: id.optional().nullable(),
+  note: z.string().trim().max(500).optional().nullable(),
+  /** أكّد الفني مراجعة أسئلة الأمان قبل التنفيذ */
+  safety_confirmed: z.boolean().default(false),
 });
 
 export const ConsultationSchema = z.object({

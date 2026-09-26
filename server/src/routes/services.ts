@@ -28,7 +28,18 @@ function mapService(r: Record<string, unknown>): ServiceItem {
     prep_ar: s(r.prep_ar),
     prep_en: s(r.prep_en),
     is_active: Number(r.is_active) === 1,
+    contrast: isContrast(r),
   };
+}
+
+/** فحص بصبغة: علم في meta_json (الكتالوج الجاهز) أو ذُكرت الصبغة في تعليمات التحضير */
+export function isContrast(r: Record<string, unknown>): boolean {
+  try {
+    if ((JSON.parse(String(r.meta_json ?? '{}')) as { contrast?: boolean }).contrast) return true;
+  } catch {
+    /* */
+  }
+  return /فحص بصبغة|with contrast/i.test(`${String(r.prep_ar ?? '')} ${String(r.prep_en ?? '')}`);
 }
 
 async function getService(id: string, hospitalId: string): Promise<ServiceItem | null> {
@@ -134,11 +145,15 @@ serviceRoutes.post('/import-defaults', requireAuth(), requirePermission('service
   let added = 0;
   for (const d of DEFAULT_SERVICES) {
     const r = await db.execute({
-      sql: `INSERT OR IGNORE INTO services (id, hospital_id, kind, code, name_ar, name_en, modality, body_part, prep_ar, prep_en, is_active, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-      args: [uuid('svc'), session.user.hospital_id, d.kind, d.code, d.ar, d.en, d.modality ?? null, d.body_part ?? null, d.prep_ar ?? null, d.prep_en ?? null, now, now],
+      sql: `INSERT OR IGNORE INTO services (id, hospital_id, kind, code, name_ar, name_en, modality, body_part, prep_ar, prep_en, meta_json, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      args: [uuid('svc'), session.user.hospital_id, d.kind, d.code, d.ar, d.en, d.modality ?? null, d.body_part ?? null, d.prep_ar ?? null, d.prep_en ?? null, d.contrast ? '{"contrast":true}' : null, now, now],
     });
     added += r.rowsAffected;
+    // كتالوج مستورد سابقاً: نضيف علم الصبغة دون لمس ما عدّله المستشفى
+    if (r.rowsAffected === 0 && d.contrast) {
+      await db.execute({ sql: `UPDATE services SET meta_json = '{"contrast":true}' WHERE hospital_id = ? AND code = ? AND meta_json IS NULL`, args: [session.user.hospital_id, d.code] });
+    }
   }
   await writeAudit({ actorId: session.user.id, action: 'services_imported', resourceType: 'service', resourceId: session.user.hospital_id, meta: { added }, ip: clientIp(c) });
   return c.json({ added, total: DEFAULT_SERVICES.length });

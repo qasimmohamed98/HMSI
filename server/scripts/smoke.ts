@@ -1152,6 +1152,64 @@ console.log('\n— إشعارات الأشعة (طلب ← تقرير) ومرف�
 }
 
 
+console.log('\n— الأشعة: نموذج الطلب وقائمة العمل وتنفيذ الفحص');
+{
+  const { db } = await import('../db/index.js');
+  const mgr = client(await login('manager'));
+  const rx = client(await login('radiology'));
+  const rdocS = await login('radiodoc', 'Radio#Doc2026zq');
+  const rdoc = client(rdocS);
+  const dep = (await db.execute(`SELECT id FROM departments WHERE hospital_id = 'h-1' LIMIT 1`)).rows[0] as any;
+  const radDep = await mgr.post('/org/departments', { name_ar: 'أشعة العيادات', kind: 'radiology' });
+  const okUnit = await mgr.post(`/org/departments/${radDep.json.id}/units`, { kind: 'device', modality: 'CT', name_ar: 'مفراس رئيسي' });
+  const downUnit = await mgr.post(`/org/departments/${radDep.json.id}/units`, { kind: 'device', modality: 'CT', name_ar: 'مفراس معطل', status: 'maintenance' });
+  const ctC = (await db.execute(`SELECT id FROM services WHERE hospital_id = 'h-1' AND code = 'CT-ABD-PEL-C'`)).rows[0] as any;
+  const xr = (await db.execute(`SELECT id FROM services WHERE hospital_id = 'h-1' AND code = 'XR-CHEST-PA'`)).rows[0] as any;
+  check('الكتالوج يعلّم فحوص الصبغة', (await mgr.get('/services?kind=imaging&modality=CT')).json.find((x: any) => x.code === 'CT-ABD-PEL-C')?.contrast === true);
+
+  const np = await mgr.post('/patients', { full_name_ar: 'مريضة المفراس', gender: 'female', birth_date: '1988-08-08', blood_type: 'Unknown', allergies: [] });
+  const pid = np.json.id ?? np.json.patient?.id;
+  const enc = (await mgr.post('/admissions/encounter', { patient_id: pid, encounter_type: 'emergency', department_id: dep.id })).json.admission_id;
+  const routine = await mgr.post(`/patients/${enc}/radiology`, { admission_id: enc, service_id: xr.id, priority: 'routine' });
+  const stat = await mgr.post(`/patients/${enc}/radiology`, { admission_id: enc, service_id: ctC.id, priority: 'stat', indication: 'ألم بطن حاد مع تعرّق', safety: { pregnancy: 'no', kidney_ok: 'no', contrast_allergy: 'yes' } });
+  check('الطلب من الكتالوج يأخذ الاسم والنوع منه', stat.status === 201 && stat.json.study_type_ar === 'مفراس بطن وحوض مع صبغة' && stat.json.modality === 'CT' && stat.json.priority === 'stat' && stat.json.stage === 'ordered', stat.json);
+  check('فحص غير موجود في الكتالوج مرفوض (404)', (await mgr.post(`/patients/${enc}/radiology`, { admission_id: enc, service_id: 'svc-none' })).status === 404);
+  check('أولوية غير صالحة مرفوضة', (await mgr.post(`/patients/${enc}/radiology`, { admission_id: enc, study_type_ar: 'فحص', priority: 'now' })).status === 422);
+  const nRad = ((await rx.get('/notifications')).json as any[]).find((n) => n.kind === 'radiology_ordered' && n.title_ar.includes('مفراس بطن'));
+  check('الطلب العاجل جداً يُنبَّه له بخطورة حرجة', nRad?.severity === 'critical' && nRad.title_ar.startsWith('عاجل جداً'));
+
+  check('الطبيب لا يدخل قائمة عمل الأشعة (403)', (await doctor.get('/radiology/worklist')).status === 403);
+  const wl = await rx.get('/radiology/worklist');
+  const mine = wl.json.items.filter((x: any) => x.patient_id === pid);
+  check('قائمة العمل: العاجل جداً قبل الروتيني', mine.length === 2 && mine[0].priority === 'stat' && mine[1].priority === 'routine', mine.map((x: any) => x.priority));
+  check('قائمة العمل تحسب العدّاد لكل أولوية', wl.json.counts.stat >= 1 && wl.json.counts.routine >= 1);
+  check('قائمة العمل تُظهر تحذيرات الأمان (حساسية الصبغة، الكلى)', mine[0].safety.warnings.includes('contrast_allergy') && mine[0].safety.warnings.includes('kidney_ok') && mine[0].safety.unanswered.includes('metformin'), mine[0].safety);
+  check('قائمة العمل تحمل نوع الزيارة والاستطباب', mine[0].encounter_type === 'emergency' && mine[0].indication === 'ألم بطن حاد مع تعرّق');
+  check('مستشفى آخر لا يرى القائمة', (await admin2.get('/radiology/worklist')).json.items.every((x: any) => x.patient_id !== pid));
+
+  const statId = stat.json.id;
+  check('التنفيذ دون تأكيد الأمان مرفوض (422)', (await rx.post(`/radiology/${statId}/perform`, { unit_id: okUnit.json.id })).json?.code === 'safety_not_confirmed');
+  check('جهاز في الصيانة لا يُختار (409)', (await rx.post(`/radiology/${statId}/perform`, { unit_id: downUnit.json.id, safety_confirmed: true })).status === 409);
+  check('الطبيب لا ينفّذ الفحص (403)', (await doctor.post(`/radiology/${statId}/perform`, { safety_confirmed: true })).status === 403);
+  const perf = await rx.post(`/radiology/${statId}/perform`, { unit_id: okUnit.json.id, safety_confirmed: true, note: 'حُقنت الصبغة بعد التأكد من الكرياتينين' });
+  check('فني الأشعة ينفّذ الفحص على جهاز يعمل', perf.status === 204);
+  check('التنفيذ مرتين مرفوض (409)', (await rx.post(`/radiology/${statId}/perform`, { safety_confirmed: true })).status === 409);
+  const afterPerf = (await rx.get('/radiology/worklist')).json.items.find((x: any) => x.id === statId);
+  check('الفحص المنفَّذ يبقى في القائمة بمرحلة «نُفّذ» واسم الجهاز', afterPerf.stage === 'performed' && afterPerf.unit_name_ar === 'مفراس رئيسي' && afterPerf.exam_done_by === 'إبراهيم حسن');
+
+  // التقرير: الفني = أولي، طبيب الأشعة = معتمد
+  await rx.patch(`/patients/${enc}/radiology/${routine.json.id}`, { report: 'صدر طبيعي.' });
+  await rdoc.patch(`/patients/${enc}/radiology/${statId}`, { report: 'التهاب زائدة دودية غير مثقوبة.' });
+  const st = (id: string) => db.execute({ sql: `SELECT stage, verified_by FROM radiology_reports WHERE id = ?`, args: [id] }).then((r) => r.rows[0] as any);
+  check('تقرير الفني مرحلته «أولي»', (await st(routine.json.id)).stage === 'reported');
+  const v = await st(statId);
+  check('تقرير طبيب الأشعة يُعتمد مباشرة', v.stage === 'verified' && v.verified_by === 'طبيب أشعة');
+  const done = (await rx.get('/radiology/worklist?view=done')).json.items.filter((x: any) => x.patient_id === pid);
+  check('عرض «المنتهية» يضم التقريرين', done.length === 2);
+  check('المنتهية لا تبقى في القائمة الجارية', (await rx.get('/radiology/worklist')).json.items.every((x: any) => x.patient_id !== pid));
+}
+
+
 console.log('\n— حذف بيانات التجربة والمستشفيات (آخر الاختبارات: يمسح البيانات)');
 {
   const sa = client(await login('admin'));

@@ -443,7 +443,21 @@ export interface RadiologyReport {
   ordered_at: string;
   report: string | null;
   status: ResultStatus;
+  /** كاتب التقرير (اسم قديم للتوافق) */
   performed_by: string | null;
+  service_id?: string | null;
+  modality?: Modality | null;
+  priority?: ImagingPriority;
+  /** سبب الطلب / الاستطباب السريري */
+  indication?: string | null;
+  safety_json?: string | null;
+  stage?: ImagingStage;
+  unit_id?: string | null;
+  scheduled_at?: string | null;
+  exam_done_by?: string | null;
+  exam_done_at?: string | null;
+  verified_by?: string | null;
+  verified_at?: string | null;
 }
 
 export interface Consultation {
@@ -634,6 +648,8 @@ export interface ServiceItem {
   prep_ar: string | null;
   prep_en: string | null;
   is_active: boolean;
+  /** فحص بصبغة (من الكتالوج) — يفعّل أسئلة الصبغة */
+  contrast?: boolean;
 }
 
 export interface UnassignedPatient {
@@ -714,4 +730,58 @@ export interface ReportOverview {
   dischargesTrend: { label: string; count: number }[];
   occupancy: { ward_name_ar: string; ward_name_en: string; used: number; total: number }[];
   recentActivity: { id: string; admission_id: string; actor: string; type: string; title_ar: string; created_at: string }[];
+}
+// ---------------------------------------------------------------- الأشعة: الأولوية والمراحل وأسئلة الأمان
+
+export const IMAGING_PRIORITIES = ['routine', 'urgent', 'stat'] as const;
+export type ImagingPriority = (typeof IMAGING_PRIORITIES)[number];
+
+/**
+ * مراحل فحص الأشعة: طُلب ← (حُجز موعد) ← نُفّذ على الجهاز ← كُتب التقرير (أولي) ← اعتُمد من طبيب الأشعة.
+ * العمود القديم status يبقى للتوافق: ordered / in_progress (نُفّذ) / resulted (تقرير).
+ */
+export const IMAGING_STAGES = ['ordered', 'scheduled', 'performed', 'reported', 'verified', 'cancelled'] as const;
+export type ImagingStage = (typeof IMAGING_STAGES)[number];
+
+export type SafetyAnswer = 'yes' | 'no';
+export type SafetyAnswers = Record<string, SafetyAnswer>;
+
+export interface SafetyQuestion {
+  key: string;
+  ar: string;
+  en: string;
+  /** الإجابة التي تستدعي انتباه فني الأشعة */
+  warnIf: SafetyAnswer;
+}
+
+/**
+ * أسئلة الأمان قبل الفحص حسب نوع الجهاز (والصبغة وجنس المريض). يجيب عنها الطالب إن عرفها،
+ * ويراجعها الفني قبل التنفيذ. الإجابة «المقلقة» تظهر في قائمة العمل كتنبيه.
+ * ⚠ مرجع للتنبيه وليس بديلاً عن بروتوكول قسم الأشعة في المستشفى.
+ */
+export function imagingSafetyQuestions(modality: Modality | null | undefined, contrast: boolean, gender?: Gender | null): SafetyQuestion[] {
+  const q: SafetyQuestion[] = [];
+  if (gender !== 'male' && modality && modality !== 'US') {
+    q.push({ key: 'pregnancy', ar: 'هل المريضة حامل أو يُحتمل حملها؟', en: 'Is the patient pregnant or possibly pregnant?', warnIf: 'yes' });
+  }
+  if (contrast) {
+    q.push({ key: 'kidney_ok', ar: 'هل فُحصت وظائف الكلى (الكرياتينين) وكانت مناسبة للصبغة؟', en: 'Were kidney function tests (creatinine) checked and suitable for contrast?', warnIf: 'no' });
+    q.push({ key: 'contrast_allergy', ar: 'هل لدى المريض حساسية سابقة من الصبغة؟', en: 'Any previous allergy to contrast?', warnIf: 'yes' });
+    if (modality === 'CT') q.push({ key: 'metformin', ar: 'هل يستخدم الميتفورمين (دواء السكري)؟', en: 'Is the patient taking metformin?', warnIf: 'yes' });
+  }
+  if (modality === 'MR') {
+    q.push({ key: 'pacemaker', ar: 'هل لديه منظّم ضربات أو صمام أو جهاز مزروع (قلب/أذن)؟', en: 'Pacemaker, heart valve or any implanted device (heart/ear)?', warnIf: 'yes' });
+    q.push({ key: 'metal', ar: 'هل لديه شرائح أو مسامير أو شظايا معدنية في الجسم؟', en: 'Any metal plates, screws or fragments in the body?', warnIf: 'yes' });
+    q.push({ key: 'claustrophobia', ar: 'هل يعاني رهاب الأماكن المغلقة؟', en: 'Claustrophobia?', warnIf: 'yes' });
+  }
+  return q;
+}
+
+/** الأسئلة المقلقة إجابتها، وغير المجاب عنها */
+export function imagingSafetyReview(questions: SafetyQuestion[], answers: SafetyAnswers | null | undefined): { warnings: SafetyQuestion[]; unanswered: SafetyQuestion[] } {
+  const a = answers ?? {};
+  return {
+    warnings: questions.filter((x) => a[x.key] === x.warnIf),
+    unanswered: questions.filter((x) => a[x.key] !== 'yes' && a[x.key] !== 'no'),
+  };
 }

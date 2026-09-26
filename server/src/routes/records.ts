@@ -426,26 +426,53 @@ recordRoutes.post('/:admissionId/radiology', requireAuth(), requirePermission('r
   const s = getSession(c)!;
   requireActive(await loadAdmission(c, input.admission_id));
 
+  // فحص من الكتالوج: الاسم ونوع الجهاز والصبغة منه (وليس مما يكتبه العميل)
+  let svc: Row | null = null;
+  if (input.service_id) {
+    const r = await db.execute({ sql: `SELECT * FROM services WHERE id = ? AND hospital_id = ? AND kind = 'imaging' AND is_active = 1`, args: [input.service_id, s.user.hospital_id] });
+    if (r.rows.length === 0) throw new HttpError('الفحص غير موجود في الكتالوج', 404);
+    svc = { ...(r.rows[0] as Row) };
+  }
+  const studyAr = svc ? String(svc.name_ar) : input.study_type_ar!;
+  const studyEn = svc ? (svc.name_en ? String(svc.name_en) : null) : (input.study_type_en ?? null);
+  const modality = svc?.modality ? String(svc.modality) : null;
+
   const withReport = Boolean(input.report?.trim()) && sessionHas(c, 'radiology.add_report');
+  const stage = withReport ? (sessionHas(c, 'radiology.verify') ? 'verified' : 'reported') : 'ordered';
   const id = uuid('rd');
   const at = new Date().toISOString();
   await db.execute({
-    sql: `INSERT INTO radiology_reports (id, admission_id, study_type, study_type_ar, study_type_en, ordered_by, ordered_by_id, ordered_at, report, status, performed_by, performed_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO radiology_reports (id, admission_id, study_type, study_type_ar, study_type_en, ordered_by, ordered_by_id, ordered_at, report, status, performed_by, performed_at,
+                                          service_id, modality, priority, indication, safety_json, stage, exam_done_by, exam_done_by_id, exam_done_at, verified_by, verified_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
-      id, input.admission_id, input.study_type_ar, input.study_type_ar, input.study_type_en ?? null, s.user.full_name_ar, s.user.id, at,
+      id, input.admission_id, studyAr, studyAr, studyEn, s.user.full_name_ar, s.user.id, at,
       withReport ? input.report!.trim() : null,
       withReport ? 'resulted' : 'ordered',
       withReport ? s.user.full_name_ar : null,
       withReport ? at : null,
+      input.service_id ?? null, modality, input.priority, input.indication || null, input.safety ? JSON.stringify(input.safety) : null, stage,
+      withReport ? s.user.full_name_ar : null, withReport ? s.user.id : null, withReport ? at : null,
+      stage === 'verified' ? s.user.full_name_ar : null, stage === 'verified' ? at : null,
     ],
   });
-  await track(c, s, input.admission_id, 'radiology', withReport ? `تقرير أشعة: ${input.study_type_ar}` : `طلب أشعة: ${input.study_type_ar}`, withReport ? `Radiology report: ${input.study_type_en ?? input.study_type_ar}` : `Radiology ordered: ${input.study_type_en ?? input.study_type_ar}`, 'radiology_ordered', 'radiology_report', id);
+  const prio = input.priority === 'stat' ? ' (عاجل جداً)' : input.priority === 'urgent' ? ' (عاجل)' : '';
+  await track(c, s, input.admission_id, 'radiology', withReport ? `تقرير أشعة: ${studyAr}` : `طلب أشعة: ${studyAr}${prio}`, withReport ? `Radiology report: ${studyEn ?? studyAr}` : `Radiology ordered: ${studyEn ?? studyAr}${input.priority !== 'routine' ? ` (${input.priority})` : ''}`, 'radiology_ordered', 'radiology_report', id);
   await notifyAdmission(
     input.admission_id,
     withReport
-      ? { toAttending: true, tab: 'radiology', kind: 'radiology_reported', titleAr: `تقرير أشعة: ${input.study_type_ar}`, titleEn: `Radiology report: ${input.study_type_en ?? input.study_type_ar}`, createdById: s.user.id }
-      : { roles: ['radiology', 'radiologist'], tab: 'radiology', kind: 'radiology_ordered', titleAr: `طلب أشعة جديد: ${input.study_type_ar}`, titleEn: `New imaging order: ${input.study_type_en ?? input.study_type_ar}`, createdById: s.user.id },
+      ? { toAttending: true, tab: 'radiology', kind: 'radiology_reported', titleAr: `تقرير أشعة: ${studyAr}`, titleEn: `Radiology report: ${studyEn ?? studyAr}`, createdById: s.user.id }
+      : {
+          roles: ['radiology', 'radiologist'],
+          tab: 'radiology',
+          kind: 'radiology_ordered',
+          // العاجل والعاجل جداً يُنبَّه لهما بخطورة أعلى (صوت أقوى وإشعار جهاز عاجل)
+          severity: input.priority === 'stat' ? 'critical' : input.priority === 'urgent' ? 'warning' : 'info',
+          titleAr: `${input.priority === 'stat' ? 'عاجل جداً — ' : input.priority === 'urgent' ? 'عاجل — ' : ''}طلب أشعة جديد: ${studyAr}`,
+          titleEn: `${input.priority === 'stat' ? 'STAT — ' : input.priority === 'urgent' ? 'Urgent — ' : ''}New imaging order: ${studyEn ?? studyAr}`,
+          bodyAr: input.indication ?? undefined,
+          createdById: s.user.id,
+        },
   );
   return c.json(await fetchRow('radiology_reports', id), 201);
 });
@@ -458,9 +485,14 @@ recordRoutes.patch('/:admissionId/radiology/:id', requireAuth(), requirePermissi
   const a = await loadAdmission(c);
   const id = c.req.param('id');
   const study = await findRecord('radiology_reports', id, a.id);
+  const now = new Date().toISOString();
+  const verify = sessionHas(c, 'radiology.verify');
   await db.execute({
-    sql: `UPDATE radiology_reports SET report = ?, status = 'resulted', performed_by = ?, performed_at = ? WHERE id = ?`,
-    args: [input.report, s.user.full_name_ar, new Date().toISOString(), id],
+    sql: `UPDATE radiology_reports SET report = ?, status = 'resulted', performed_by = ?, performed_at = ?, stage = ?,
+                 exam_done_by = COALESCE(exam_done_by, ?), exam_done_by_id = COALESCE(exam_done_by_id, ?), exam_done_at = COALESCE(exam_done_at, ?),
+                 verified_by = ?, verified_at = ?
+          WHERE id = ?`,
+    args: [input.report, s.user.full_name_ar, now, verify ? 'verified' : 'reported', s.user.full_name_ar, s.user.id, now, verify ? s.user.full_name_ar : null, verify ? now : null, id],
   });
   await track(c, s, a.id, 'radiology', 'إعداد تقرير أشعة', 'Radiology report ready', 'radiology_report_updated', 'radiology_report', id);
   await notifyAdmission(a.id, {
