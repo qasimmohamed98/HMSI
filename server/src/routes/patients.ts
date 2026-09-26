@@ -23,11 +23,13 @@ function hidePin(c: Context, a: AdmissionSummary | null | undefined): AdmissionS
 patientRoutes.get('/', requireAuth(), requirePermission('patients.view'), async (c) => {
   const search = c.req.query('search')?.slice(0, 100) || undefined;
   const admitted = c.req.query('admitted') === '1';
+  const open = c.req.query('open') === '1';
   const session = getSession(c)!;
   const mine = c.req.query('mine') === '1';
   const list = await listPatients(session.user.hospital_id, {
     search,
     admitted,
+    open,
     doctorId: isRestricted(session.user) ? session.user.id : undefined,
     nurseId: mine && session.user.role === 'nurse' ? session.user.id : undefined,
   });

@@ -19,10 +19,22 @@ export function AdmittedPatientCard({ patient, children }: { patient: Patient; c
           <p className="truncate font-bold text-ink">{localName(patient, 'full_name')}</p>
           <p className="text-xs text-ink/50">
             {patient.file_number}
-            {admission && (
+            {admission && (admission.encounter_type ?? 'inpatient') === 'inpatient' && (
               <>
                 <span className="mx-1.5 text-ink/25">·</span>
                 {t('dept.wardBed', { ward: localName(admission, 'ward_name'), bed: admission.bed_no })}
+              </>
+            )}
+            {admission && (admission.encounter_type ?? 'inpatient') !== 'inpatient' && (
+              <>
+                <span className="mx-1.5 text-ink/25">·</span>
+                <span className="font-semibold text-brand-700 dark:text-brand-300">{t(`encounter.types.${admission.encounter_type}`)}</span>
+                {admission.referral_source && (
+                  <>
+                    <span className="mx-1.5 text-ink/25">·</span>
+                    {t('encounter.referredBy', { source: admission.referral_source })}
+                  </>
+                )}
               </>
             )}
           </p>

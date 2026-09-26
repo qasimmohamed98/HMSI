@@ -7,7 +7,10 @@ import { recordArchive, type TrashActor } from '../lib/trash.js';
 
 export interface PatientListOptions {
   search?: string;
+  /** منوَّمون على أسرّة فقط */
   admitted?: boolean;
+  /** لديهم زيارة مفتوحة من أي نوع (تنويم، مراجع، طوارئ، فحص فقط) — صفحات الأشعة والمختبر والصيدلية */
+  open?: boolean;
   /** الطبيب الذي يطلب القائمة (مرضاه فقط) */
   doctorId?: string;
   /** الممرض: مرضاه المعيَّنون حالياً */
@@ -108,6 +111,9 @@ export async function listPatients(hospitalId: string, opts: PatientListOptions 
     where.push(`(p.full_name_ar LIKE ? ESCAPE '\\' OR p.full_name_en LIKE ? ESCAPE '\\' OR p.file_number LIKE ? ESCAPE '\\' OR p.national_id LIKE ? ESCAPE '\\' OR p.phone LIKE ? ESCAPE '\\')`);
     const pat = likePattern(search);
     args.push(pat, pat, pat, pat, pat);
+  }
+  if (opts.open) {
+    where.push(`EXISTS (SELECT 1 FROM admissions a WHERE a.patient_id = p.id AND a.status = 'active')`);
   }
   if (opts.admitted) {
     where.push(`EXISTS (SELECT 1 FROM admissions a WHERE a.patient_id = p.id AND a.status = 'active' AND a.encounter_type = 'inpatient')`);

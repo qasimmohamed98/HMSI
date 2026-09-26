@@ -946,6 +946,24 @@ console.log('\n— الأساس المشترك: الزيارات، أنواع ا
   check('فلتر «المنوّمون» لا يضم المراجع', (await recep.get('/patients?admitted=1')).json.every((x: any) => x.id !== pid));
   const freeBed = (await db.execute(`SELECT b.id FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = 'h-1' AND b.status = 'free' LIMIT 1`)).rows[0] as any;
   check('لا سرير لزيارة بلا تنويم (409)', (await mgr.post(`/org/beds/${freeBed.id}/assign`, { admission_id: encId })).status === 409);
+  // صفحات الأشعة والمختبر والصيدلية: كل من له زيارة مفتوحة، لا المنوّمون فقط
+  const openList = (await client(await login('radiology')).get('/patients?open=1')).json as any[];
+  check('قائمة «زيارة مفتوحة» تضم مريض الفحص فقط', openList.some((x) => x.id === pid && x.activeAdmission?.encounter_type === 'diagnostic'));
+  const radChart = await client(await login('radiology')).get(`/patients/${pid}/chart`);
+  check('ملف مريض الفحص يحمل طلب الأشعة الذي في قائمة الأشعة', radChart.json.radiology?.some((r: any) => r.study_type_ar === 'مفراس رأس بدون صبغة'), radChart.json?.radiology);
+  check('«منوّمون فقط» لا تضمه', ((await client(await login('radiology')).get('/patients?admitted=1')).json as any[]).every((x) => x.id !== pid));
+  check('لا تُفتح زيارة فوق زيارة مفتوحة (409)', (await recep.post('/admissions/encounter', { patient_id: pid, encounter_type: 'outpatient', department_id: dep.json.id })).status === 409);
+  {
+    // تحويل زيارة الطوارئ إلى تنويم: تُغلق الزيارة المفتوحة ويبقى سجل واحد مفتوح
+    const np2 = await recep.post('/patients', { full_name_ar: 'مريض طوارئ يُنوَّم', gender: 'male', birth_date: '1975-03-03', blood_type: 'Unknown', allergies: [] });
+    const pid2 = np2.json.id ?? np2.json.patient?.id;
+    const er = await recep.post('/admissions/encounter', { patient_id: pid2, encounter_type: 'emergency', department_id: dep.json.id });
+    const bed2 = (await db.execute(`SELECT b.id FROM beds b JOIN wards w ON w.id = b.ward_id JOIN departments d ON d.id = w.department_id WHERE d.hospital_id = 'h-1' AND b.status = 'free' LIMIT 1`)).rows[0] as any;
+    const wdep = (await db.execute(`SELECT w.department_id AS d FROM beds b JOIN wards w ON w.id = b.ward_id WHERE b.id = '${bed2.id}'`)).rows[0] as any;
+    const adm = await mgr.post('/admissions', { patient_id: pid2, bed_id: bed2.id, department_id: wdep.d });
+    const openN = await n(`SELECT COUNT(*) AS n FROM admissions WHERE patient_id = ? AND status = 'active'`, [pid2]);
+    check('التنويم بعد الطوارئ يغلق زيارة الطوارئ ويبقى تنويم واحد مفتوح', er.status === 201 && adm.status === 201 && openN === 1);
+  }
   check('الجولة التمريضية لا تضم زيارة الفحص', (await nurse.get('/medication-rounds/vitals')).json.every((x: any) => x.admission_id !== encId));
   check('إغلاق التنويم عبر /close مرفوض (409)', (await recep.post('/admissions/adm2/close', {})).status === 409);
   const cl = await recep.post(`/admissions/${encId}/close`, { outcome: 'home' });

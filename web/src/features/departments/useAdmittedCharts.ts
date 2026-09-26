@@ -14,7 +14,7 @@ export function useAdmittedCharts() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: DEPT_KEY,
     queryFn: async (): Promise<AdmittedEntry[]> => {
-      const patients = await API.listPatients({ admitted: true });
+      const patients = await API.listPatients({ open: true });
       const charts = await Promise.all(patients.map((p) => API.getChart(p.id)));
       return patients.map((p, i) => ({ patient: p, chart: charts[i] }));
     },

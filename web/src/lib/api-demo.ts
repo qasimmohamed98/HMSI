@@ -232,7 +232,7 @@ export const demoApi: Api = {
       ...e.patient,
       activeAdmission: e.record && e.record.admission.status === 'active' ? e.record.admission : null,
     }));
-    if (params?.admitted) list = list.filter((p) => p.activeAdmission);
+    if (params?.admitted || params?.open) list = list.filter((p) => p.activeAdmission);
     const q = (params?.search ?? '').trim().toLowerCase();
     if (q) {
       list = list.filter((p) => p.full_name_ar.toLowerCase().includes(q) || p.full_name_en.toLowerCase().includes(q) || p.file_number.toLowerCase().includes(q) || (p.national_id ?? '').includes(q) || (p.phone ?? '').includes(q));

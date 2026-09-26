@@ -43,6 +43,12 @@ export async function admitPatient(input: {
       args: [input.patient_id],
     });
     if (activeRows.rows.length > 0) throw new HttpConflict('المريض منوّم بالفعل');
+    // زيارة الطوارئ/المراجع المفتوحة تتحول إلى هذا التنويم: تُغلق ويستمر السجل في التنويم الجديد
+    await tx.execute({
+      sql: `UPDATE admissions SET status = 'discharged', discharge_type = 'transfer', discharged_at = ?, discharge_summary = 'حُوِّل إلى تنويم'
+            WHERE patient_id = ? AND status = 'active' AND encounter_type != 'inpatient'`,
+      args: [new Date().toISOString(), input.patient_id],
+    });
 
     const dept = await tx.execute({ sql: `SELECT id FROM departments WHERE id = ? AND hospital_id = ? LIMIT 1`, args: [input.department_id, hospitalId] });
     if (dept.rows.length === 0) throw new HttpConflict('القسم غير موجود');
@@ -179,6 +185,8 @@ export async function createEncounter(
       args: [input.patient_id, hospitalId],
     });
     if (patientRows.rows.length === 0) throw new HttpConflict('المريض غير موجود');
+    const open = await tx.execute({ sql: `SELECT id FROM admissions WHERE patient_id = ? AND status = 'active' LIMIT 1`, args: [input.patient_id] });
+    if (open.rows.length > 0) throw new HttpConflict('للمريض زيارة أو تنويم مفتوح — استخدمه أو أغلقه أولاً');
     const dept = await tx.execute({ sql: `SELECT id FROM departments WHERE id = ? AND hospital_id = ? LIMIT 1`, args: [input.department_id, hospitalId] });
     if (dept.rows.length === 0) throw new HttpConflict('القسم غير موجود');
     if (input.attending_doctor_id) {

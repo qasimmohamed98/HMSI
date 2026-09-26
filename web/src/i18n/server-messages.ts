@@ -93,6 +93,7 @@ const EN: Record<string, string> = {
   'حجم الشعار يتجاوز 300 كيلوبايت': 'The logo exceeds 300 KB',
   'حجم الملف يتجاوز 4 ميجابايت': 'The file exceeds 4 MB',
   'حجم الملف يتجاوز 18 ميجابايت': 'The file exceeds 18 MB',
+  'للمريض زيارة أو تنويم مفتوح — استخدمه أو أغلقه أولاً': 'The patient already has an open visit or admission — use it or close it first',
   'حدث خطأ غير متوقع في الخادم': 'Unexpected server error',
   'حدد المدة أو التاريخ': 'Choose a period or a date',
   'رقم الهاتف غير صحيح': 'Invalid phone number',

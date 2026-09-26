@@ -51,6 +51,8 @@ export type { ChartData, ReportOverview };
 export interface PatientListParams {
   search?: string;
   admitted?: boolean;
+  /** زيارة مفتوحة من أي نوع */
+  open?: boolean;
   /** للممرض: مرضاه المعيَّنون فقط */
   mine?: boolean;
 }

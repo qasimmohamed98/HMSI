@@ -114,6 +114,7 @@ export const liveApi: Api = {
     const qs = new URLSearchParams();
     if (params?.search) qs.set('search', params.search);
     if (params?.admitted) qs.set('admitted', '1');
+    if (params?.open) qs.set('open', '1');
     if (params?.mine) qs.set('mine', '1');
     return request(`/patients${qs.toString() ? `?${qs}` : ''}`);
   },
