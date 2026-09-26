@@ -41,6 +41,7 @@ export const en: Dict = {
     admissions: 'Admissions',
     wards: 'Wards & Beds',
     departments: 'Departments',
+    catalog: 'Services & prices',
     laboratory: 'Laboratory',
     radiology: 'Radiology',
     pharmacy: 'Pharmacy',
@@ -74,6 +75,8 @@ export const en: Dict = {
     demoHint: 'Demo mode — password for all accounts: password123 (e.g. admin, doctor, nurse, reception)',
   },
   dashboard: {
+    welcomeRole: 'Welcome — {{role}}',
+    noPatientAccess: 'Your role does not access patient data. Your department’s tools appear here when enabled (inventory and store in the next phase).',
     title: 'Dashboard',
     subtitle: 'Hospital status overview today',
     totalPatients: 'Total patients',
@@ -850,7 +853,7 @@ export const en: Dict = {
     back: 'Back to my hospital',
   },
   history: {
-    title: 'Admissions',
+    title: 'Admissions and visits',
     current: 'Current',
     viewingPast: 'Viewing a past admission — read only',
     reason: 'Reason for admission',
@@ -1244,6 +1247,8 @@ export const en: Dict = {
     summary: 'Summary (optional)',
     closed: 'Visit closed',
     referredBy: 'Referred from {{source}}',
+    date: 'Visit date',
+    status: { active: 'Open visit', discharged: 'Closed' },
   },
   device: {
     title: 'This device: install and notifications',

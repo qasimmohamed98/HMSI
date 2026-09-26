@@ -39,6 +39,7 @@ export const ar = {
     admissions: 'الدخول',
     wards: 'الردهات والأسرّة',
     departments: 'الأقسام',
+    catalog: 'الخدمات والأسعار',
     laboratory: 'المختبر',
     radiology: 'الأشعة',
     pharmacy: 'الصيدلية',
@@ -72,6 +73,8 @@ export const ar = {
     demoHint: 'وضع العرض التجريبي — كلمة المرور لكل الحسابات: password123 (مثل: admin، doctor، nurse، reception)',
   },
   dashboard: {
+    welcomeRole: 'أهلاً بك — {{role}}',
+    noPatientAccess: 'دورك لا يطّلع على بيانات المرضى. أدوات قسمك تظهر هنا عند تفعيلها (المخزون والمذخر في المرحلة القادمة).',
     title: 'لوحة التحكم',
     subtitle: 'نظرة عامة على حالة المستشفى اليوم',
     totalPatients: 'إجمالي المرضى',
@@ -883,7 +886,7 @@ export const ar = {
     back: 'العودة لمستشفاي',
   },
   history: {
-    title: 'التنويمات',
+    title: 'التنويمات والزيارات',
     current: 'الحالي',
     viewingPast: 'تعرض تنويماً سابقاً — للقراءة فقط',
     reason: 'سبب الدخول',
@@ -1277,6 +1280,8 @@ export const ar = {
     summary: 'ملخص (اختياري)',
     closed: 'أُغلقت الزيارة',
     referredBy: 'محوَّل من {{source}}',
+    date: 'تاريخ الزيارة',
+    status: { active: 'زيارة مفتوحة', discharged: 'أُغلقت' },
   },
   device: {
     title: 'هذا الجهاز: التثبيت والإشعارات',

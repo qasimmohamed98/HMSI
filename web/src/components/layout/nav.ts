@@ -19,6 +19,7 @@ import {
   Info,
   Users2,
   BookOpen,
+  Tags,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -39,10 +40,11 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { to: '/', key: 'dashboard', icon: LayoutDashboard },
-      { to: '/patients', key: 'patients', icon: Users },
-      { to: '/wards', key: 'wards', icon: Building2 },
+      { to: '/patients', key: 'patients', icon: Users, permission: 'patients.view' },
+      { to: '/wards', key: 'wards', icon: Building2, permission: 'patients.view' },
       { to: '/handover', key: 'handover', icon: ClipboardList, permission: 'vitals.write' },
       { to: '/departments', key: 'departments', icon: Network, permission: 'departments.manage' },
+      { to: '/services', key: 'catalog', icon: Tags, permission: 'services.manage' },
     ],
   },
   {

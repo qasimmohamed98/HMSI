@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Patient } from '@hmsi/shared';
-import { Search, UserPlus, BedDouble, Stethoscope, Pencil, Archive, KeyRound } from 'lucide-react';
+import { Search, UserPlus, BedDouble, Stethoscope, Pencil, Archive, KeyRound, ClipboardPlus } from 'lucide-react';
 import { Card, Button, Badge, Skeleton, EmptyState, Avatar, TableRoot, THead, TBody, Th, Td, TRow, StatusBadge, ConfirmDialog, Dialog } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Input } from '@/components/ui/Input';
@@ -16,7 +16,13 @@ import { useMediaQuery } from '@/lib/use-media';
 import { NewPatientDialog } from '@/features/patients/NewPatientDialog';
 import { EditPatientDialog } from '@/features/patients/EditPatientDialog';
 import { AdmitDialog } from '@/features/patients/AdmitDialog';
+import { EncounterDialog } from '@/features/patients/EncounterDialog';
 import { useToast } from '@/components/ui'
+
+/** الزيارة الحالية تنويم؟ (البيانات القديمة بلا نوع = تنويم) */
+const isInpatient = (p: Patient) => Boolean(p.activeAdmission) && (p.activeAdmission!.encounter_type ?? 'inpatient') === 'inpatient';
+/** يُسمح بالتنويم إن لم يكن منوّماً (حتى لو كانت له زيارة مراجع/طوارئ مفتوحة) */
+const canAdmitNow = (p: Patient) => !isInpatient(p);
 
 export default function PatientsPage() {
   const { t } = useTranslation();
@@ -31,6 +37,7 @@ export default function PatientsPage() {
     update: hasPermission(user?.role, 'patients.update'),
     archive: hasPermission(user?.role, 'patients.archive'),
     admit: hasPermission(user?.role, 'admissions.manage'),
+    encounter: hasPermission(user?.role, 'encounters.create'),
   };
 
   const [search, setSearch] = useState('');
@@ -40,6 +47,7 @@ export default function PatientsPage() {
   const [mine, setMine] = useState(() => user?.role === 'nurse');
   const [showNew, setShowNew] = useState(false);
   const [admitTarget, setAdmitTarget] = useState<Patient | null>(null);
+  const [visitTarget, setVisitTarget] = useState<Patient | null>(null);
   // رمز العائلة يُعرض مرة بعد التنويم ليُسلَّم لذوي المريض
   const [admittedPin, setAdmittedPin] = useState<{ name: string; pin: string } | null>(null);
   const [editTarget, setEditTarget] = useState<Patient | null>(null);
@@ -170,7 +178,8 @@ export default function PatientsPage() {
               key={p.id}
               patient={p}
               onClick={() => navigate(`/patients/${p.id}`)}
-              onAdmit={can.admit && !p.activeAdmission ? () => setAdmitTarget(p) : undefined}
+              onAdmit={can.admit && canAdmitNow(p) ? () => setAdmitTarget(p) : undefined}
+              onVisit={can.encounter && !p.activeAdmission ? () => setVisitTarget(p) : undefined}
               onEdit={can.update ? () => setEditTarget(p) : undefined}
               onArchive={can.archive ? () => setArchiveTarget(p) : undefined}
             />
@@ -211,14 +220,14 @@ export default function PatientsPage() {
                     <Badge variant="outline"><bdi dir="ltr">{p.blood_type}</bdi></Badge>
                   </Td>
                   <Td>{p.activeAdmission ? localName(p.activeAdmission, 'department_name') : '—'}</Td>
-                  <Td>{p.activeAdmission ? localName(p.activeAdmission, 'ward_name') : '—'}</Td>
+                  <Td>{isInpatient(p) ? localName(p.activeAdmission!, 'ward_name') : '—'}</Td>
                   <Td className="tabular whitespace-nowrap" dir="ltr">
-                    {p.activeAdmission ? `${p.activeAdmission.room} / ${p.activeAdmission.bed_no}` : '—'}
+                    {isInpatient(p) ? `${p.activeAdmission!.room} / ${p.activeAdmission!.bed_no}` : '—'}
                   </Td>
                   <Td className="tabular">
                     {p.activeAdmission ? fmtDate(p.activeAdmission.admitted_at, { day: 'numeric', month: 'short' }) : '—'}
                   </Td>
-                  <Td>{p.activeAdmission ? <StatusBadge status="active" /> : <StatusBadge status={p.status} />}</Td>
+                  <Td>{p.activeAdmission && !isInpatient(p) ? <VisitBadge patient={p} /> : p.activeAdmission ? <StatusBadge status="active" /> : <StatusBadge status={p.status} />}</Td>
                   <Td>
                     <div className="flex items-center gap-1.5">
                       {can.update && (
@@ -238,7 +247,20 @@ export default function PatientsPage() {
                           <Archive className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                      {can.admit && !p.activeAdmission && (
+                      {can.encounter && !p.activeAdmission && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<ClipboardPlus className="h-3.5 w-3.5" />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setVisitTarget(p);
+                          }}
+                        >
+                          {t('encounter.new')}
+                        </Button>
+                      )}
+                      {can.admit && canAdmitNow(p) && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -290,6 +312,18 @@ export default function PatientsPage() {
           </div>
         </Dialog>
       )}
+      {visitTarget && (
+        <EncounterDialog
+          patient={visitTarget}
+          onClose={() => setVisitTarget(null)}
+          onDone={() => {
+            invalidatePatients();
+            // الاستقبال لا يرى الملف الطبي: يبقى في القائمة
+            if (hasPermission(user?.role, 'chart.view')) navigate(`/patients/${visitTarget.id}`);
+            setVisitTarget(null);
+          }}
+        />
+      )}
       {admitTarget && (
         <AdmitDialog open onClose={() => setAdmitTarget(null)} patient={admitTarget} onSubmit={(input) => admitMut.mutate(input)} busy={admitMut.isPending} />
       )}
@@ -297,7 +331,12 @@ export default function PatientsPage() {
   );
 }
 
-function PatientMobileCard({ patient: p, onClick, onAdmit, onEdit, onArchive }: { patient: Patient; onClick: () => void; onAdmit?: () => void; onEdit?: () => void; onArchive?: () => void }) {
+function VisitBadge({ patient: p }: { patient: Patient }) {
+  const { t } = useTranslation();
+  return <Badge variant="info">{t(`encounter.types.${p.activeAdmission?.encounter_type ?? 'inpatient'}`)}</Badge>;
+}
+
+function PatientMobileCard({ patient: p, onClick, onAdmit, onVisit, onEdit, onArchive }: { patient: Patient; onClick: () => void; onAdmit?: () => void; onVisit?: () => void; onEdit?: () => void; onArchive?: () => void }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-ink/8 bg-surface-raised p-4 shadow-card transition-all hover:border-brand-300 hover:shadow-float dark:border-white/10 dark:hover:border-brand-700">
@@ -306,12 +345,12 @@ function PatientMobileCard({ patient: p, onClick, onAdmit, onEdit, onArchive }: 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-sm font-bold text-ink">{localName(p, 'full_name')}</p>
-            {p.activeAdmission ? <StatusBadge status="active" /> : <StatusBadge status={p.status} />}
+            {p.activeAdmission && !isInpatient(p) ? <VisitBadge patient={p} /> : p.activeAdmission ? <StatusBadge status="active" /> : <StatusBadge status={p.status} />}
           </div>
           <p className="text-xs text-ink/45">
             <bdi dir="ltr">{p.file_number}</bdi> · {t('gender.' + p.gender)} · {calcAge(p.birth_date)} {t('common.years')}
           </p>
-          {p.activeAdmission ? (
+          {isInpatient(p) && p.activeAdmission ? (
             <p className="mt-1.5 text-xs font-semibold text-ink/65">
               {localName(p.activeAdmission, 'department_name')} · {localName(p.activeAdmission, 'ward_name')} · <bdi dir="ltr">{p.activeAdmission.room}/{p.activeAdmission.bed_no}</bdi>
             </p>
@@ -319,6 +358,11 @@ function PatientMobileCard({ patient: p, onClick, onAdmit, onEdit, onArchive }: 
         </div>
       </button>
       <div className="flex items-center gap-1.5">
+        {onVisit && (
+          <Button size="sm" variant="ghost" icon={<ClipboardPlus className="h-3.5 w-3.5" />} onClick={onVisit}>
+            {t('encounter.new')}
+          </Button>
+        )}
         {onAdmit && (
           <Button size="sm" variant="outline" icon={<Stethoscope className="h-3.5 w-3.5" />} onClick={onAdmit}>
             {t('admit.action')}

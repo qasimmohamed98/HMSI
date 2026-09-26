@@ -11,6 +11,7 @@ import { printWristband } from '@/lib/labels';
 import { PrintMenu } from '@/features/patient/PrintMenu';
 import { fmtDate, fmtDateTime, localName } from '@/lib/format';
 import { PatientHeader } from '@/features/patient/PatientHeader';
+import { CloseEncounterButton } from '@/features/patients/CloseEncounterButton';
 import { OverviewSection } from '@/features/patient/sections/OverviewSection';
 import { VitalsSection } from '@/features/patient/sections/VitalsSection';
 import { NotesSection } from '@/features/patient/sections/NotesSection';
@@ -181,16 +182,19 @@ export default function PatientChartPage() {
             onChange={(e) => setAdmissionId(e.target.value === chart.admissions[0]?.id ? undefined : e.target.value)}
             options={chart.admissions.map((a, i) => ({
               value: a.id,
-              label: `${fmtDate(a.admitted_at, { day: 'numeric', month: 'short', year: 'numeric' })}${a.discharged_at ? ` → ${fmtDate(a.discharged_at, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · ${a.department_name_ar}${i === 0 ? ` (${t('history.current')})` : ''}`,
+              label: `${fmtDate(a.admitted_at, { day: 'numeric', month: 'short', year: 'numeric' })}${a.discharged_at ? ` → ${fmtDate(a.discharged_at, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · ${t(`encounter.types.${a.encounter_type ?? 'inpatient'}`)} · ${localName(a, 'department_name')}${i === 0 ? ` (${t('history.current')})` : ''}`,
             }))}
           />
         </div>
       )}
       {viewingPast && <Alert variant="info">{t('history.viewingPast')}</Alert>}
-      {chart.admissionId && !viewingPast && active && <CareTeamCard chart={chart} />}
+      {chart.admissionId && !viewingPast && active && chart.patient.admission?.encounter_type !== 'diagnostic' && <CareTeamCard chart={chart} />}
 
       <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
-        {chart.patient.admission && (
+        {chart.patient.admission && chart.patient.admission.status === 'active' && (chart.patient.admission.encounter_type ?? 'inpatient') !== 'inpatient' && can('encounters.create') && !viewingPast && (
+          <CloseEncounterButton admissionId={chart.patient.admission.id} />
+        )}
+        {chart.patient.admission && ['inpatient', 'emergency'].includes(chart.patient.admission.encounter_type ?? 'inpatient') && (
           <Button size="sm" variant="outline" icon={<Tag className="h-4 w-4" />} onClick={() => printWristband(chart.patient, chart.patient.admission!, t)}>
             {t('labels.wristband')}
           </Button>

@@ -171,6 +171,25 @@ export const GUIDE_AR: GuideContent = {
           tips: ['اطبع رمز QR لكل سرير وألصقه عليه — يمسحه ذوو المريض لمتابعة حالته.', '«إخلاء السرير» يفصل المريض عن السرير فقط ولا يُخرجه من المستشفى.'],
         },
         {
+          id: 'units',
+          title: 'أنواع الأقسام وأجهزتها',
+          steps: [
+            'عند إضافة قسم أو تعديله اختر نوعه: سريري (ردهات)، أشعة، مختبر، صيدلية، مخزن، طوارئ، عيادات، عمليات…',
+            'اضغط زر الأجهزة على بطاقة القسم وأضف أجهزته (مفراس 1، رنين 1.5T) أو غرفه (سونار غرفة 3) مع نوع الجهاز.',
+            'غيّر حالة الجهاز عند العطل: يعمل، في الصيانة، متوقف — ستُستخدم في مواعيد الأشعة.',
+          ],
+        },
+        {
+          id: 'catalog',
+          title: 'الخدمات والأسعار',
+          steps: [
+            'افتح «الخدمات والأسعار» واضغط «استيراد القائمة الجاهزة»: فحوص الأشعة بكل أنواعها مع تعليمات التحضير، وفحوص المختبر الشائعة، والإقامة.',
+            'اضغط القلم بجانب أي خدمة لتضع سعرها بالدينار، أو تعدّل اسمها وتعليمات التحضير، أو توقفها.',
+            'أضف خدماتك الخاصة بزر «إضافة خدمة» برمز قصير بالإنجليزية.',
+          ],
+          tips: ['كل تغيير في السعر يُسجَّل في سجل التدقيق بقيمتيه قبل وبعد.', 'المحاسب يستطيع تعديل الأسعار أيضاً.'],
+        },
+        {
           id: 'users',
           title: 'إضافة الموظفين وأدوارهم',
           steps: ['افتح «المستخدمون» واضغط «مستخدم جديد».', 'اكتب اسم المستخدم وكلمة المرور والاسم الكامل.', 'اختر الدور: طبيب، تمريض، مختبر، أشعة، صيدلي، استقبال، أو مشاهد.', 'اضغط «حفظ» وأعطِ الموظف اسم المستخدم وكلمة المرور.'],
@@ -239,6 +258,19 @@ export const GUIDE_AR: GuideContent = {
           steps: ['في قائمة المرضى اضغط «تنويم» بجانب المريض.', 'اختر القسم، ثم الردهة، ثم السرير الشاغر.', 'اختر الطبيب المعالج واكتب سبب الدخول.', 'اضغط «تأكيد التنويم» — يظهر «رمز متابعة العائلة» المكوّن من 6 أرقام.'],
           images: [img('patients-admit', 'نافذة التنويم')],
           tips: ['أعطِ رمز العائلة لذوي المريض واطلب منهم مسح رمز QR على السرير.', 'لطباعة سوار المريض افتح ملفه واضغط «سوار المريض».'],
+        },
+        {
+          id: 'visit',
+          title: 'زيارة بلا تنويم: مراجع، طوارئ، أو فحص فقط',
+          intro: 'للمريض الذي جاء لمراجعة أو للطوارئ أو لأشعة أو تحليل فقط — دون سرير.',
+          steps: [
+            'في قائمة المرضى اضغط «زيارة جديدة» بجانب المريض (أو سجّله أولاً إن كان جديداً).',
+            'اختر نوع الزيارة، والقسم (يُقترح المناسب تلقائياً)، والطبيب المسؤول إن وُجد.',
+            'إن جاء بتحويل فاكتب جهة التحويل والطبيب المحوِّل.',
+            'اضغط «فتح الزيارة» — تُطلب له الأشعة والتحاليل من ملفه كالمنوَّم تماماً.',
+            'عند الانتهاء افتح ملفه واضغط «إغلاق الزيارة».',
+          ],
+          tips: ['الزيارة لا تظهر في الأسرّة ولا الإشغال ولا جولة التمريض — هذه للمنوَّمين فقط.', 'مريض الطوارئ يمكن تنويمه لاحقاً بزر «تنويم» كالمعتاد.'],
         },
       ],
     },
@@ -616,6 +648,25 @@ export const GUIDE_EN: GuideContent = {
           tips: ['Print each bed’s QR code and stick it on the bed — families scan it to follow the patient.', '“Vacate bed” only detaches the patient from the bed; it does not discharge them.'],
         },
         {
+          id: 'units',
+          title: 'Department types and devices',
+          steps: [
+            'When adding or editing a department choose its type: clinical (wards), radiology, lab, pharmacy, store, emergency, clinics, theatres…',
+            'Press the devices button on the department card and add its devices (CT 1, MRI 1.5T) or rooms (Ultrasound room 3) with the device type.',
+            'Change a device’s status when it breaks down: working, in maintenance, out of service — used later for imaging appointments.',
+          ],
+        },
+        {
+          id: 'catalog',
+          title: 'Services and prices',
+          steps: [
+            'Open “Services & prices” and press “Import the ready-made list”: all imaging exams with preparation instructions, common lab tests and stays.',
+            'Press the pencil next to any service to set its price in dinars, edit its name and preparation, or suspend it.',
+            'Add your own services with “Add a service” and a short Latin code.',
+          ],
+          tips: ['Every price change is recorded in the audit log with the old and new values.', 'The accountant can edit prices too.'],
+        },
+        {
           id: 'users',
           title: 'Adding staff and roles',
           steps: ['Open “Users” and press “New user”.', 'Enter username, password and full name.', 'Choose the role: doctor, nurse, lab, radiology, pharmacist, reception or viewer.', 'Press “Save” and give the staff member their username and password.'],
@@ -675,6 +726,19 @@ export const GUIDE_EN: GuideContent = {
           steps: ['Press “Admit” next to the patient.', 'Choose the department, then the ward, then a free bed.', 'Choose the attending doctor and enter the reason.', 'Press “Confirm admission” — the 6-digit family PIN appears.'],
           images: [imgEn('patients-admit', 'Admission window')],
           tips: ['Give the family PIN to the relatives and ask them to scan the QR code on the bed.', 'To print the wristband open the chart and press “Wristband”.'],
+        },
+        {
+          id: 'visit',
+          title: 'A visit without admission: outpatient, emergency or test only',
+          intro: 'For a patient who came for a clinic visit, the emergency department, or an imaging or lab test only — without a bed.',
+          steps: [
+            'In the patient list press “New visit” next to the patient (register them first if new).',
+            'Choose the visit type, the department (the suitable one is suggested) and the responsible doctor if any.',
+            'If referred, enter where from and the referring doctor.',
+            'Press “Open visit” — imaging and lab tests are ordered from the chart exactly as for inpatients.',
+            'When finished open the chart and press “Close visit”.',
+          ],
+          tips: ['Visits do not appear in beds, occupancy or the nursing round — those are for inpatients only.', 'An emergency patient can be admitted later with “Admit” as usual.'],
         },
       ],
     },

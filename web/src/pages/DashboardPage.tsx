@@ -22,13 +22,29 @@ import { DueDosesCard } from '@/features/dashboard/DueDosesCard';
 
 export default function DashboardPage() {
   const { t } = useTranslation();
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['dashboard'], queryFn: API.dashboard });
+  const { user: me } = useAuth();
+  const canSeePatients = me ? ROLE_PERMISSIONS[me.role].includes('patients.view') : false;
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['dashboard'], queryFn: API.dashboard, enabled: canSeePatients });
   const isMobile = useMediaQuery('(max-width: 639px)');
   const isLarge = useMediaQuery('(min-width: 1440px)');
   const { user } = useAuth();
   const canAdminister = user ? ROLE_PERMISSIONS[user.role].includes('medications.administer') : false;
 
   const date = fmtDate(new Date().toISOString(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  // أدوار بلا وصول للمرضى (أمين المخزن): ترحيب فقط — لوحة القسم تأتي مع مرحلة المخزون
+  if (!canSeePatients) {
+    return (
+      <div>
+        <PageHeader title={t('nav.dashboard')} subtitle={date} />
+        <Card>
+          <CardContent>
+            <EmptyState title={t('dashboard.welcomeRole', { role: t(`user.role.${me?.role ?? 'viewer'}`) })} description={t('dashboard.noPatientAccess')} />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

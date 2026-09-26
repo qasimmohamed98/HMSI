@@ -879,7 +879,16 @@ console.log('\n— الأساس المشترك: الزيارات، أنواع ا
   const aud = await db.execute({ sql: `SELECT meta_json FROM audit_logs WHERE action = 'service_updated' AND resource_id = ? ORDER BY rowid DESC LIMIT 1`, args: [svc.json.id] });
   check('تعديل السعر يُسجَّل بقيمتيه في التدقيق', upd.json.price === 60000 && String(aud.rows[0]?.meta_json ?? '').includes('"price_from":50000'));
   check('الطبيب لا يعدّل الأسعار (403)', (await doctor.patch(`/services/${svc.json.id}`, { price: 1 })).status === 403);
-  check('المحاسب يعدّل الأسعار', (await client(await login('cashier1', 'Temp#Cash2026qz')).get('/auth/me')).status === 200);
+  {
+    const sk = client(await login('storekeep', 'Temp#Store2026q'));
+    await sk.post('/auth/password', { current_password: 'Temp#Store2026q', new_password: 'Store#Keeper2026z' });
+    await sk.post('/auth/accept-terms', { accept: true, version: (await import('@hmsi/shared')).TERMS_VERSION });
+    check('أمين المخزن لا يرى لوحة المرضى ولا المرضى (403)', (await sk.get('/dashboard/stats')).status === 403 && (await sk.get('/patients')).status === 403);
+    const acc = client(await login('cashier1', 'Temp#Cash2026qz'));
+    await acc.post('/auth/password', { current_password: 'Temp#Cash2026qz', new_password: 'Cash#Desk2026zq' });
+    await acc.post('/auth/accept-terms', { accept: true, version: (await import('@hmsi/shared')).TERMS_VERSION });
+    check('المحاسب يعدّل الأسعار', (await acc.patch(`/services/${svc.json.id}`, { price: 65000 })).json.price === 65000);
+  }
   check('مستشفى آخر لا يرى كتالوج غيره', (await admin2.get('/services?kind=imaging')).json.every((x: any) => x.id !== svc.json.id));
 
   // الزيارات بلا تنويم
