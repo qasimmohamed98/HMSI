@@ -202,6 +202,11 @@ export const PerformImagingSchema = z.object({
   safety_confirmed: z.boolean().default(false),
 });
 
+export const ScheduleImagingSchema = z.object({
+  unit_id: id,
+  scheduled_at: z.string().min(10),
+});
+
 export const ConsultationSchema = z.object({
   admission_id: id,
   specialty: z.string().min(2).max(80),

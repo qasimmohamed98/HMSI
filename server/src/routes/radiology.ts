@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { imagingSafetyQuestions, imagingSafetyReview, type Modality, type SafetyAnswers } from '@hmsi/shared';
-import { PerformImagingSchema } from '@hmsi/shared/validate';
+import { PerformImagingSchema, ScheduleImagingSchema } from '@hmsi/shared/validate';
 import { db } from '../../db/index.js';
 import { getSession, requireAuth, requirePermission } from '../middleware/auth.js';
 import { parseBody } from '../lib/validate.js';
@@ -37,7 +37,83 @@ radiologyRoutes.get('/worklist', requireAuth(), requirePermission('radiology.add
     args.push(modality);
   }
   const rows = await db.execute({
-    sql: `SELECT rr.*, a.encounter_type, a.referral_source, a.referring_doctor, a.room, a.bed_no, w.name_ar AS ward_name_ar, w.name_en AS ward_name_en,
+    sql: `${WORK_ITEM_SELECT}
+          WHERE ${where.join(' AND ')}
+          ORDER BY ${done ? 'COALESCE(rr.performed_at, rr.ordered_at) DESC' : `${RANK}, rr.ordered_at ASC`}
+          LIMIT 200`,
+    args,
+  });
+  const byRecord = await filesByRecord(rows.rows.map((r) => String((r as unknown as Row).id)));
+  const counts = await db.execute({
+    sql: `SELECT rr.priority, COUNT(*) AS n FROM radiology_reports rr JOIN admissions a ON a.id = rr.admission_id JOIN patients p ON p.id = a.patient_id
+          WHERE p.hospital_id = ? AND rr.stage IN ('ordered','scheduled','performed') GROUP BY rr.priority`,
+    args: [s.user.hospital_id],
+  });
+  return c.json({
+    counts: Object.fromEntries(counts.rows.map((r) => [String((r as unknown as Row).priority), Number((r as unknown as Row).n)])),
+    items: rows.rows.map((row) => mapWorkItem(row as unknown as Row, byRecord)),
+  });
+});
+
+/** يحوّل صفاً من radiology_reports (مع أعمدة الوصلات) إلى بند قائمة عمل — يُستخدم في قائمة العمل وجدول المواعيد */
+function mapWorkItem(r: Row, byRecord: Map<string, Row[]>) {
+  const modalityV = str(r.modality) as Modality | null;
+  const gender = r.gender === 'male' || r.gender === 'female' ? r.gender : null;
+  let answers: SafetyAnswers = {};
+  try {
+    answers = JSON.parse(String(r.safety_json ?? '{}')) as SafetyAnswers;
+  } catch {
+    /* */
+  }
+  const questions = imagingSafetyQuestions(modalityV, isContrast(r), gender);
+  const review = imagingSafetyReview(questions, answers);
+  return {
+    id: String(r.id),
+    admission_id: String(r.admission_id),
+    patient_id: String(r.patient_id),
+    full_name_ar: String(r.full_name_ar),
+    full_name_en: str(r.full_name_en),
+    file_number: String(r.file_number),
+    gender,
+    birth_date: str(r.birth_date),
+    encounter_type: String(r.encounter_type ?? 'inpatient'),
+    referral_source: str(r.referral_source),
+    room: str(r.room),
+    bed_no: str(r.bed_no),
+    ward_name_ar: str(r.ward_name_ar),
+    ward_name_en: str(r.ward_name_en),
+    study_type_ar: String(r.study_type_ar),
+    study_type_en: str(r.study_type_en),
+    modality: modalityV,
+    priority: String(r.priority ?? 'routine'),
+    indication: str(r.indication),
+    stage: String(r.stage ?? 'ordered'),
+    ordered_by: String(r.ordered_by),
+    ordered_at: String(r.ordered_at),
+    prep_ar: str(r.prep_ar),
+    prep_en: str(r.prep_en),
+    unit_id: str(r.unit_id),
+    unit_name_ar: str(r.unit_name_ar),
+    unit_name_en: str(r.unit_name_en),
+    scheduled_at: str(r.scheduled_at),
+    exam_done_by: str(r.exam_done_by),
+    exam_done_at: str(r.exam_done_at),
+    exam_note: str(r.exam_note),
+    report: str(r.report),
+    performed_by: str(r.performed_by),
+    performed_at: str(r.performed_at),
+    verified_by: str(r.verified_by),
+    safety: {
+      questions,
+      answers,
+      warnings: review.warnings.map((x) => x.key),
+      unanswered: review.unanswered.map((x) => x.key),
+    },
+    files: (byRecord.get(String(r.id)) ?? []).map((f) => ({ id: String(f.id), admission_id: String(f.admission_id), file_name: String(f.file_name), size: Number(f.size) })),
+  };
+}
+
+const WORK_ITEM_SELECT = `SELECT rr.*, a.encounter_type, a.referral_source, a.referring_doctor, a.room, a.bed_no, w.name_ar AS ward_name_ar, w.name_en AS ward_name_en,
                  p.id AS patient_id, p.full_name_ar, p.full_name_en, p.file_number, p.gender, p.birth_date,
                  sv.prep_ar, sv.prep_en, sv.meta_json, u.name_ar AS unit_name_ar, u.name_en AS unit_name_en
           FROM radiology_reports rr
@@ -45,13 +121,9 @@ radiologyRoutes.get('/worklist', requireAuth(), requirePermission('radiology.add
           JOIN patients p ON p.id = a.patient_id
           LEFT JOIN wards w ON w.id = a.ward_id
           LEFT JOIN services sv ON sv.id = rr.service_id
-          LEFT JOIN department_units u ON u.id = rr.unit_id
-          WHERE ${where.join(' AND ')}
-          ORDER BY ${done ? 'COALESCE(rr.performed_at, rr.ordered_at) DESC' : `${RANK}, rr.ordered_at ASC`}
-          LIMIT 200`,
-    args,
-  });
-  const ids = rows.rows.map((r) => String((r as unknown as Row).id));
+          LEFT JOIN department_units u ON u.id = rr.unit_id`;
+
+async function filesByRecord(ids: string[]): Promise<Map<string, Row[]>> {
   const files = ids.length
     ? await db.execute({
         sql: `SELECT id, record_id, admission_id, file_name, size FROM attachments WHERE record_type = 'radiology' AND record_id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at`,
@@ -63,70 +135,89 @@ radiologyRoutes.get('/worklist', requireAuth(), requirePermission('radiology.add
     const r = f as unknown as Row;
     byRecord.set(String(r.record_id), [...(byRecord.get(String(r.record_id)) ?? []), r]);
   }
-  const counts = await db.execute({
-    sql: `SELECT rr.priority, COUNT(*) AS n FROM radiology_reports rr JOIN admissions a ON a.id = rr.admission_id JOIN patients p ON p.id = a.patient_id
-          WHERE p.hospital_id = ? AND rr.stage IN ('ordered','scheduled','performed') GROUP BY rr.priority`,
+  return byRecord;
+}
+
+/**
+ * جدول المواعيد اليومي: أجهزة/غرف الأشعة في المستشفى مع ما حُجز عليها في اليوم المطلوب،
+ * وقائمة الطلبات التي لم تُحجَز بعد (لتوزيعها على الأجهزة).
+ */
+radiologyRoutes.get('/schedule', requireAuth(), requirePermission('radiology.add_report', 'radiology.perform', 'radiology.verify'), async (c) => {
+  const s = getSession(c)!;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(c.req.query('date') ?? '') ? c.req.query('date')! : new Date().toISOString().slice(0, 10);
+  const units = await db.execute({
+    sql: `SELECT u.* FROM department_units u JOIN departments d ON d.id = u.department_id WHERE d.hospital_id = ? AND (d.kind = 'radiology' OR u.modality IS NOT NULL) ORDER BY u.modality, u.name_ar`,
     args: [s.user.hospital_id],
   });
-  return c.json({
-    counts: Object.fromEntries(counts.rows.map((r) => [String((r as unknown as Row).priority), Number((r as unknown as Row).n)])),
-    items: rows.rows.map((row) => {
-      const r = row as unknown as Row;
-      const modalityV = str(r.modality) as Modality | null;
-      const gender = r.gender === 'male' || r.gender === 'female' ? r.gender : null;
-      let answers: SafetyAnswers = {};
-      try {
-        answers = JSON.parse(String(r.safety_json ?? '{}')) as SafetyAnswers;
-      } catch {
-        /* */
-      }
-      const questions = imagingSafetyQuestions(modalityV, isContrast(r), gender);
-      const review = imagingSafetyReview(questions, answers);
-      return {
-        id: String(r.id),
-        admission_id: String(r.admission_id),
-        patient_id: String(r.patient_id),
-        full_name_ar: String(r.full_name_ar),
-        full_name_en: str(r.full_name_en),
-        file_number: String(r.file_number),
-        gender,
-        birth_date: str(r.birth_date),
-        encounter_type: String(r.encounter_type ?? 'inpatient'),
-        referral_source: str(r.referral_source),
-        room: str(r.room),
-        bed_no: str(r.bed_no),
-        ward_name_ar: str(r.ward_name_ar),
-        ward_name_en: str(r.ward_name_en),
-        study_type_ar: String(r.study_type_ar),
-        study_type_en: str(r.study_type_en),
-        modality: modalityV,
-        priority: String(r.priority ?? 'routine'),
-        indication: str(r.indication),
-        stage: String(r.stage ?? 'ordered'),
-        ordered_by: String(r.ordered_by),
-        ordered_at: String(r.ordered_at),
-        prep_ar: str(r.prep_ar),
-        prep_en: str(r.prep_en),
-        unit_id: str(r.unit_id),
-        unit_name_ar: str(r.unit_name_ar),
-        unit_name_en: str(r.unit_name_en),
-        exam_done_by: str(r.exam_done_by),
-        exam_done_at: str(r.exam_done_at),
-        exam_note: str(r.exam_note),
-        report: str(r.report),
-        performed_by: str(r.performed_by),
-        performed_at: str(r.performed_at),
-        verified_by: str(r.verified_by),
-        safety: {
-          questions,
-          answers,
-          warnings: review.warnings.map((x) => x.key),
-          unanswered: review.unanswered.map((x) => x.key),
-        },
-        files: (byRecord.get(String(r.id)) ?? []).map((f) => ({ id: String(f.id), admission_id: String(f.admission_id), file_name: String(f.file_name), size: Number(f.size) })),
-      };
-    }),
+  const scheduledRows = await db.execute({
+    sql: `${WORK_ITEM_SELECT} WHERE p.hospital_id = ? AND rr.stage = 'scheduled' AND substr(rr.scheduled_at, 1, 10) = ? ORDER BY rr.scheduled_at ASC`,
+    args: [s.user.hospital_id, date],
   });
+  const unscheduledRows = await db.execute({
+    sql: `${WORK_ITEM_SELECT} WHERE p.hospital_id = ? AND rr.stage = 'ordered' ORDER BY ${RANK}, rr.ordered_at ASC LIMIT 100`,
+    args: [s.user.hospital_id],
+  });
+  const ids = [...scheduledRows.rows, ...unscheduledRows.rows].map((r) => String((r as unknown as Row).id));
+  const byRecord = await filesByRecord(ids);
+  return c.json({
+    date,
+    units: units.rows.map((r) => {
+      const u = r as unknown as Row;
+      return { id: String(u.id), department_id: str(u.department_id), kind: String(u.kind), modality: str(u.modality), name_ar: String(u.name_ar), name_en: str(u.name_en), status: String(u.status), notes: str(u.notes) };
+    }),
+    scheduled: scheduledRows.rows.map((row) => mapWorkItem(row as unknown as Row, byRecord)),
+    unscheduled: unscheduledRows.rows.map((row) => mapWorkItem(row as unknown as Row, byRecord)),
+  });
+});
+
+/** حجز موعد على جهاز: من «طُلب» أو لإعادة جدولة موعد قائم */
+radiologyRoutes.post('/:id/schedule', requireAuth(), requirePermission('radiology.add_report', 'radiology.perform', 'radiology.verify'), async (c) => {
+  const parsed = await parseBody(c, ScheduleImagingSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof ScheduleImagingSchema)['_output'];
+  const s = getSession(c)!;
+  const id = c.req.param('id');
+  const r = await db.execute({
+    sql: `SELECT rr.id, rr.admission_id, rr.stage, rr.study_type_ar FROM radiology_reports rr JOIN admissions a ON a.id = rr.admission_id JOIN patients p ON p.id = a.patient_id WHERE rr.id = ? AND p.hospital_id = ?`,
+    args: [id, s.user.hospital_id],
+  });
+  const row = r.rows[0] as unknown as Row | undefined;
+  if (!row) throw new HttpError('طلب الأشعة غير موجود', 404);
+  if (!['ordered', 'scheduled'].includes(String(row.stage))) return c.json({ message: 'الفحص نُفِّذ أو أُلغي بالفعل' }, 409);
+  const u = await db.execute({ sql: `SELECT status FROM department_units WHERE id = ? AND hospital_id = ?`, args: [input.unit_id, s.user.hospital_id] });
+  const unit = u.rows[0] as unknown as Row | undefined;
+  if (!unit) throw new HttpError('الجهاز غير موجود', 404);
+  if (String(unit.status) === 'out_of_service') return c.json({ message: 'الجهاز متوقف — اختر جهازاً آخر' }, 409);
+  await db.execute({
+    sql: `UPDATE radiology_reports SET stage = 'scheduled', unit_id = ?, scheduled_at = ? WHERE id = ?`,
+    args: [input.unit_id, input.scheduled_at, id],
+  });
+  await addTimeline({
+    admissionId: String(row.admission_id),
+    actor: s.user.full_name_ar,
+    actorId: s.user.id,
+    type: 'radiology',
+    titleAr: `حُجز موعد فحص الأشعة: ${String(row.study_type_ar)}`,
+    titleEn: `Imaging exam scheduled: ${String(row.study_type_ar)}`,
+  });
+  await writeAudit({ actorId: s.user.id, action: 'imaging_scheduled', resourceType: 'radiology_report', resourceId: id, meta: { unit: input.unit_id, at: input.scheduled_at }, ip: clientIp(c) });
+  return c.body(null, 204);
+});
+
+/** إلغاء الحجز: يعود الفحص «بانتظار التنفيذ» بلا جهاز أو وقت محددين */
+radiologyRoutes.delete('/:id/schedule', requireAuth(), requirePermission('radiology.add_report', 'radiology.perform', 'radiology.verify'), async (c) => {
+  const s = getSession(c)!;
+  const id = c.req.param('id');
+  const r = await db.execute({
+    sql: `SELECT rr.id, rr.stage FROM radiology_reports rr JOIN admissions a ON a.id = rr.admission_id JOIN patients p ON p.id = a.patient_id WHERE rr.id = ? AND p.hospital_id = ?`,
+    args: [id, s.user.hospital_id],
+  });
+  const row = r.rows[0] as unknown as Row | undefined;
+  if (!row) throw new HttpError('طلب الأشعة غير موجود', 404);
+  if (String(row.stage) !== 'scheduled') return c.json({ message: 'لا يوجد موعد محجوز على هذا الفحص' }, 409);
+  await db.execute({ sql: `UPDATE radiology_reports SET stage = 'ordered', unit_id = NULL, scheduled_at = NULL WHERE id = ?`, args: [id] });
+  await writeAudit({ actorId: s.user.id, action: 'imaging_unscheduled', resourceType: 'radiology_report', resourceId: id, ip: clientIp(c) });
+  return c.body(null, 204);
 });
 
 /** تنفيذ الفحص على الجهاز: يبدأ من فني الأشعة، ويُسجَّل الجهاز ومن نفّذ ومتى */

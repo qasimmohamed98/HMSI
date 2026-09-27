@@ -184,6 +184,7 @@ export interface RadiologyWorkItem {
   performed_by: string | null;
   performed_at: string | null;
   verified_by: string | null;
+  scheduled_at: string | null;
   safety: { questions: SafetyQuestion[]; answers: SafetyAnswers; warnings: string[]; unanswered: string[] };
   files: { id: string; admission_id: string; file_name: string; size: number }[];
 }
@@ -191,6 +192,13 @@ export interface RadiologyWorkItem {
 export interface RadiologyWorklist {
   counts: Partial<Record<ImagingPriority, number>>;
   items: RadiologyWorkItem[];
+}
+
+export interface RadiologySchedule {
+  date: string;
+  units: DepartmentUnit[];
+  scheduled: RadiologyWorkItem[];
+  unscheduled: RadiologyWorkItem[];
 }
 
 export interface ConsultationInput {
@@ -761,6 +769,9 @@ export interface Api {
   // قائمة عمل الأشعة (فني الأشعة وطبيبها)
   radiologyWorklist(params?: { view?: 'open' | 'done'; modality?: Modality }): Promise<RadiologyWorklist>;
   performRadiology(id: string, input: { unitId?: string | null; note?: string | null; safetyConfirmed: boolean }): Promise<void>;
+  radiologySchedule(date?: string): Promise<RadiologySchedule>;
+  scheduleRadiology(id: string, input: { unitId: string; scheduledAt: string }): Promise<void>;
+  unscheduleRadiology(id: string): Promise<void>;
   // كتالوج الخدمات والأسعار
   listServices(filter?: { kind?: ServiceKind; modality?: Modality; q?: string; all?: boolean }): Promise<ServiceItem[]>;
   createService(input: ServiceInput): Promise<ServiceItem>;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, PenLine, Play, ScanLine, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CalendarClock, PenLine, Play, ScanLine, ShieldAlert } from 'lucide-react';
 import { hasPermission, type DepartmentUnit, type Modality } from '@hmsi/shared';
 import { Button, Dialog, Textarea, Select, Badge, Skeleton, EmptyState, Card, CardContent, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -13,6 +13,8 @@ import { localizeServerMessage } from '@/i18n/server-messages';
 import { calcAge, fmtDateTime, localName } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { RecordFileChips } from '@/features/patient/sections/RecordFiles';
+import { ScheduleDialog } from '@/features/radiology/ScheduleDialog';
+import { ScheduleView } from '@/features/radiology/ScheduleView';
 
 const STRIPE = { stat: 'bg-danger-600', urgent: 'bg-warning-500', routine: 'bg-transparent' } as const;
 
@@ -22,18 +24,20 @@ export default function RadiologyPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
-  const [view, setView] = useState<'open' | 'done'>('open');
+  const [view, setView] = useState<'open' | 'schedule' | 'done'>('open');
   const [modality, setModality] = useState<Modality | ''>('');
   const [performFor, setPerformFor] = useState<RadiologyWorkItem | null>(null);
   const [reportFor, setReportFor] = useState<RadiologyWorkItem | null>(null);
+  const [scheduleFor, setScheduleFor] = useState<RadiologyWorkItem | null>(null);
 
   const canPerform = hasPermission(user?.role, 'radiology.perform') || hasPermission(user?.role, 'radiology.verify');
   const canReport = hasPermission(user?.role, 'radiology.add_report');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['radiology', 'worklist', view, modality],
-    queryFn: () => API.radiologyWorklist({ view, modality: modality || undefined }),
+    queryFn: () => API.radiologyWorklist({ view: view === 'done' ? 'done' : 'open', modality: modality || undefined }),
     refetchInterval: 30_000,
+    enabled: view !== 'schedule',
   });
   const refresh = () => void qc.invalidateQueries({ queryKey: ['radiology', 'worklist'] });
 
@@ -57,23 +61,25 @@ export default function RadiologyPage() {
         subtitle={t('dept.radSubtitle')}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              aria-label={t('imaging.allModalities')}
-              value={modality}
-              onChange={(e) => setModality(e.target.value as Modality | '')}
-              className="h-9 rounded-lg border border-ink/12 bg-surface-raised px-2.5 text-sm font-semibold text-ink dark:border-white/12"
-            >
-              <option value="">{t('imaging.allModalities')}</option>
-              {modalities.map((m) => (
-                <option key={m} value={m}>
-                  {t(`org.modality.${m}`)}
-                </option>
-              ))}
-            </select>
+            {view !== 'schedule' && (
+              <select
+                aria-label={t('imaging.allModalities')}
+                value={modality}
+                onChange={(e) => setModality(e.target.value as Modality | '')}
+                className="h-9 rounded-lg border border-ink/12 bg-surface-raised px-2.5 text-sm font-semibold text-ink dark:border-white/12"
+              >
+                <option value="">{t('imaging.allModalities')}</option>
+                {modalities.map((m) => (
+                  <option key={m} value={m}>
+                    {t(`org.modality.${m}`)}
+                  </option>
+                ))}
+              </select>
+            )}
             <div className="flex rounded-lg border border-ink/10 p-0.5 dark:border-white/10">
-              {(['open', 'done'] as const).map((v) => (
+              {(['open', 'schedule', 'done'] as const).map((v) => (
                 <button key={v} type="button" onClick={() => setView(v)} className={cn('rounded-md px-3 py-1.5 text-sm font-semibold', view === v ? 'bg-brand-600 text-white' : 'text-ink/60 hover:text-ink')}>
-                  {t(`imaging.${v}`)}
+                  {v === 'schedule' ? t('imaging.scheduleTab') : t(`imaging.${v}`)}
                 </button>
               ))}
             </div>
@@ -81,40 +87,47 @@ export default function RadiologyPage() {
         }
       />
 
-      {view === 'open' && data && data.items.length > 0 && (
-        <p className="mb-3 text-sm font-semibold text-ink/60">{t('imaging.counts', { stat: c.stat ?? 0, urgent: c.urgent ?? 0, routine: c.routine ?? 0 })}</p>
-      )}
-
-      {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-36 w-full rounded-2xl" />
-          ))}
-        </div>
-      ) : error || !data ? (
-        <Card>
-          <CardContent>
-            <EmptyState title={t('errors.generic')} action={{ label: t('common.retry'), onClick: () => void refetch() }} />
-          </CardContent>
-        </Card>
-      ) : data.items.length === 0 ? (
-        <Card>
-          <CardContent>
-            <EmptyState title={view === 'open' ? t('imaging.emptyOpen') : t('imaging.emptyDone')} icon={<ScanLine className="h-6 w-6" />} />
-          </CardContent>
-        </Card>
+      {view === 'schedule' ? (
+        <ScheduleView />
       ) : (
-        <ul className="space-y-3">
-          {data.items.map((it) => (
-            <WorkCard key={it.id} item={it} canPerform={canPerform} canReport={canReport} onPerform={() => setPerformFor(it)} onReport={() => setReportFor(it)} />
-          ))}
-        </ul>
+        <>
+          {view === 'open' && data && data.items.length > 0 && (
+            <p className="mb-3 text-sm font-semibold text-ink/60">{t('imaging.counts', { stat: c.stat ?? 0, urgent: c.urgent ?? 0, routine: c.routine ?? 0 })}</p>
+          )}
+
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : error || !data ? (
+            <Card>
+              <CardContent>
+                <EmptyState title={t('errors.generic')} action={{ label: t('common.retry'), onClick: () => void refetch() }} />
+              </CardContent>
+            </Card>
+          ) : data.items.length === 0 ? (
+            <Card>
+              <CardContent>
+                <EmptyState title={view === 'open' ? t('imaging.emptyOpen') : t('imaging.emptyDone')} icon={<ScanLine className="h-6 w-6" />} />
+              </CardContent>
+            </Card>
+          ) : (
+            <ul className="space-y-3">
+              {data.items.map((it) => (
+                <WorkCard key={it.id} item={it} canPerform={canPerform} canReport={canReport} onPerform={() => setPerformFor(it)} onReport={() => setReportFor(it)} onSchedule={() => setScheduleFor(it)} />
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       {performFor && <PerformDialog key={performFor.id} item={performFor} onClose={() => setPerformFor(null)} onDone={() => { setPerformFor(null); refresh(); }} />}
       {reportFor && (
         <ReportDialog key={reportFor.id} item={reportFor} onClose={() => setReportFor(null)} busy={reportMut.isPending} onSubmit={(input) => reportMut.mutate({ item: reportFor, input })} />
       )}
+      {scheduleFor && <ScheduleDialog key={scheduleFor.id} item={scheduleFor} onClose={() => setScheduleFor(null)} onDone={() => { setScheduleFor(null); refresh(); }} />}
     </div>
   );
 }
@@ -124,7 +137,21 @@ function questionText(item: RadiologyWorkItem, key: string) {
   return q ? (currentLang() === 'en' ? q.en : q.ar) : key;
 }
 
-function WorkCard({ item, canPerform, canReport, onPerform, onReport }: { item: RadiologyWorkItem; canPerform: boolean; canReport: boolean; onPerform: () => void; onReport: () => void }) {
+function WorkCard({
+  item,
+  canPerform,
+  canReport,
+  onPerform,
+  onReport,
+  onSchedule,
+}: {
+  item: RadiologyWorkItem;
+  canPerform: boolean;
+  canReport: boolean;
+  onPerform: () => void;
+  onReport: () => void;
+  onSchedule: () => void;
+}) {
   const { t } = useTranslation();
   const en = currentLang() === 'en';
   const waiting = item.stage === 'ordered' || item.stage === 'scheduled';
@@ -168,7 +195,10 @@ function WorkCard({ item, canPerform, canReport, onPerform, onReport }: { item: 
             {item.indication}
           </p>
         )}
-        <p className="text-xs text-ink/50">{t('imaging.ordered', { by: item.ordered_by, at: fmtDateTime(item.ordered_at) })}</p>
+        <p className="text-xs text-ink/50">
+          {t('imaging.ordered', { by: item.ordered_by, at: fmtDateTime(item.ordered_at) })}
+          {item.stage === 'scheduled' && item.scheduled_at && ` · ${t('imaging.scheduledFor', { at: fmtDateTime(item.scheduled_at) })}`}
+        </p>
 
         {waiting && (w > 0 || un > 0) && (
           <div className={cn('rounded-lg border px-3 py-2 text-sm', w > 0 ? 'border-danger-300 bg-danger-50 text-danger-800 dark:border-danger-700 dark:bg-danger-900/25 dark:text-danger-100' : 'border-warning-300 bg-warning-50 text-warning-800 dark:border-warning-700 dark:bg-warning-900/25 dark:text-warning-100')}>
@@ -217,6 +247,11 @@ function WorkCard({ item, canPerform, canReport, onPerform, onReport }: { item: 
             {waiting && canPerform && (
               <Button size="sm" icon={<Play className="h-3.5 w-3.5" />} onClick={onPerform}>
                 {t('imaging.perform')}
+              </Button>
+            )}
+            {waiting && canPerform && (
+              <Button size="sm" variant="outline" icon={<CalendarClock className="h-3.5 w-3.5" />} onClick={onSchedule}>
+                {item.stage === 'scheduled' ? t('imaging.reschedule') : t('imaging.schedule')}
               </Button>
             )}
             {canReport && (item.stage === 'performed' || item.stage === 'reported' || (waiting && !canPerform)) && (

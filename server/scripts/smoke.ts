@@ -1163,6 +1163,7 @@ console.log('\n— الأشعة: نموذج الطلب وقائمة العمل �
   const radDep = await mgr.post('/org/departments', { name_ar: 'أشعة العيادات', kind: 'radiology' });
   const okUnit = await mgr.post(`/org/departments/${radDep.json.id}/units`, { kind: 'device', modality: 'CT', name_ar: 'مفراس رئيسي' });
   const downUnit = await mgr.post(`/org/departments/${radDep.json.id}/units`, { kind: 'device', modality: 'CT', name_ar: 'مفراس معطل', status: 'maintenance' });
+  const deadUnit = await mgr.post(`/org/departments/${radDep.json.id}/units`, { kind: 'device', modality: 'CT', name_ar: 'مفراس متوقف', status: 'out_of_service' });
   const ctC = (await db.execute(`SELECT id FROM services WHERE hospital_id = 'h-1' AND code = 'CT-ABD-PEL-C'`)).rows[0] as any;
   const xr = (await db.execute(`SELECT id FROM services WHERE hospital_id = 'h-1' AND code = 'XR-CHEST-PA'`)).rows[0] as any;
   check('الكتالوج يعلّم فحوص الصبغة', (await mgr.get('/services?kind=imaging&modality=CT')).json.find((x: any) => x.code === 'CT-ABD-PEL-C')?.contrast === true);
@@ -1186,6 +1187,22 @@ console.log('\n— الأشعة: نموذج الطلب وقائمة العمل �
   check('قائمة العمل تُظهر تحذيرات الأمان (حساسية الصبغة، الكلى)', mine[0].safety.warnings.includes('contrast_allergy') && mine[0].safety.warnings.includes('kidney_ok') && mine[0].safety.unanswered.includes('metformin'), mine[0].safety);
   check('قائمة العمل تحمل نوع الزيارة والاستطباب', mine[0].encounter_type === 'emergency' && mine[0].indication === 'ألم بطن حاد مع تعرّق');
   check('مستشفى آخر لا يرى القائمة', (await admin2.get('/radiology/worklist')).json.items.every((x: any) => x.patient_id !== pid));
+
+  // المواعيد: حجز الفحص الروتيني على جهاز في يوم محدد، ثم ظهوره في جدول ذلك اليوم وخروجه من قائمة «غير محجوز»
+  const routineId = routine.json.id;
+  const schedDate = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+  check('الطبيب لا يحجز مواعيد (403)', (await doctor.get('/radiology/schedule')).status === 403);
+  check('جهاز متوقف تماماً لا يُحجز عليه (409)', (await rx.post(`/radiology/${routineId}/schedule`, { unit_id: deadUnit.json.id, scheduled_at: `${schedDate}T09:00:00.000Z` })).status === 409);
+  const booked = await rx.post(`/radiology/${routineId}/schedule`, { unit_id: okUnit.json.id, scheduled_at: `${schedDate}T09:00:00.000Z` });
+  check('حجز الموعد على جهاز يعمل', booked.status === 204);
+  const sched = await rx.get(`/radiology/schedule?date=${schedDate}`);
+  check('اليوم المحجوز يُظهر الجهاز والموعد', sched.json.scheduled.some((x: any) => x.id === routineId && x.unit_id === okUnit.json.id));
+  check('الفحص المحجوز يخرج من قائمة «غير محجوز»', sched.json.unscheduled.every((x: any) => x.id !== routineId));
+  const afterSched = (await rx.get('/radiology/worklist')).json.items.find((x: any) => x.id === routineId);
+  check('مرحلة الفحص بعد الحجز «محجوز»', afterSched.stage === 'scheduled' && afterSched.scheduled_at?.startsWith(schedDate));
+  check('إلغاء الحجز يعيد الفحص «بانتظار التنفيذ»', (await rx.del(`/radiology/${routineId}/schedule`)).status === 204);
+  const afterCancel = (await rx.get('/radiology/worklist')).json.items.find((x: any) => x.id === routineId);
+  check('بعد الإلغاء: بلا جهاز وبلا موعد', afterCancel.stage === 'ordered' && !afterCancel.unit_id && !afterCancel.scheduled_at);
 
   const statId = stat.json.id;
   check('التنفيذ دون تأكيد الأمان مرفوض (422)', (await rx.post(`/radiology/${statId}/perform`, { unit_id: okUnit.json.id })).json?.code === 'safety_not_confirmed');

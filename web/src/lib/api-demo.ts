@@ -44,6 +44,7 @@ import type {
   LabInput,
   RadiologyInput,
   RadiologyWorklist,
+  RadiologySchedule,
   ConsultationInput,
   ProcedureInput,
   DischargeInput,
@@ -542,6 +543,15 @@ export const demoApi: Api = {
     return { counts: {}, items: [] };
   },
   async performRadiology(): Promise<void> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async radiologySchedule(): Promise<RadiologySchedule> {
+    return { date: new Date().toISOString().slice(0, 10), units: [], scheduled: [], unscheduled: [] };
+  },
+  async scheduleRadiology(): Promise<void> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async unscheduleRadiology(): Promise<void> {
     throw new Error('غير متاح في وضع العرض التوضيحي');
   },
   async listUnits() {
