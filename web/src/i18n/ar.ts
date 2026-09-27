@@ -458,6 +458,8 @@ export const ar = {
     deactivate: 'تعطيل',
     activate: 'تفعيل',
     cannotDeactivateSelf: 'لا يمكنك تعطيل حسابك الخاص',
+    department: 'القسم',
+    departmentNone: '— بلا قسم —',
   },
   reports: {
     title: 'التقارير',
@@ -1180,6 +1182,9 @@ export const ar = {
   },
   org: {
     kindLabel: 'نوع القسم',
+    head: 'مدير القسم',
+    headNone: '— بلا مدير —',
+    headHint: 'مدير القسم يدير موظفي هذا القسم فقط (تعيين/تعديل/إعادة كلمة مرور) من صفحة «المستخدمون»، دون صلاحية إدارة كل مستخدمي المستشفى.',
     kinds: {
       clinical: 'قسم سريري (ردهات)',
       radiology: 'الأشعة',

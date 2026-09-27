@@ -43,6 +43,7 @@ export const CreateUserSchema = z.object({
   full_name_en: z.string().min(2).max(100).optional(),
   email: z.string().email().optional().nullable(),
   role: z.enum(['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'radiologist', 'storekeeper', 'accountant', 'reception', 'viewer']),
+  department_id: id.nullable().optional(),
 });
 
 export const CreatePatientSchema = z.object({
@@ -284,12 +285,15 @@ export const UpdateUserSchema = z.object({
   email: z.string().email().optional().nullable(),
   role: z.enum(['admin', 'doctor', 'nurse', 'pharmacist', 'lab', 'radiology', 'radiologist', 'storekeeper', 'accountant', 'reception', 'viewer']).optional(),
   is_active: z.boolean().optional(),
+  department_id: id.nullable().optional(),
 });
 
 export const CreateDepartmentSchema = z.object({
   name_ar: z.string().min(2).max(120),
   name_en: z.string().min(2).max(120).nullable().optional(),
   kind: z.enum(DEPARTMENT_KINDS).optional(),
+  /** مدير القسم — يجب أن يكون مستخدماً من نفس المستشفى (يتحقق منه الخادم) */
+  head_user_id: id.nullable().optional(),
 });
 
 export const DepartmentUnitSchema = z.object({

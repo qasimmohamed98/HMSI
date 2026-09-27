@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Network, Plus, Pencil, Trash2, Building2, MonitorCog } from 'lucide-react';
+import { Network, Plus, Pencil, Trash2, Building2, MonitorCog, UserCog } from 'lucide-react';
 import { Card, CardContent, Skeleton, EmptyState, Badge, Button, Dialog, Input, ConfirmDialog, Select } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { API, type DepartmentInput } from '@/lib/api';
@@ -76,6 +76,10 @@ export default function DepartmentsPage() {
                   <div className="min-w-0">
                     <p className="truncate font-bold text-ink">{localName(d, 'name')}</p>
                     <p className="truncate text-xs text-ink/50">{t(`org.kinds.${d.kind ?? 'clinical'}`)}</p>
+                    <p className="truncate text-xs text-ink/45">
+                      <UserCog className="me-1 inline h-3 w-3 align-text-bottom" />
+                      {d.head_user_id ? localName(d, 'head_name') : t('org.headNone')}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -145,11 +149,13 @@ function DepartmentDialog({
   const [nameAr, setNameAr] = useState(dept?.name_ar ?? '');
   const [nameEn, setNameEn] = useState(dept?.name_en ?? '');
   const [kind, setKind] = useState<DepartmentKind>(dept?.kind ?? 'clinical');
+  const [headUserId, setHeadUserId] = useState<string>(dept?.head_user_id ?? '');
   const [error, setError] = useState('');
+  const { data: users } = useQuery({ queryKey: ['users'], queryFn: API.listUsers });
 
   const submit = () => {
     if (nameAr.trim().length < 2) { setError(t('errors.required')); return; }
-    onSubmit({ nameAr, nameEn: nameEn || null, kind });
+    onSubmit({ nameAr, nameEn: nameEn || null, kind, headUserId: headUserId || null });
     onClose();
   };
 
@@ -170,6 +176,15 @@ function DepartmentDialog({
         <Input label={t('departments.nameAr')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder={t('examples.department')} />
         <Input label={t('departments.nameEn')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="Internal Medicine" dir="ltr" />
         <Select label={t('org.kindLabel')} value={kind} onChange={(e) => setKind(e.target.value as DepartmentKind)} options={DEPARTMENT_KINDS.map((k) => ({ value: k, label: t(`org.kinds.${k}`) }))} />
+        <div>
+          <Select
+            label={t('org.head')}
+            value={headUserId}
+            onChange={(e) => setHeadUserId(e.target.value)}
+            options={[{ value: '', label: t('org.headNone') }, ...(users ?? []).filter((u) => u.is_active).map((u) => ({ value: u.id, label: `${localName(u, 'full_name') || u.username} — ${t(`user.role.${u.role}`)}` }))]}
+          />
+          <p className="mt-1.5 text-xs text-ink/50">{t('org.headHint')}</p>
+        </div>
       </div>
     </Dialog>
   );

@@ -22,6 +22,9 @@ export function toUser(r: Record<string, unknown>): User {
     must_change_password: Boolean(Number(r.must_change_password ?? 0)),
     totp_enabled: Boolean(Number(r.totp_enabled ?? 0)),
     terms_required: Number(r.terms_version ?? 0) < TERMS_VERSION,
+    department_id: r.department_id == null ? null : String(r.department_id),
+    department_name_ar: r.department_name_ar == null ? null : String(r.department_name_ar),
+    department_name_en: r.department_name_en == null ? null : String(r.department_name_en),
   };
 }
 

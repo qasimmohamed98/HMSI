@@ -43,6 +43,8 @@ export async function purgeHospital(hospitalId: string, keepUserIds: string[] = 
     await run('wards', `DELETE FROM wards WHERE department_id IN (SELECT id FROM departments WHERE hospital_id = ?)`, H);
     await run('services', `DELETE FROM services WHERE hospital_id = ?`, H);
     await run('department_units', `DELETE FROM department_units WHERE hospital_id = ?`, H);
+    // مدير القسم: يجب فكّ ارتباط الموظفين بالقسم قبل حذفه (users.department_id يشير إلى departments)
+    await tx.execute({ sql: `UPDATE users SET department_id = NULL WHERE hospital_id = ?`, args: H });
     await run('departments', `DELETE FROM departments WHERE hospital_id = ?`, H);
     await run('settings', `DELETE FROM settings WHERE hospital_id = ?`, H);
     // المستخدمون وما يرتبط بهم

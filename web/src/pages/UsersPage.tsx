@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { API, type NewUserInput, type UpdateUserInput } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/components/ui';
-import type { Role, User } from '@hmsi/shared';
+import { hasPermission, type Department, type Role, type User } from '@hmsi/shared';
 
 const roleTone = (role: string) =>
   ({
@@ -31,8 +31,14 @@ export default function UsersPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['users'], queryFn: API.listUsers });
+  const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: API.listDepartments });
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
+
+  // مدير المستشفى يرى كل الموظفين؛ مدير القسم (مفوَّض) يرى ويدير موظفي أقسامه فقط
+  const isFullAdmin = hasPermission(user?.role, 'users.manage');
+  const headedDepartments = (departments ?? []).filter((d) => d.head_user_id === user?.id);
+  const canManageAny = isFullAdmin || headedDepartments.length > 0;
 
   const toggleMut = useMutation({
     mutationFn: (u: User) => API.updateUser(u.id, { isActive: !u.is_active }),
@@ -48,7 +54,7 @@ export default function UsersPage() {
         title={t('nav.users')}
         subtitle={localName(user, 'hospital_name')}
         actions={
-          user?.role === 'admin' || user?.role === 'super_admin' ? (
+          canManageAny ? (
             <Button icon={<Plus className="h-4 w-4" />} onClick={() => setCreateOpen(true)}>
               {t('users.add')}
             </Button>
@@ -74,13 +80,14 @@ export default function UsersPage() {
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {data.map((u) => {
-                const editable = (user?.role === 'super_admin' || user?.role === 'admin') && u.role !== 'super_admin';
+                const editable = u.role !== 'super_admin' && (isFullAdmin || (u.role !== 'admin' && headedDepartments.some((d) => d.id === u.department_id)));
                 return (
                   <div key={u.id} className="flex items-center gap-3 rounded-xl border border-ink/8 p-3.5 dark:border-white/10">
                     <Avatar name={localName(u, 'full_name') || u.username} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-ink">{localName(u, 'full_name') || u.username}</p>
                       <p className="truncate text-xs text-ink/45">{u.username}</p>
+                      {u.department_id && <p className="truncate text-xs text-ink/40">{localName(u, 'department_name')}</p>}
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <Badge variant={roleTone(u.role)}>{t(`user.role.${u.role as Role}`)}</Badge>
@@ -113,6 +120,8 @@ export default function UsersPage() {
       {createOpen && (
         <UserFormDialog
           open
+          isFullAdmin={isFullAdmin}
+          departments={isFullAdmin ? (departments ?? []) : headedDepartments}
           onClose={() => setCreateOpen(false)}
           onSuccess={() => {
             setCreateOpen(false);
@@ -125,6 +134,8 @@ export default function UsersPage() {
         <EditUserDialog
           open
           user={editUser}
+          isFullAdmin={isFullAdmin}
+          departments={isFullAdmin ? (departments ?? []) : headedDepartments}
           onClose={() => setEditUser(null)}
           onSuccess={() => {
             setEditUser(null);
@@ -137,7 +148,19 @@ export default function UsersPage() {
   );
 }
 
-function UserFormDialog({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
+function UserFormDialog({
+  open,
+  onClose,
+  onSuccess,
+  isFullAdmin,
+  departments,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  isFullAdmin: boolean;
+  departments: Department[];
+}) {
   const { t } = useTranslation();
   const [form, setForm] = useState<NewUserInput>({
     username: '',
@@ -146,6 +169,8 @@ function UserFormDialog({ open, onClose, onSuccess }: { open: boolean; onClose: 
     fullNameEn: '',
     email: '',
     role: 'doctor',
+    // مدير القسم المفوَّض ينشئ الموظف مباشرة ضمن قسمه (قسم واحد غالباً)
+    departmentId: !isFullAdmin && departments.length === 1 ? departments[0].id : undefined,
   });
   const mut = useMutation({
     mutationFn: API.createUser,
@@ -155,8 +180,10 @@ function UserFormDialog({ open, onClose, onSuccess }: { open: boolean; onClose: 
   const set = <K extends keyof NewUserInput>(k: K, v: NewUserInput[K]) => setForm((f) => ({ ...f, [k]: v }));
   const submit = () => {
     if (form.username.trim().length < 3 || form.password.length < 6 || form.fullNameAr.trim().length < 2) return;
-    mut.mutate({ ...form, username: form.username.trim(), fullNameAr: form.fullNameAr.trim(), fullNameEn: form.fullNameEn?.trim() || undefined });
+    if (!isFullAdmin && !form.departmentId) return;
+    mut.mutate({ ...form, username: form.username.trim(), fullNameAr: form.fullNameAr.trim(), fullNameEn: form.fullNameEn?.trim() || undefined, email: form.email?.trim() || null });
   };
+  const roles = isFullAdmin ? CREATABLE_ROLES : CREATABLE_ROLES.filter((r) => r !== 'admin');
 
   return (
     <Dialog
@@ -184,20 +211,44 @@ function UserFormDialog({ open, onClose, onSuccess }: { open: boolean; onClose: 
           <Input label={t('users.fullNameEn')} value={form.fullNameEn ?? ''} onChange={(e) => set('fullNameEn', e.target.value)} dir="ltr" />
         </div>
         <Input label={t('users.email')} type="email" value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} dir="ltr" />
-        <Select label={t('users.role')} value={form.role} onChange={(e) => set('role', e.target.value as NewUserInput['role'])} options={CREATABLE_ROLES.map((r) => ({ value: r, label: t(`user.role.${r}`) }))} />
+        <Select label={t('users.role')} value={form.role} onChange={(e) => set('role', e.target.value as NewUserInput['role'])} options={roles.map((r) => ({ value: r, label: t(`user.role.${r}`) }))} />
+        {(isFullAdmin || departments.length > 0) && (
+          <Select
+            label={t('users.department')}
+            value={form.departmentId ?? ''}
+            onChange={(e) => set('departmentId', e.target.value || null)}
+            options={[...(isFullAdmin ? [{ value: '', label: t('users.departmentNone') }] : []), ...departments.map((d) => ({ value: d.id, label: localName(d, 'name') }))]}
+          />
+        )}
       </div>
     </Dialog>
   );
 }
 
-function EditUserDialog({ open, user, onClose, onSuccess }: { open: boolean; user: User; onClose: () => void; onSuccess: () => void }) {
+function EditUserDialog({
+  open,
+  user,
+  onClose,
+  onSuccess,
+  isFullAdmin,
+  departments,
+}: {
+  open: boolean;
+  user: User;
+  onClose: () => void;
+  onSuccess: () => void;
+  isFullAdmin: boolean;
+  departments: Department[];
+}) {
   const { t } = useTranslation();
   const [form, setForm] = useState<UpdateUserInput>({
     fullNameAr: user.full_name_ar,
     fullNameEn: user.full_name_en || null,
     email: user.email,
     role: (user.role === 'super_admin' ? 'viewer' : user.role) as UpdateUserInput['role'],
+    departmentId: user.department_id ?? null,
   });
+  const roles = isFullAdmin ? CREATABLE_ROLES : CREATABLE_ROLES.filter((r) => r !== 'admin');
   const mut = useMutation({
     mutationFn: (input: UpdateUserInput) => API.updateUser(user.id, input),
     onSuccess,
@@ -247,8 +298,16 @@ function EditUserDialog({ open, user, onClose, onSuccess }: { open: boolean; use
           label={t('users.role')}
           value={form.role!}
           onChange={(e) => set('role', e.target.value as UpdateUserInput['role'])}
-          options={CREATABLE_ROLES.map((r) => ({ value: r, label: t(`user.role.${r}`) }))}
+          options={roles.map((r) => ({ value: r, label: t(`user.role.${r}`) }))}
         />
+        {(isFullAdmin || departments.length > 0) && (
+          <Select
+            label={t('users.department')}
+            value={form.departmentId ?? ''}
+            onChange={(e) => set('departmentId', e.target.value || null)}
+            options={[...(isFullAdmin ? [{ value: '', label: t('users.departmentNone') }] : []), ...departments.map((d) => ({ value: d.id, label: localName(d, 'name') }))]}
+          />
+        )}
         <div className="space-y-2 border-t border-ink/8 pt-4 dark:border-white/10">
           <p className="text-sm font-bold text-ink">{t('password.reset')}</p>
           <p className="text-xs text-ink/50">{t('password.resetHint')}</p>

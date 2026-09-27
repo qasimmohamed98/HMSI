@@ -167,9 +167,9 @@ export const liveApi: Api = {
   wards: () => request('/wards'),
   listDepartments: () => request('/org/departments'),
   createDepartment: (input) =>
-    request('/org/departments', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, kind: input.kind }) }),
+    request('/org/departments', { method: 'POST', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, kind: input.kind, head_user_id: input.headUserId ?? null }) }),
   updateDepartment: (id, input) =>
-    request(`/org/departments/${id}`, { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, kind: input.kind }) }),
+    request(`/org/departments/${id}`, { method: 'PATCH', body: JSON.stringify({ name_ar: input.nameAr, name_en: input.nameEn ?? null, kind: input.kind, head_user_id: input.headUserId }) }),
   radiologyWorklist: (p) => request(`/radiology/worklist${qs({ view: p?.view === 'done' ? 'done' : undefined, modality: p?.modality })}`),
   performRadiology: (id, input) => request(`/radiology/${id}/perform`, { method: 'POST', body: JSON.stringify({ unit_id: input.unitId ?? null, note: input.note?.trim() || null, safety_confirmed: input.safetyConfirmed }) }),
   radiologySchedule: (date) => request(`/radiology/schedule${qs({ date })}`),
@@ -339,6 +339,7 @@ export const liveApi: Api = {
         full_name_en: input.fullNameEn,
         email: input.email ?? null,
         role: input.role,
+        department_id: input.departmentId ?? null,
       }),
     }),
   updateUser: (id, input) =>
@@ -350,6 +351,7 @@ export const liveApi: Api = {
         email: input.email,
         role: input.role,
         is_active: input.isActive,
+        department_id: input.departmentId,
       }),
     }),
   listDoctors: () => request('/doctors'),

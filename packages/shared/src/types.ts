@@ -203,6 +203,10 @@ export interface User {
   totp_enabled?: boolean;
   /** لم يوافق على الإصدار الحالي من شروط الاستخدام وسياسة الخصوصية: لا شيء قبل الموافقة */
   terms_required?: boolean;
+  /** القسم الذي يتبعه الموظف (صيدلية، مختبر، أشعة...) — يديره «مدير القسم» إن وُجد */
+  department_id?: string | null;
+  department_name_ar?: string | null;
+  department_name_en?: string | null;
 }
 
 /**
@@ -661,6 +665,10 @@ export interface Department {
   kind?: DepartmentKind;
   ward_count?: number;
   unit_count?: number;
+  /** مدير القسم: يدير موظفي هذا القسم دون صلاحية users.manage الشاملة (النظام العراقي: مدير الصيادلة، مدير الأشعة...) */
+  head_user_id?: string | null;
+  head_name_ar?: string | null;
+  head_name_en?: string | null;
 }
 
 /** وحدة داخل القسم: جهاز (مفراس 1، رنين 1.5T) أو غرفة (سونار غرفة 3) */

@@ -425,6 +425,8 @@ export const en: Dict = {
     deactivate: 'Deactivate',
     activate: 'Activate',
     cannotDeactivateSelf: 'You cannot deactivate your own account',
+    department: 'Department',
+    departmentNone: '— No department —',
   },
   reports: {
     title: 'Reports',
@@ -1147,6 +1149,9 @@ export const en: Dict = {
   },
   org: {
     kindLabel: 'Department type',
+    head: 'Department head',
+    headNone: '— No head —',
+    headHint: 'The department head manages this department\'s staff only (add/edit/reset password) from the Users page, without full hospital-wide user management.',
     kinds: {
       clinical: 'Clinical (wards)',
       radiology: 'Radiology',

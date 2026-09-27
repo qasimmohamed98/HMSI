@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { NAV_GROUPS } from './nav';
 import { useAuth } from '@/lib/auth';
+import { API } from '@/lib/api';
 import { ROLE_PERMISSIONS } from '@hmsi/shared';
 
 export function SidebarNav({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) {
@@ -12,12 +14,18 @@ export function SidebarNav({ onNavigate, collapsed = false }: { onNavigate?: () 
   // اشتراك منتهٍ: لا يظهر إلا «الاشتراك والدفع» (بقية الصفحات محجوبة)
   const expired = user?.role !== 'super_admin' && user?.subscription?.status === 'expired';
 
+  // مدير القسم (مفوَّض) له وصول لصفحة «المستخدمون» رغم عدم امتلاكه صلاحية users.manage الشاملة —
+  // نتحقق من ذلك هنا لإظهار الرابط له فقط، دون طلب إضافي لمن يملك الصلاحية الشاملة أصلاً
+  const needsHeadCheck = !!user && !perms.includes('users.manage' as never);
+  const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: API.listDepartments, enabled: needsHeadCheck });
+  const isDepartmentHead = needsHeadCheck && (departments ?? []).some((d) => d.head_user_id === user!.id);
+
   return (
     <nav className="flex flex-col gap-1">
       {NAV_GROUPS.map((group, gi) => {
         const visible = expired
           ? group.items.filter((item) => item.to === '/billing')
-          : group.items.filter((item) => !item.permission || perms.includes(item.permission as never));
+          : group.items.filter((item) => !item.permission || perms.includes(item.permission as never) || (item.permission === 'users.manage' && isDepartmentHead));
         if (visible.length === 0) return null;
         return (
           <div key={gi} className="flex flex-col gap-1">

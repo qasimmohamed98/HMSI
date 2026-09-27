@@ -13,6 +13,9 @@ function mapDepartment(r: Record<string, unknown>): Department {
     kind: (r.kind ? String(r.kind) : 'clinical') as DepartmentKind,
     ward_count: r.ward_count === undefined ? undefined : Number(r.ward_count),
     unit_count: r.unit_count === undefined ? undefined : Number(r.unit_count),
+    head_user_id: r.head_user_id == null ? null : String(r.head_user_id),
+    head_name_ar: r.head_name_ar == null ? null : String(r.head_name_ar),
+    head_name_en: r.head_name_en == null ? null : String(r.head_name_en),
   };
 }
 
@@ -21,11 +24,15 @@ export function generateBedCode(): string {
   return 'b' + randomBytes(12).toString('base64url').replace(/[-_]/g, '').slice(0, 15).toLowerCase();
 }
 
+const DEPARTMENT_FROM = `FROM departments d
+          LEFT JOIN users h ON h.id = d.head_user_id`;
+
 export async function listDepartments(hospitalId: string): Promise<Department[]> {
   const rows = await db.execute({
-    sql: `SELECT d.*, (SELECT COUNT(*) FROM wards w WHERE w.department_id = d.id) AS ward_count,
+    sql: `SELECT d.*, h.full_name_ar AS head_name_ar, h.full_name_en AS head_name_en,
+                 (SELECT COUNT(*) FROM wards w WHERE w.department_id = d.id) AS ward_count,
                  (SELECT COUNT(*) FROM department_units u WHERE u.department_id = d.id) AS unit_count
-          FROM departments d
+          ${DEPARTMENT_FROM}
           WHERE d.hospital_id = ?
           ORDER BY d.name_ar ASC`,
     args: [hospitalId],
@@ -34,26 +41,39 @@ export async function listDepartments(hospitalId: string): Promise<Department[]>
 }
 
 export async function getDepartment(id: string, hospitalId: string): Promise<Department | null> {
-  const rows = await db.execute({ sql: `SELECT d.* FROM departments d WHERE d.id = ? AND d.hospital_id = ? LIMIT 1`, args: [id, hospitalId] });
+  const rows = await db.execute({
+    sql: `SELECT d.*, h.full_name_ar AS head_name_ar, h.full_name_en AS head_name_en ${DEPARTMENT_FROM} WHERE d.id = ? AND d.hospital_id = ? LIMIT 1`,
+    args: [id, hospitalId],
+  });
   if (rows.rows.length === 0) return null;
   return mapDepartment(rows.rows[0] as Record<string, unknown>);
 }
 
-export async function createDepartment(input: { name_ar: string; name_en?: string | null; kind?: DepartmentKind }, hospitalId: string): Promise<Department> {
+/** يتحقق أن مدير القسم المقترح مستخدم فعّال من نفس المستشفى (أو null لإلغاء التعيين) */
+async function assertHeadInHospital(headUserId: string | null | undefined, hospitalId: string): Promise<void> {
+  if (!headUserId) return;
+  const rows = await db.execute({ sql: `SELECT id FROM users WHERE id = ? AND hospital_id = ? LIMIT 1`, args: [headUserId, hospitalId] });
+  if (rows.rows.length === 0) throw new HttpConflict('المستخدم المختار مديراً للقسم غير موجود في هذا المستشفى');
+}
+
+export async function createDepartment(input: { name_ar: string; name_en?: string | null; kind?: DepartmentKind; head_user_id?: string | null }, hospitalId: string): Promise<Department> {
+  await assertHeadInHospital(input.head_user_id, hospitalId);
   const id = uuid('dep');
   await db.execute({
-    sql: `INSERT INTO departments (id, hospital_id, name_ar, name_en, kind) VALUES (?, ?, ?, ?, ?)`,
-    args: [id, hospitalId, input.name_ar, input.name_en || input.name_ar, input.kind ?? 'clinical'],
+    sql: `INSERT INTO departments (id, hospital_id, name_ar, name_en, kind, head_user_id) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [id, hospitalId, input.name_ar, input.name_en || input.name_ar, input.kind ?? 'clinical', input.head_user_id ?? null],
   });
   return (await getDepartment(id, hospitalId))!;
 }
 
-export async function updateDepartment(id: string, hospitalId: string, input: { name_ar?: string; name_en?: string | null; kind?: DepartmentKind }): Promise<Department | null> {
+export async function updateDepartment(id: string, hospitalId: string, input: { name_ar?: string; name_en?: string | null; kind?: DepartmentKind; head_user_id?: string | null }): Promise<Department | null> {
   const exists = await getDepartment(id, hospitalId);
   if (!exists) return null;
+  if (input.head_user_id !== undefined) await assertHeadInHospital(input.head_user_id, hospitalId);
   await db.execute({
-    sql: `UPDATE departments SET name_ar = COALESCE(?, name_ar), name_en = COALESCE(?, name_en), kind = COALESCE(?, kind) WHERE id = ?`,
-    args: [input.name_ar ?? null, input.name_en ?? null, input.kind ?? null, id],
+    sql: `UPDATE departments SET name_ar = COALESCE(?, name_ar), name_en = COALESCE(?, name_en), kind = COALESCE(?, kind),
+                 head_user_id = CASE WHEN ? THEN ? ELSE head_user_id END WHERE id = ?`,
+    args: [input.name_ar ?? null, input.name_en ?? null, input.kind ?? null, input.head_user_id !== undefined ? 1 : 0, input.head_user_id ?? null, id],
   });
   return getDepartment(id, hospitalId);
 }

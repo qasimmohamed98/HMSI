@@ -324,6 +324,8 @@ export interface DepartmentInput {
   nameAr: string;
   nameEn?: string | null;
   kind?: DepartmentKind;
+  /** مدير القسم (مدير الصيادلة، مدير الأشعة...) — null لإلغاء التعيين */
+  headUserId?: string | null;
 }
 
 export interface UnitInput {
@@ -397,6 +399,8 @@ export interface NewUserInput {
   fullNameEn?: string;
   email?: string | null;
   role: Exclude<Role, 'super_admin'>;
+  /** القسم الذي يتبعه الموظف — إلزامي حين ينشئه مدير قسم (مفوَّض) لا مدير مستشفى كامل الصلاحية */
+  departmentId?: string | null;
 }
 
 export interface UpdateUserInput {
@@ -405,6 +409,7 @@ export interface UpdateUserInput {
   email?: string | null;
   role?: Exclude<Role, 'super_admin'>;
   isActive?: boolean;
+  departmentId?: string | null;
 }
 
 export interface CreateHospitalInput {

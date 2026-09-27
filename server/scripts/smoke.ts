@@ -1296,6 +1296,81 @@ console.log('\n— الأشعة: نموذج الطلب وقائمة العمل �
 }
 
 
+console.log('\n— مدير القسم: تدرج وظيفي عراقي (تفويض إدارة موظفي القسم دون صلاحية users.manage الشاملة)');
+{
+  const mgr = client(await login('manager'));
+  // قسمان صيدلانيان تجريبيان: يرأس سامي (الصيدلي) أحدهما فقط
+  const deptA = await mgr.post('/org/departments', { name_ar: 'صيدلية المبنى أ', name_en: 'Pharmacy Building A', kind: 'pharmacy' });
+  const deptB = await mgr.post('/org/departments', { name_ar: 'صيدلية المبنى ب', name_en: 'Pharmacy Building B', kind: 'pharmacy' });
+  check('إنشاء قسمين صيدلانيين جديدين', deptA.status === 201 && deptB.status === 201);
+
+  check('لا يمكن تعيين مستخدم من مستشفى آخر مديراً للقسم', (await mgr.patch(`/org/departments/${deptA.json.id}`, { head_user_id: 'u_admin2' })).status === 409);
+
+  const setHead = await mgr.patch(`/org/departments/${deptA.json.id}`, { head_user_id: 'u_pharmacist' });
+  check('تعيين الصيدلي مديراً لصيدلية المبنى أ', setHead.status === 200 && setHead.json.head_user_id === 'u_pharmacist');
+  check('القسم يحمل اسم مديره', setHead.json.head_name_ar === 'سامي عودة');
+
+  const pharm = client(await login('pharmacist'));
+  const noHead = client(await login('nurse')); // ممرض عادي — ليس مديراً لأي قسم ولا يملك users.manage
+
+  check('موظف عادي ليس مديراً لأي قسم لا يرى صفحة المستخدمين', (await noHead.get('/users')).status === 403);
+
+  const before = await pharm.get('/users');
+  check('مدير القسم يرى قائمة فارغة من موظفي قسمه في البداية', before.status === 200 && before.json.length === 0);
+
+  const created = await pharm.post('/users', {
+    username: 'pharmA_staff1',
+    password: 'Passw0rd123',
+    full_name_ar: 'موظف صيدلية أ',
+    role: 'pharmacist',
+    department_id: deptA.json.id,
+  });
+  check('مدير القسم ينشئ موظفاً ضمن قسمه', created.status === 201);
+
+  check(
+    'مدير القسم لا ينشئ موظفاً في قسم لا يديره',
+    (
+      await pharm.post('/users', {
+        username: 'pharmB_staff1',
+        password: 'Passw0rd123',
+        full_name_ar: 'موظف صيدلية ب',
+        role: 'pharmacist',
+        department_id: deptB.json.id,
+      })
+    ).status === 400,
+  );
+
+  check(
+    'مدير القسم لا يمنح دور مدير المستشفى',
+    (
+      await pharm.post('/users', {
+        username: 'pharmA_staff2',
+        password: 'Passw0rd123',
+        full_name_ar: 'موظف آخر',
+        role: 'admin',
+        department_id: deptA.json.id,
+      })
+    ).status === 403,
+  );
+
+  const listed = await pharm.get('/users');
+  check('قائمة مدير القسم تقتصر على موظفي قسمه فقط', listed.status === 200 && listed.json.length === 1 && listed.json[0].username === 'pharma_staff1');
+
+  check('مدير القسم يعدّل موظفاً ضمن قسمه', (await pharm.patch(`/users/${created.json.id}`, { full_name_ar: 'موظف صيدلية أ - محدّث' })).status === 200);
+
+  check('مدير القسم لا يعدّل موظفاً خارج قسمه', (await pharm.patch('/users/u_nurse', { full_name_ar: 'اسم آخر' })).status === 403);
+
+  check('مدير القسم لا يعدّل موظفاً من مستشفى آخر (لا يظهر له أصلاً)', (await pharm.patch('/users/u_admin2', { full_name_ar: 'اسم آخر' })).status === 404);
+
+  check('مدير القسم لا ينقل موظفه لقسم لا يديره', (await pharm.patch(`/users/${created.json.id}`, { department_id: deptB.json.id })).status === 400);
+
+  check('مدير القسم يعيد كلمة مرور موظف قسمه', (await pharm.post(`/users/${created.json.id}/password`, { password: 'NewPass2026' })).status === 204);
+
+  check('مدير القسم لا يعيد كلمة مرور موظف خارج قسمه', (await pharm.post('/users/u_nurse/password', { password: 'NewPass2026' })).status === 403);
+
+  check('مدير المستشفى يبقى بكل الصلاحيات ويرى كل الموظفين', (await mgr.get('/users')).status === 200 && (await mgr.get('/users')).json.length > 1);
+}
+
 console.log('\n— حذف بيانات التجربة والمستشفيات (آخر الاختبارات: يمسح البيانات)');
 {
   const sa = client(await login('admin'));
