@@ -8,6 +8,7 @@ import { Logo } from '@/components/layout/Logo';
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
 const LegalPage = lazy(() => import('@/pages/LegalPage'));
 const ServicesPage = lazy(() => import('@/pages/ServicesPage'));
+const MedicationsCatalogPage = lazy(() => import('@/pages/MedicationsCatalogPage'));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const PatientsPage = lazy(() => import('@/pages/PatientsPage'));
 const PatientChartPage = lazy(() => import('@/pages/PatientChartPage'));
@@ -104,6 +105,7 @@ export const router = createBrowserRouter([
           { path: 'wards', element: withSuspense(<WardsPage />) },
           { path: 'departments', element: withSuspense(<DepartmentsPage />) },
           { path: 'services', element: withSuspense(<ServicesPage />) },
+          { path: 'medications-catalog', element: withSuspense(<MedicationsCatalogPage />) },
           { path: 'laboratory', element: withSuspense(<LaboratoryPage />) },
           { path: 'radiology', element: withSuspense(<RadiologyPage />) },
           { path: 'pharmacy', element: withSuspense(<PharmacyPage />) },

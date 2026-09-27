@@ -184,6 +184,7 @@ export const GUIDE_AR: GuideContent = {
           title: 'الخدمات والأسعار',
           steps: [
             'افتح «الخدمات والأسعار» واضغط «استيراد القائمة الجاهزة»: فحوص الأشعة بكل أنواعها مع تعليمات التحضير، وفحوص المختبر الشائعة، والإقامة.',
+            'افتح «قائمة الأدوية» واضغط «استيراد القائمة الجاهزة» لإضافة قائمة أدوية شائعة (ليست النسخة الرسمية الكاملة من وزارة الصحة) — تُقترح عند وصف الدواء، ويديرها الصيدلي.',
             'اضغط القلم بجانب أي خدمة لتضع سعرها بالدينار، أو تعدّل اسمها وتعليمات التحضير، أو توقفها.',
             'أضف خدماتك الخاصة بزر «إضافة خدمة» برمز قصير بالإنجليزية.',
           ],
@@ -672,6 +673,7 @@ export const GUIDE_EN: GuideContent = {
           title: 'Services and prices',
           steps: [
             'Open “Services & prices” and press “Import the ready-made list”: all imaging exams with preparation instructions, common lab tests and stays.',
+            'Open “Medication formulary” and press “Import the ready-made list” to add a common starter drug list (not the official complete Ministry of Health list) — suggested when prescribing, managed by the pharmacist.',
             'Press the pencil next to any service to set its price in dinars, edit its name and preparation, or suspend it.',
             'Add your own services with “Add a service” and a short Latin code.',
           ],

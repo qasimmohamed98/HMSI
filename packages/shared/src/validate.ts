@@ -16,6 +16,7 @@ import {
   MODALITIES,
   SERVICE_KINDS,
   IMAGING_PRIORITIES,
+  MEDICATION_FORMS,
 } from './types.js';
 
 const id = z.string().min(1).max(64);
@@ -159,6 +160,20 @@ export const CreateMedicationSchema = z.object({
   end_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   /** سبب تجاوز تحذير الحساسية (مطلوب فقط عند وجود تعارض) */
   allergy_override_reason: z.string().trim().min(5).max(300).optional().nullable(),
+  /** من قائمة الأدوية المعتمدة (إن اختير منها) */
+  catalog_id: id.optional().nullable(),
+});
+
+export const MedicationCatalogSchema = z.object({
+  generic_name_ar: z.string().min(2).max(120),
+  generic_name_en: z.string().max(120).optional().nullable(),
+  brand_name_ar: z.string().max(120).optional().nullable(),
+  brand_name_en: z.string().max(120).optional().nullable(),
+  form: z.enum(MEDICATION_FORMS),
+  strength: z.string().max(40).optional().nullable(),
+  route: z.string().max(40).optional().nullable(),
+  controlled: z.boolean().optional().default(false),
+  is_active: z.boolean().optional().default(true),
 });
 
 /** طلب فحص (طبيب) أو إدخال مباشر مع النتيجة (فني المختبر) */

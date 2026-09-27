@@ -141,6 +141,36 @@ check('إضافة دواء', med.status === 201);
 const medUpd = await doctor.patch(`/patients/adm2/medications/${med.json.id}`, { status: 'completed', end_at: '2026-09-24' });
 check('تغيير الحالة لا يمسح الاسم الإنجليزي', medUpd.status === 200 && medUpd.json.name_en === 'Paracetamol', medUpd.json);
 
+console.log('\n— المرحلة 3أ: قائمة الأدوية المعتمدة (Formulary)');
+{
+  const pharm = client(await login('pharmacist'));
+  check('الطبيب لا يدير قائمة الأدوية (403)', (await doctor.post('/medications-catalog', { generic_name_ar: 'دواء', form: 'tablet' })).status === 403);
+  const imp = await pharm.post('/medications-catalog/import-defaults', {});
+  check('الصيدلي يستورد القائمة الجاهزة', imp.status === 200 && imp.json.added > 50, imp.json);
+  const imp2 = await pharm.post('/medications-catalog/import-defaults', {});
+  check('الاستيراد الثاني لا يكرّر الأدوية', imp2.json.added === 0, imp2.json);
+  const list = await doctor.get('/medications-catalog?q=سيفترياكسون');
+  const ceftriaxone = list.json.find((x: any) => x.generic_name_ar === 'سيفترياكسون');
+  check('الطبيب يبحث في القائمة عند الوصف', Boolean(ceftriaxone) && ceftriaxone.controlled === false, list.json);
+  const morphine = (await doctor.get('/medications-catalog?q=مورفين')).json[0];
+  check('المورفين مُعلَّم خاضعاً للرقابة', morphine?.controlled === true, morphine);
+
+  const custom = await pharm.post('/medications-catalog', { generic_name_ar: 'دواء تجريبي 3أ', form: 'tablet', controlled: true });
+  check('الصيدلي يضيف دواءً مخصصاً', custom.status === 201 && custom.json.controlled === true);
+  const upd = await pharm.patch(`/medications-catalog/${custom.json.id}`, { is_active: false });
+  check('الصيدلي يوقف دواءً', upd.status === 200 && upd.json.is_active === false);
+  check('الدواء الموقوف لا يظهر بلا ?all=1', !(await doctor.get('/medications-catalog')).json.some((x: any) => x.id === custom.json.id));
+  check('الدواء الموقوف يظهر مع ?all=1', (await pharm.get('/medications-catalog?all=1')).json.some((x: any) => x.id === custom.json.id));
+
+  // الوصف من القائمة: ينسخ علم «خاضع للرقابة» على السجل، ويرفع خطورة الإشعار
+  const rxMed = await doctor.post('/patients/adm2/medications', {
+    admission_id: 'adm2', name_ar: morphine.generic_name_ar, name_en: morphine.generic_name_en, dose: '10mg', route: 'IV', frequency: 'q6h prn', start_at: '2026-09-27', catalog_id: morphine.id,
+  });
+  check('الوصف من القائمة يحفظ مرجعها وعلم الرقابة', rxMed.status === 201 && rxMed.json.catalog_id === morphine.id && Number(rxMed.json.controlled) === 1, rxMed.json);
+  const nCtl = ((await pharm.get('/notifications')).json as any[]).find((n) => n.kind === 'medication_prescribed' && n.title_ar.startsWith('دواء خاضع للرقابة'));
+  check('الصيدلي يُنبَّه بخطورة أعلى للدواء الخاضع للرقابة', nCtl?.severity === 'warning', nCtl);
+}
+
 console.log('\n— المرضى والتنويم');
 const p1 = await reception.post('/patients', { full_name_ar: 'مريض اختبار أول', gender: 'male', birth_date: '1990-01-01' });
 const p2 = await reception.post('/patients', { full_name_ar: 'مريض اختبار ثاني', gender: 'female', birth_date: '1991-01-01' });

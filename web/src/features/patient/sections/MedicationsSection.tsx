@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Plus, Pill, Timer, Trash2, Pencil, ShieldAlert } from 'lucide-react';
 import { Button, Dialog, Input, Badge, Select, Alert, Textarea } from '@/components/ui';
@@ -148,7 +148,7 @@ export function MedicationsSection({ chart, canWrite, canAdminister = false }: {
           onClose={() => setOpen(false)}
           admissionId={chart.admissionId}
           allergies={allergies}
-          onSubmit={(i) => mut.mutate({ admissionId: chart.admissionId ?? '', nameAr: i.nameAr ?? '', dose: i.dose ?? '', route: i.route ?? '', frequency: i.frequency ?? '', startAt: i.startAt ?? todayISO(), allergyOverrideReason: i.allergyOverrideReason })}
+          onSubmit={(i) => mut.mutate({ admissionId: chart.admissionId ?? '', nameAr: i.nameAr ?? '', dose: i.dose ?? '', route: i.route ?? '', frequency: i.frequency ?? '', startAt: i.startAt ?? todayISO(), allergyOverrideReason: i.allergyOverrideReason, catalogId: i.catalogId })}
           busy={mut.isPending}
         />
       )}
@@ -187,6 +187,7 @@ function AddMedicationDialog({
   busy: boolean;
 }) {
   const { t } = useTranslation();
+  const en = currentLang() === 'en';
   const [nameAr, setNameAr] = useState(initial?.name_ar ?? '');
   const [dose, setDose] = useState(initial?.dose ?? '');
   const [route, setRoute] = useState(initial?.route ?? '');
@@ -197,12 +198,16 @@ function AddMedicationDialog({
   const conflicts = useMemo(() => (nameAr.trim().length >= 3 ? findAllergyConflicts([nameAr], allergies) : []), [nameAr, allergies]);
   const needsReason = conflicts.length > 0;
 
+  // قائمة الأدوية المعتمدة: تُقترح أثناء الكتابة (الاسم الحر يبقى ممكناً)
+  const { data: catalog } = useQuery({ queryKey: ['medications-catalog'], queryFn: () => API.listMedicationsCatalog() });
+  const matched = useMemo(() => (catalog ?? []).find((m) => m.generic_name_ar === nameAr.trim() || m.brand_name_ar === nameAr.trim()), [catalog, nameAr]);
+
   if (!admissionId) return null;
   const submit = () => {
     if (nameAr.trim().length < 2 || !dose.trim()) return;
     if (needsReason && reason.trim().length < 5) return;
     const nameChanged = !initial || initial.name_ar !== nameAr;
-    onSubmit({ nameAr, dose, route, frequency, startAt: start, allergyOverrideReason: needsReason && nameChanged ? reason.trim() : undefined });
+    onSubmit({ nameAr, dose, route, frequency, startAt: start, allergyOverrideReason: needsReason && nameChanged ? reason.trim() : undefined, catalogId: matched?.id ?? null });
   };
 
   return (
@@ -222,7 +227,35 @@ function AddMedicationDialog({
       }
     >
       <div className="space-y-4">
-        <Input label={t('medications.name')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus placeholder={t('examples.medication')} />
+        <div>
+          <Input
+            label={t('medications.name')}
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
+            autoFocus
+            placeholder={t('examples.medication')}
+            list="med-catalog-list"
+            hint={t('medications.catalogHint')}
+          />
+          <datalist id="med-catalog-list">
+            {(catalog ?? []).map((m) => (
+              <option key={m.id} value={m.generic_name_ar}>
+                {en && m.generic_name_en ? m.generic_name_en : m.brand_name_ar ? `${m.brand_name_ar}${m.strength ? ` · ${m.strength}` : ''}` : (m.strength ?? '')}
+              </option>
+            ))}
+          </datalist>
+          {matched && (
+            <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-ink/55">
+              {t(`formulary.forms.${matched.form}`)}
+              {matched.route ? ` · ${matched.route}` : ''}
+              {matched.controlled && (
+                <Badge variant="danger">
+                  <ShieldAlert className="h-3 w-3" /> {t('formulary.controlled')}
+                </Badge>
+              )}
+            </p>
+          )}
+        </div>
         {needsReason && <AllergyWarning conflicts={conflicts} reason={reason} onReason={setReason} />}
         <div className="grid grid-cols-2 gap-3">
           <Input label={t('medications.dose')} value={dose} onChange={(e) => setDose(e.target.value)} placeholder={t('examples.dose')} />

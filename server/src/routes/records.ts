@@ -223,19 +223,28 @@ recordRoutes.post('/:admissionId/medications', requireAuth(), requirePermission(
   const id = uuid('md');
   const gate = await allergyGate(c, s, input.admission_id, [input.name_ar, input.name_en], input.allergy_override_reason, id);
   if (gate instanceof Response) return gate;
+  // إن اختير من قائمة الأدوية المعتمدة: نسخ علم «خاضع للرقابة» وقت الوصف (لا يتغيّر لاحقاً إن عدّله الصيدلي في القائمة)
+  let controlled = 0;
+  if (input.catalog_id) {
+    const cat = await db.execute({
+      sql: `SELECT controlled FROM medications_catalog WHERE id = ? AND hospital_id = ?`,
+      args: [input.catalog_id, s.user.hospital_id],
+    });
+    controlled = cat.rows[0] ? Number((cat.rows[0] as unknown as Record<string, unknown>).controlled) : 0;
+  }
   await db.execute({
-    sql: `INSERT INTO medications (id, admission_id, name_ar, name_en, dose, route, frequency, start_at, end_at, status, prescribed_by, created_at, allergy_override_json)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
-    args: [id, input.admission_id, input.name_ar, input.name_en ?? null, input.dose, input.route, input.frequency, input.start_at, input.end_at ?? null, s.user.full_name_ar, new Date().toISOString(), gate.override],
+    sql: `INSERT INTO medications (id, admission_id, name_ar, name_en, dose, route, frequency, start_at, end_at, status, prescribed_by, created_at, allergy_override_json, catalog_id, controlled)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+    args: [id, input.admission_id, input.name_ar, input.name_en ?? null, input.dose, input.route, input.frequency, input.start_at, input.end_at ?? null, s.user.full_name_ar, new Date().toISOString(), gate.override, input.catalog_id ?? null, controlled],
   });
   await track(c, s, input.admission_id, 'medication', `وصف دواء: ${input.name_ar}`, `Medication: ${input.name_en ?? input.name_ar}`, 'medication_prescribed', 'medication', id);
   await notifyAdmission(input.admission_id, {
     roles: ['pharmacist'],
     toNurse: true,
     kind: 'medication_prescribed',
-    severity: gate.override ? 'warning' : 'info',
-    titleAr: `دواء جديد للصرف: ${input.name_ar}`,
-    titleEn: `New medication to dispense: ${input.name_en ?? input.name_ar}`,
+    severity: gate.override || controlled ? 'warning' : 'info',
+    titleAr: `${controlled ? 'دواء خاضع للرقابة — ' : ''}دواء جديد للصرف: ${input.name_ar}`,
+    titleEn: `${controlled ? 'Controlled substance — ' : ''}New medication to dispense: ${input.name_en ?? input.name_ar}`,
     bodyAr: gate.override ? 'وُصف رغم تحذير حساسية' : undefined,
     bodyEn: gate.override ? 'Prescribed despite an allergy warning' : undefined,
     createdById: s.user.id,

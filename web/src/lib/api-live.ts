@@ -188,6 +188,24 @@ export const liveApi: Api = {
   createService: (input) => request('/services', { method: 'POST', body: JSON.stringify(input) }),
   updateService: (id, input) => request(`/services/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   importDefaultServices: () => request('/services/import-defaults', { method: 'POST', body: '{}' }),
+  listMedicationsCatalog: (f = {}) => request(`/medications-catalog${qs({ q: f.q, all: f.all ? '1' : undefined })}`),
+  createMedicationCatalogItem: (input) =>
+    request('/medications-catalog', {
+      method: 'POST',
+      body: JSON.stringify({
+        generic_name_ar: input.genericNameAr, generic_name_en: input.genericNameEn ?? null, brand_name_ar: input.brandNameAr ?? null, brand_name_en: input.brandNameEn ?? null,
+        form: input.form, strength: input.strength ?? null, route: input.route ?? null, controlled: input.controlled ?? false, is_active: input.isActive,
+      }),
+    }),
+  updateMedicationCatalogItem: (id, input) =>
+    request(`/medications-catalog/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        generic_name_ar: input.genericNameAr, generic_name_en: input.genericNameEn, brand_name_ar: input.brandNameAr, brand_name_en: input.brandNameEn,
+        form: input.form, strength: input.strength, route: input.route, controlled: input.controlled, is_active: input.isActive,
+      }),
+    }),
+  importDefaultMedications: () => request('/medications-catalog/import-defaults', { method: 'POST', body: '{}' }),
   createEncounter: (input) => request('/admissions/encounter', { method: 'POST', body: JSON.stringify(input) }),
   closeEncounter: (admissionId, input) => request(`/admissions/${admissionId}/close`, { method: 'POST', body: JSON.stringify(input) }),
   deleteDepartment: (id) => request(`/org/departments/${id}`, { method: 'DELETE' }),
@@ -269,6 +287,7 @@ export const liveApi: Api = {
         start_at: input.startAt,
         end_at: input.endAt ?? null,
         allergy_override_reason: input.allergyOverrideReason || undefined,
+        catalog_id: input.catalogId ?? undefined,
       }),
     }),
   addLabResult: (input) =>

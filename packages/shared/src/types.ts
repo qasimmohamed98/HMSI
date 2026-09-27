@@ -416,6 +416,29 @@ export interface Medication {
   dispensed_at?: string | null;
   /** تجاوز تحذير حساسية: JSON { reason, conflicts, by, at } */
   allergy_override_json?: string | null;
+  /** من قائمة الأدوية المعتمدة (إن اختير منها) */
+  catalog_id?: string | null;
+  /** مخدرة أو مؤثرات عقلية — نسخة من علم القائمة وقت الوصف */
+  controlled?: boolean;
+}
+
+/** أشكال الدواء في قائمة الأدوية المعتمدة */
+export const MEDICATION_FORMS = ['tablet', 'capsule', 'syrup', 'injection', 'drops', 'cream', 'inhaler', 'suppository', 'patch', 'iv_fluid', 'other'] as const;
+export type MedicationForm = (typeof MEDICATION_FORMS)[number];
+
+/** بند في قائمة الأدوية المعتمدة (Formulary) لكل مستشفى */
+export interface MedicationCatalogItem {
+  id: string;
+  hospital_id: string;
+  generic_name_ar: string;
+  generic_name_en: string | null;
+  brand_name_ar: string | null;
+  brand_name_en: string | null;
+  form: MedicationForm;
+  strength: string | null;
+  route: string | null;
+  controlled: boolean;
+  is_active: boolean;
 }
 
 export interface LabResult {

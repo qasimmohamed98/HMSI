@@ -6,6 +6,8 @@ import type {
   SafetyAnswers,
   SafetyQuestion,
   ReportTemplate,
+  MedicationCatalogItem,
+  MedicationForm,
   DepartmentKind,
   DepartmentUnit,
   Modality,
@@ -51,7 +53,7 @@ import type {
 import { demoApi } from './api-demo';
 import { liveApi } from './api-live';
 
-export type { ChartData, ReportOverview, ReportTemplate };
+export type { ChartData, ReportOverview, ReportTemplate, MedicationCatalogItem };
 
 export interface PatientListParams {
   search?: string;
@@ -122,6 +124,8 @@ export interface MedicationInput {
   endAt?: string | null;
   /** سبب تجاوز تحذير الحساسية */
   allergyOverrideReason?: string | null;
+  /** من قائمة الأدوية المعتمدة (إن اختير منها) */
+  catalogId?: string | null;
 }
 
 export interface LabInput {
@@ -260,6 +264,8 @@ export interface MedicationStatusInput {
   frequency?: string;
   startAt?: string;
   allergyOverrideReason?: string | null;
+  /** من قائمة الأدوية المعتمدة (إن اختير منها) */
+  catalogId?: string | null;
 }
 
 export interface NoteUpdateInput {
@@ -327,6 +333,18 @@ export interface UnitInput {
   name_en?: string | null;
   status?: DepartmentUnit['status'];
   notes?: string | null;
+}
+
+export interface MedicationCatalogInput {
+  genericNameAr: string;
+  genericNameEn?: string | null;
+  brandNameAr?: string | null;
+  brandNameEn?: string | null;
+  form: MedicationForm;
+  strength?: string | null;
+  route?: string | null;
+  controlled?: boolean;
+  isActive?: boolean;
 }
 
 export interface ServiceInput {
@@ -788,6 +806,11 @@ export interface Api {
   createService(input: ServiceInput): Promise<ServiceItem>;
   updateService(id: string, input: Partial<ServiceInput>): Promise<ServiceItem>;
   importDefaultServices(): Promise<{ added: number; total: number }>;
+  // قائمة الأدوية المعتمدة (Formulary)
+  listMedicationsCatalog(filter?: { q?: string; all?: boolean }): Promise<MedicationCatalogItem[]>;
+  createMedicationCatalogItem(input: MedicationCatalogInput): Promise<MedicationCatalogItem>;
+  updateMedicationCatalogItem(id: string, input: Partial<MedicationCatalogInput>): Promise<MedicationCatalogItem>;
+  importDefaultMedications(): Promise<{ added: number; total: number }>;
   // الزيارات بلا تنويم (مراجع، طوارئ، فحص فقط)
   createEncounter(input: EncounterInput): Promise<{ admission_id: string; patient_id: string }>;
   closeEncounter(admissionId: string, input: { outcome: DischargeType; summary?: string }): Promise<void>;

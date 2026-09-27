@@ -46,6 +46,7 @@ import type {
   RadiologyWorklist,
   RadiologySchedule,
   ReportTemplate,
+  MedicationCatalogItem,
   ConsultationInput,
   ProcedureInput,
   DischargeInput,
@@ -590,6 +591,18 @@ export const demoApi: Api = {
     throw new Error('غير متاح في وضع العرض التوضيحي');
   },
   async importDefaultServices(): Promise<{ added: number; total: number }> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async listMedicationsCatalog(): Promise<MedicationCatalogItem[]> {
+    return [];
+  },
+  async createMedicationCatalogItem(): Promise<MedicationCatalogItem> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async updateMedicationCatalogItem(): Promise<MedicationCatalogItem> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async importDefaultMedications(): Promise<{ added: number; total: number }> {
     throw new Error('غير متاح في وضع العرض التوضيحي');
   },
   async createEncounter(): Promise<{ admission_id: string; patient_id: string }> {
