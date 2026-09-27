@@ -85,9 +85,12 @@ export default function DepartmentsPage() {
                       {t('departments.wardCount', { count: d.ward_count ?? 0 })}
                     </Badge>
                   ) : null}
-                  <Button size="sm" variant="outline" icon={<MonitorCog className="h-3.5 w-3.5" />} onClick={() => setUnitsFor(d)}>
-                    {t('org.unitCount', { count: d.unit_count ?? 0 })}
-                  </Button>
+                  {/* الأجهزة والغرف مفهوم خاص بالأشعة حالياً (المفراس، الرنين…) — يظهر فقط لقسم من نوع «أشعة»، لا لكل الأقسام */}
+                  {d.kind === 'radiology' && (
+                    <Button size="sm" variant="outline" icon={<MonitorCog className="h-3.5 w-3.5" />} onClick={() => setUnitsFor(d)}>
+                      {t('org.unitCount', { count: d.unit_count ?? 0 })}
+                    </Button>
+                  )}
                   <Button size="icon-sm" variant="ghost" aria-label={t('common.edit')} onClick={() => setDialog({ dept: d })}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>

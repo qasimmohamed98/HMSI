@@ -16,6 +16,17 @@ installErrorReporter();
 // زر «تثبيت التطبيق»: المتصفح يرسل الحدث مبكراً فنلتقطه قبل رسم الواجهة
 captureInstallPrompt();
 
+// عند نشر نسخة جديدة: الـ Service Worker يفعّلها فوراً (skipWaiting + clientsClaim)، فتُعاد الصفحة تلقائياً مرة واحدة
+// حتى لا يبقى المستخدم على نسخة قديمة إلى أن يغلق التبويب بنفسه (يهم خصوصاً من يبقي النظام مفتوحاً طوال يومه)
+if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+}
+
 const queryClient = new QueryClient({
   // أي عملية كتابة تفشل بدون معالج خاص تُظهر رسالة الخادم للمستخدم بدل الفشل الصامت
   mutationCache: new MutationCache({

@@ -1175,7 +1175,7 @@ export const en: Dict = {
     },
     units: 'Devices and rooms',
     unitsTitle: 'Devices and rooms: {{name}}',
-    unitsHint: 'Add the department’s devices (CT 1, MRI 1.5T…) or rooms (Ultrasound room 3). Device status will be used for scheduling.',
+    unitsHint: 'Add the department’s devices (CT 1, MRI 1.5T…) or rooms (Ultrasound room 3). Device status (working/maintenance/down) is used when booking appointments and performing exams.',
     addUnit: 'Add a device or room',
     unitKind: { device: 'Device', room: 'Room' },
     unitStatus: { active: 'Working', maintenance: 'In maintenance', out_of_service: 'Out of service' },
