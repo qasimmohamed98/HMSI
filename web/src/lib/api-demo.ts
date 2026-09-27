@@ -45,6 +45,7 @@ import type {
   RadiologyInput,
   RadiologyWorklist,
   RadiologySchedule,
+  ReportTemplate,
   ConsultationInput,
   ProcedureInput,
   DischargeInput,
@@ -552,6 +553,21 @@ export const demoApi: Api = {
     throw new Error('غير متاح في وضع العرض التوضيحي');
   },
   async unscheduleRadiology(): Promise<void> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async verifyRadiology(): Promise<void> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async addRadiologyAddendum(): Promise<void> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async listReportTemplates(): Promise<ReportTemplate[]> {
+    return [];
+  },
+  async createReportTemplate(): Promise<ReportTemplate> {
+    throw new Error('غير متاح في وضع العرض التوضيحي');
+  },
+  async deleteReportTemplate(): Promise<void> {
     throw new Error('غير متاح في وضع العرض التوضيحي');
   },
   async listUnits() {

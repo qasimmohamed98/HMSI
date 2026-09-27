@@ -458,6 +458,24 @@ export interface RadiologyReport {
   exam_done_at?: string | null;
   verified_by?: string | null;
   verified_at?: string | null;
+  /** نتيجة حرجة تحتاج تبليغاً فورياً (نزف دماغي، استرواح صدري…) */
+  critical?: boolean;
+  /** إضافة بعد اعتماد التقرير — لا يُعدَّل التقرير المعتمد نفسه */
+  addendum?: string | null;
+  addendum_by?: string | null;
+  addendum_at?: string | null;
+}
+
+/** قالب تقرير جاهز حسب نوع الجهاز — يُدرج نصّه في التقرير ليُعدَّل لا ليُنسخ حرفياً */
+export interface ReportTemplate {
+  id: string;
+  hospital_id: string;
+  modality: Modality | null;
+  title_ar: string;
+  title_en: string | null;
+  body_ar: string;
+  body_en: string | null;
+  created_at: string;
 }
 
 export interface Consultation {

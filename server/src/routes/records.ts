@@ -485,24 +485,31 @@ recordRoutes.patch('/:admissionId/radiology/:id', requireAuth(), requirePermissi
   const a = await loadAdmission(c);
   const id = c.req.param('id');
   const study = await findRecord('radiology_reports', id, a.id);
+  // التقرير المعتمد لا يُعدَّل — إضافة ملحق فقط (POST /radiology/:id/addendum)
+  if (String(study.stage) === 'verified') return c.json({ message: 'التقرير معتمد بالفعل — أضف ملحقاً بدل التعديل', code: 'already_verified' }, 409);
   const now = new Date().toISOString();
   const verify = sessionHas(c, 'radiology.verify');
   await db.execute({
-    sql: `UPDATE radiology_reports SET report = ?, status = 'resulted', performed_by = ?, performed_at = ?, stage = ?,
+    sql: `UPDATE radiology_reports SET report = ?, status = 'resulted', performed_by = ?, performed_at = ?, stage = ?, critical = ?,
                  exam_done_by = COALESCE(exam_done_by, ?), exam_done_by_id = COALESCE(exam_done_by_id, ?), exam_done_at = COALESCE(exam_done_at, ?),
                  verified_by = ?, verified_at = ?
           WHERE id = ?`,
-    args: [input.report, s.user.full_name_ar, now, verify ? 'verified' : 'reported', s.user.full_name_ar, s.user.id, now, verify ? s.user.full_name_ar : null, verify ? now : null, id],
+    args: [input.report, s.user.full_name_ar, now, verify ? 'verified' : 'reported', input.critical ? 1 : 0, s.user.full_name_ar, s.user.id, now, verify ? s.user.full_name_ar : null, verify ? now : null, id],
   });
   await track(c, s, a.id, 'radiology', 'إعداد تقرير أشعة', 'Radiology report ready', 'radiology_report_updated', 'radiology_report', id);
+  const studyName = String(study.study_type_ar ?? study.study_type);
+  const studyNameEn = String(study.study_type_en ?? study.study_type_ar ?? study.study_type);
   await notifyAdmission(a.id, {
     toAttending: true,
     // من طلب الفحص يُبلَّغ دائماً (حتى لو لم يكن في فريق الرعاية، مثل زيارة «فحص فقط»)
     userIds: study.ordered_by_id ? [String(study.ordered_by_id)] : [],
     tab: 'radiology',
     kind: 'radiology_reported',
-    titleAr: `تقرير أشعة جاهز: ${String(study.study_type_ar ?? study.study_type)}`,
-    titleEn: `Radiology report ready: ${String(study.study_type_en ?? study.study_type_ar ?? study.study_type)}`,
+    severity: input.critical ? 'critical' : 'info',
+    titleAr: input.critical ? `نتيجة حرجة — ${studyName}` : `تقرير أشعة جاهز: ${studyName}`,
+    titleEn: input.critical ? `Critical finding — ${studyNameEn}` : `Radiology report ready: ${studyNameEn}`,
+    bodyAr: input.critical ? 'يحتاج تبليغاً وتقييماً فورياً' : undefined,
+    bodyEn: input.critical ? 'Needs immediate notification and review' : undefined,
     createdById: s.user.id,
   });
   return c.json(await fetchRow('radiology_reports', id), 200);

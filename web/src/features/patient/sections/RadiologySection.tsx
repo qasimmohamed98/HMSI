@@ -100,6 +100,7 @@ export function RadiologySection({ chart, canOrder, canResult, onNeedVisit, auto
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {r.critical && <Badge variant="danger">{t('imaging.critical')}</Badge>}
                   {r.priority && r.priority !== 'routine' && <Badge variant={r.priority === 'stat' ? 'danger' : 'warning'}>{t(`imaging.priorities.${r.priority}`)}</Badge>}
                   <Badge variant={r.stage === 'verified' ? 'success' : r.stage === 'reported' ? 'info' : r.stage === 'performed' ? 'brand' : 'warning'}>{t(`imaging.stages.${r.stage ?? (r.report ? 'verified' : 'ordered')}`)}</Badge>
                   {r.report && (
@@ -133,6 +134,13 @@ export function RadiologySection({ chart, canOrder, canResult, onNeedVisit, auto
                   <p className="text-sm leading-relaxed text-ink/85">{r.report}</p>
                   {r.stage === 'reported' && <p className="mt-1.5 text-xs font-semibold text-info-600 dark:text-info-300">{t('imaging.preliminaryNote')}</p>}
                   {r.performed_by && <p className="mt-1.5 text-xs text-ink/45">{t('radiology.performedBy')}: {r.performed_by}</p>}
+                  {r.addendum && (
+                    <div className="mt-2.5 rounded-md border border-warning-300 bg-warning-50 px-3 py-2 dark:border-warning-700 dark:bg-warning-900/25">
+                      <p className="text-xs font-bold text-warning-800 dark:text-warning-200">{t('imaging.addendumLabel')}</p>
+                      <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-ink/85">{r.addendum}</p>
+                      <p className="mt-1 text-xs text-ink/45">{t('imaging.addendumBy', { name: r.addendum_by ?? '—', at: r.addendum_at ? fmtDateTime(r.addendum_at) : '—' })}</p>
+                    </div>
+                  )}
                 </div>
               )}
               <RecordFiles chart={chart} recordType="radiology" recordId={r.id} />

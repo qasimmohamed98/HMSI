@@ -1224,6 +1224,45 @@ console.log('\n— الأشعة: نموذج الطلب وقائمة العمل �
   const done = (await rx.get('/radiology/worklist?view=done')).json.items.filter((x: any) => x.patient_id === pid);
   check('عرض «المنتهية» يضم التقريرين', done.length === 2);
   check('المنتهية لا تبقى في القائمة الجارية', (await rx.get('/radiology/worklist')).json.items.every((x: any) => x.patient_id !== pid));
+
+  // قوالب التقارير الجاهزة
+  check('الفني لا يُنشئ قوالب (403)', (await rx.post('/report-templates', { modality: 'CT', title_ar: 'قالب فني', body_ar: 'نص' })).status === 403);
+  const tpl = await rdoc.post('/report-templates', { modality: 'CT', title_ar: 'مفراس بطن طبيعي', body_ar: 'مفراس البطن والحوض ضمن الحدود الطبيعية.' });
+  check('طبيب الأشعة ينشئ قالباً', tpl.status === 201 && tpl.json.title_ar === 'مفراس بطن طبيعي');
+  const tplList = await rx.get('/report-templates?modality=CT');
+  check('الفني يرى القالب عند طلب نفس نوع الجهاز', tplList.json.some((x: any) => x.id === tpl.json.id));
+
+  // اعتماد التقرير الأولي كما هو (طبيب الأشعة يوافق على تقرير الفني دون تعديل)
+  check('الفني لا يعتمد تقريراً (403)', (await rx.post(`/radiology/${routineId}/verify`)).status === 403);
+  check('لا اعتماد لتقرير معتمد بالفعل (409)', (await rdoc.post(`/radiology/${statId}/verify`)).status === 409);
+  const verified = await rdoc.post(`/radiology/${routineId}/verify`);
+  check('طبيب الأشعة يعتمد التقرير الأولي كما هو', verified.status === 204);
+  const afterVerify = await st(routineId);
+  check('مرحلته صارت «معتمد» وسُجِّل اسم المعتمِد', afterVerify.stage === 'verified' && afterVerify.verified_by === 'طبيب أشعة');
+
+  // طلب ثالث بلا تقرير بعد — يُستخدم لاختبار رفض الملحق قبل الاعتماد
+  const routine2 = await mgr.post(`/patients/${enc}/radiology`, { admission_id: enc, service_id: xr.id, priority: 'routine' });
+  check('لا ملحق على طلب لم يُعتمد بعد (409)', (await rdoc.post(`/radiology/${routine2.json.id}/addendum`, { addendum: 'ملحق' })).status === 409);
+
+  // التقرير المعتمد لا يُعدَّل — إضافة ملحق فقط
+  check('تعديل تقرير معتمد مباشرة مرفوض (409)', (await rdoc.patch(`/patients/${enc}/radiology/${routineId}`, { report: 'نص آخر' })).json?.code === 'already_verified');
+  check('الفني لا يضيف ملحقاً (403)', (await rx.post(`/radiology/${routineId}/addendum`, { addendum: 'ملحق' })).status === 403);
+  const addRes = await rdoc.post(`/radiology/${routineId}/addendum`, { addendum: 'أُعيد فحص الصور: لا تغيّر عن التقرير الأصلي.' });
+  check('طبيب الأشعة يضيف ملحقاً على تقرير معتمد', addRes.status === 200);
+  const afterAdd = (await rx.get('/radiology/worklist?view=done')).json.items.find((x: any) => x.id === routineId);
+  check('الملحق يظهر في قائمة العمل مع اسم من أضافه', afterAdd?.addendum?.includes('لا تغيّر') && afterAdd.addendum_by === 'طبيب أشعة');
+  const nAdd = ((await mgr.get('/notifications')).json as any[]).find((n) => n.kind === 'radiology_addendum');
+  check('من طلب الفحص يُبلَّغ بالملحق', Boolean(nAdd));
+
+  // نتيجة حرجة: تقرير بعلم «حرج» يُنبَّه له بخطورة حرجة حتى لو كان أولوية الطلب روتينية
+  await rx.patch(`/patients/${enc}/radiology/${routine2.json.id}`, { report: 'استرواح صدري كبير.', critical: true });
+  const critItem = (await rx.get('/radiology/worklist?view=done')).json.items.find((x: any) => x.id === routine2.json.id);
+  check('علم النتيجة الحرجة يُحفظ ويظهر في قائمة العمل', critItem?.critical === true);
+  const nCrit = ((await mgr.get('/notifications')).json as any[]).find((n) => n.kind === 'radiology_reported' && n.title_ar.startsWith('نتيجة حرجة'));
+  check('النتيجة الحرجة تُنبَّه بخطورة حرجة', nCrit?.severity === 'critical');
+
+  check('الفني لا يحذف قالباً (403)', (await rx.del(`/report-templates/${tpl.json.id}`)).status === 403);
+  check('طبيب الأشعة يحذف القالب', (await rdoc.del(`/report-templates/${tpl.json.id}`)).status === 204);
 }
 
 

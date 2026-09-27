@@ -37,6 +37,7 @@ import { handoverRoutes } from './routes/handover.js';
 import { careTeamRoutes } from './routes/careTeam.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { radiologyRoutes } from './routes/radiology.js';
+import { reportTemplateRoutes } from './routes/reportTemplates.js';
 
 export const api = new Hono();
 
@@ -95,6 +96,7 @@ api.route('/api/notifications', notificationRoutes);
 api.route('/api/push', pushRoutes);
 api.route('/api/services', serviceRoutes);
 api.route('/api/radiology', radiologyRoutes);
+api.route('/api/report-templates', reportTemplateRoutes);
 api.route('/api/medication-rounds', roundsRoutes);
 api.route('/api/handover', handoverRoutes);
 api.route('/api/care-team', careTeamRoutes);

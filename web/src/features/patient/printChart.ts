@@ -1,10 +1,11 @@
 import type { TFunction } from 'i18next';
 import type { User } from '@hmsi/shared';
 import { calcMews } from '@hmsi/shared';
-import type { ChartData } from '@/lib/api';
+import type { ChartData, RadiologyWorkItem } from '@/lib/api';
 import { calcAge, doctorName, fmtDate, fmtDateTime, localName } from '@/lib/format';
 import { jsonParse } from '@/lib/demo-data';
 import { esc, htmlTable, openPrintDocument } from '@/lib/print-doc';
+import { currentLang } from '@/i18n';
 
 /**
  * مطبوعات المريض على A4 بشعار المستشفى: الملف الطبي كاملاً، تقرير التحاليل، تقرير الأشعة، ملخص الخروج.
@@ -67,7 +68,8 @@ function radiologyBlocks(chart: ChartData, t: TFunction, onlyId?: string): strin
     .map(
       (r) => `<h2>${esc(r.study_type_ar)}${r.study_type_en ? ` <span class="muted">(${esc(r.study_type_en)})</span>` : ''}</h2>
 <p class="muted">${esc(t('reports.cols.ordered_at'))}: ${esc(fmtDateTime(r.ordered_at))} · ${esc(t('reports.cols.ordered_by'))}: ${esc(r.ordered_by)}${r.performed_by ? ` · ${esc(t('reports.cols.performed_by'))}: ${esc(r.performed_by)}` : ''}</p>
-<div class="box">${esc(r.report ?? '—')}</div>`,
+<div class="box">${esc(r.report ?? '—')}</div>
+${r.addendum ? `<h2 style="font-size:11pt;margin-top:8px">${esc(t('imaging.addendumLabel'))}</h2><p class="muted">${esc(t('imaging.addendumBy', { name: r.addendum_by ?? '—', at: r.addendum_at ? fmtDateTime(r.addendum_at) : '—' }))}</p><div class="box">${esc(r.addendum)}</div>` : ''}`,
     )
     .join('');
 }
@@ -181,6 +183,32 @@ export function printRadiologyReport(chart: ChartData, t: TFunction, user: User 
     title: t('print.radTitle'),
     meta: patientMeta(chart, t),
     body: radiologyBlocks(chart, t, reportId),
+    signatures: [t('print.radSign'), t('print.stamp')],
+  });
+}
+
+/** تقرير أشعة واحد من قائمة عمل الأشعة (بلا حاجة لفتح ملف المريض كاملاً) */
+export function printRadiologyWorkItem(item: RadiologyWorkItem, t: TFunction, user: User | null): void {
+  const en = currentLang() === 'en';
+  const meta: Meta = [
+    [t('patients.name'), item.full_name_ar + (item.full_name_en ? ` — ${item.full_name_en}` : '')],
+    [t('patients.fileNumber'), item.file_number],
+    [t('patients.age'), item.birth_date ? `${calcAge(item.birth_date)} ${t('common.years')}${item.gender ? ` · ${t(`gender.${item.gender}`)}` : ''}` : (item.gender ? t(`gender.${item.gender}`) : null)],
+    [t('encounter.type'), t(`encounter.types.${item.encounter_type}`)],
+    [t('patients.bed'), item.ward_name_ar ? `${localName({ name_ar: item.ward_name_ar, name_en: item.ward_name_en }, 'name')}${item.bed_no ? ` · ${item.bed_no}` : ''}` : null],
+    [t('encounter.referralSource'), item.referral_source],
+    [t('radiology.orderedBy'), `${item.ordered_by} · ${fmtDateTime(item.ordered_at)}`],
+  ];
+  const title = en && item.study_type_en ? item.study_type_en : item.study_type_ar;
+  const body = `<h2>${esc(title)}${item.modality ? ` <span class="muted">(${esc(item.modality)})</span>` : ''}</h2>
+${item.indication ? `<p class="muted">${esc(t('imaging.reasonLabel'))}: ${esc(item.indication)}</p>` : ''}
+<div class="box">${esc(item.report ?? '—')}</div>
+${item.addendum ? `<h2 style="font-size:11pt;margin-top:10px">${esc(t('imaging.addendumLabel'))}</h2><p class="muted">${esc(t('imaging.addendumBy', { name: item.addendum_by ?? '—', at: item.addendum_at ? fmtDateTime(item.addendum_at) : '—' }))}</p><div class="box">${esc(item.addendum)}</div>` : ''}`;
+  openPrintDocument({
+    ...base(user, t),
+    title: t('print.radTitle'),
+    meta,
+    body,
     signatures: [t('print.radSign'), t('print.stamp')],
   });
 }

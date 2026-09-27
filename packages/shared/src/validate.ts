@@ -231,6 +231,20 @@ export const TransferPatientSchema = z.object({
 
 export const UpdateRadiologySchema = z.object({
   report: z.string().min(2).max(4000),
+  /** نتيجة حرجة تُبلَّغ فوراً للطبيب المعالج ومن طلب الفحص */
+  critical: z.boolean().default(false),
+});
+
+export const AddendumSchema = z.object({
+  addendum: z.string().min(2).max(2000),
+});
+
+export const ReportTemplateSchema = z.object({
+  modality: z.enum(MODALITIES).optional().nullable(),
+  title_ar: z.string().min(2).max(120),
+  title_en: z.string().max(120).optional().nullable(),
+  body_ar: z.string().min(2).max(4000),
+  body_en: z.string().max(4000).optional().nullable(),
 });
 
 export const UpdateMedicationSchema = z.object({

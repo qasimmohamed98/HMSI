@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { imagingSafetyQuestions, imagingSafetyReview, type Modality, type SafetyAnswers } from '@hmsi/shared';
-import { PerformImagingSchema, ScheduleImagingSchema } from '@hmsi/shared/validate';
+import { PerformImagingSchema, ScheduleImagingSchema, AddendumSchema } from '@hmsi/shared/validate';
 import { db } from '../../db/index.js';
 import { getSession, requireAuth, requirePermission } from '../middleware/auth.js';
 import { parseBody } from '../lib/validate.js';
 import { writeAudit, addTimeline } from '../lib/audit.js';
+import { notifyAdmission } from '../lib/notify.js';
 import { clientIp } from '../config.js';
 import { HttpError } from '../lib/errors.js';
 import { isContrast } from './services.js';
@@ -103,6 +104,10 @@ function mapWorkItem(r: Row, byRecord: Map<string, Row[]>) {
     performed_by: str(r.performed_by),
     performed_at: str(r.performed_at),
     verified_by: str(r.verified_by),
+    critical: Number(r.critical ?? 0) === 1,
+    addendum: str(r.addendum),
+    addendum_by: str(r.addendum_by),
+    addendum_at: str(r.addendum_at),
     safety: {
       questions,
       answers,
@@ -262,4 +267,74 @@ radiologyRoutes.post('/:id/perform', requireAuth(), requirePermission('radiology
   });
   await writeAudit({ actorId: s.user.id, action: 'imaging_performed', resourceType: 'radiology_report', resourceId: id, meta: { unit: input.unit_id ?? null }, ip: clientIp(c) });
   return c.body(null, 204);
+});
+
+/** اعتماد تقرير أولي كما هو (طبيب الأشعة يوافق على تقرير الفني دون تعديل النص) */
+radiologyRoutes.post('/:id/verify', requireAuth(), requirePermission('radiology.verify'), async (c) => {
+  const s = getSession(c)!;
+  const id = c.req.param('id');
+  const r = await db.execute({
+    sql: `SELECT rr.id, rr.admission_id, rr.stage, rr.study_type_ar, rr.study_type_en FROM radiology_reports rr
+          JOIN admissions a ON a.id = rr.admission_id JOIN patients p ON p.id = a.patient_id WHERE rr.id = ? AND p.hospital_id = ?`,
+    args: [id, s.user.hospital_id],
+  });
+  const row = r.rows[0] as unknown as Row | undefined;
+  if (!row) throw new HttpError('طلب الأشعة غير موجود', 404);
+  if (String(row.stage) !== 'reported') return c.json({ message: 'لا يوجد تقرير أولي بانتظار الاعتماد' }, 409);
+  const now = new Date().toISOString();
+  await db.execute({
+    sql: `UPDATE radiology_reports SET stage = 'verified', verified_by = ?, verified_at = ? WHERE id = ?`,
+    args: [s.user.full_name_ar, now, id],
+  });
+  await addTimeline({
+    admissionId: String(row.admission_id),
+    actor: s.user.full_name_ar,
+    actorId: s.user.id,
+    type: 'radiology',
+    titleAr: `اعتُمد تقرير الأشعة: ${String(row.study_type_ar)}`,
+    titleEn: `Radiology report verified: ${String(row.study_type_ar)}`,
+  });
+  await writeAudit({ actorId: s.user.id, action: 'imaging_verified', resourceType: 'radiology_report', resourceId: id, ip: clientIp(c) });
+  return c.body(null, 204);
+});
+
+/** ملحق على تقرير معتمد بالفعل — لا يُعدَّل نص التقرير الأصلي، يُضاف إليه ملحق موقَّع ومؤرَّخ */
+radiologyRoutes.post('/:id/addendum', requireAuth(), requirePermission('radiology.verify'), async (c) => {
+  const parsed = await parseBody(c, AddendumSchema);
+  if (!parsed.ok) return parsed.json;
+  const input = parsed.data as (typeof AddendumSchema)['_output'];
+  const s = getSession(c)!;
+  const id = c.req.param('id');
+  const r = await db.execute({
+    sql: `SELECT rr.id, rr.admission_id, rr.stage, rr.study_type_ar, rr.study_type_en, rr.ordered_by_id FROM radiology_reports rr
+          JOIN admissions a ON a.id = rr.admission_id JOIN patients p ON p.id = a.patient_id WHERE rr.id = ? AND p.hospital_id = ?`,
+    args: [id, s.user.hospital_id],
+  });
+  const row = r.rows[0] as unknown as Row | undefined;
+  if (!row) throw new HttpError('طلب الأشعة غير موجود', 404);
+  if (String(row.stage) !== 'verified') return c.json({ message: 'الملحق يُضاف على تقرير معتمد فقط — عدّل التقرير مباشرة قبل الاعتماد' }, 409);
+  const now = new Date().toISOString();
+  await db.execute({
+    sql: `UPDATE radiology_reports SET addendum = ?, addendum_by = ?, addendum_by_id = ?, addendum_at = ? WHERE id = ?`,
+    args: [input.addendum, s.user.full_name_ar, s.user.id, now, id],
+  });
+  await addTimeline({
+    admissionId: String(row.admission_id),
+    actor: s.user.full_name_ar,
+    actorId: s.user.id,
+    type: 'radiology',
+    titleAr: `أُضيف ملحق لتقرير الأشعة: ${String(row.study_type_ar)}`,
+    titleEn: `Addendum added to radiology report: ${String(row.study_type_ar)}`,
+  });
+  await notifyAdmission(String(row.admission_id), {
+    toAttending: true,
+    userIds: row.ordered_by_id ? [String(row.ordered_by_id)] : [],
+    tab: 'radiology',
+    kind: 'radiology_addendum',
+    titleAr: `ملحق على تقرير أشعة: ${String(row.study_type_ar)}`,
+    titleEn: `Radiology report addendum: ${String(row.study_type_en ?? row.study_type_ar)}`,
+    createdById: s.user.id,
+  });
+  await writeAudit({ actorId: s.user.id, action: 'imaging_addendum', resourceType: 'radiology_report', resourceId: id, ip: clientIp(c) });
+  return c.json(await db.execute({ sql: `SELECT addendum, addendum_by, addendum_at FROM radiology_reports WHERE id = ?`, args: [id] }).then((res) => res.rows[0]), 200);
 });

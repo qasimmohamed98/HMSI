@@ -5,6 +5,7 @@ import type {
   ImagingStage,
   SafetyAnswers,
   SafetyQuestion,
+  ReportTemplate,
   DepartmentKind,
   DepartmentUnit,
   Modality,
@@ -50,7 +51,7 @@ import type {
 import { demoApi } from './api-demo';
 import { liveApi } from './api-live';
 
-export type { ChartData, ReportOverview };
+export type { ChartData, ReportOverview, ReportTemplate };
 
 export interface PatientListParams {
   search?: string;
@@ -185,6 +186,10 @@ export interface RadiologyWorkItem {
   performed_at: string | null;
   verified_by: string | null;
   scheduled_at: string | null;
+  critical: boolean;
+  addendum: string | null;
+  addendum_by: string | null;
+  addendum_at: string | null;
   safety: { questions: SafetyQuestion[]; answers: SafetyAnswers; warnings: string[]; unanswered: string[] };
   files: { id: string; admission_id: string; file_name: string; size: number }[];
 }
@@ -242,6 +247,7 @@ export interface LabResultInput {
 
 export interface RadiologyUpdateInput {
   report: string;
+  critical?: boolean;
 }
 
 export interface MedicationStatusInput {
@@ -772,6 +778,11 @@ export interface Api {
   radiologySchedule(date?: string): Promise<RadiologySchedule>;
   scheduleRadiology(id: string, input: { unitId: string; scheduledAt: string }): Promise<void>;
   unscheduleRadiology(id: string): Promise<void>;
+  verifyRadiology(id: string): Promise<void>;
+  addRadiologyAddendum(id: string, addendum: string): Promise<void>;
+  listReportTemplates(modality?: Modality): Promise<ReportTemplate[]>;
+  createReportTemplate(input: { modality?: Modality | null; titleAr: string; titleEn?: string | null; bodyAr: string; bodyEn?: string | null }): Promise<ReportTemplate>;
+  deleteReportTemplate(id: string): Promise<void>;
   // كتالوج الخدمات والأسعار
   listServices(filter?: { kind?: ServiceKind; modality?: Modality; q?: string; all?: boolean }): Promise<ServiceItem[]>;
   createService(input: ServiceInput): Promise<ServiceItem>;
