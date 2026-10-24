@@ -1,3 +1,4 @@
+import { bodyLimit } from 'hono/body-limit';
 import { Hono } from 'hono';
 import { contextStorage } from 'hono/context-storage';
 import { securityHeaders, csrfProtection, requireSecretOutsideLocal } from './middleware/security.js';
@@ -45,6 +46,13 @@ export const api = new Hono();
 // سياق الطلب متاح للمستودعات (فرض «الطبيب يرى مرضاه فقط» في getAdmissionScope)
 api.use('*', contextStorage());
 api.use('*', securityHeaders());
+// حدّ حجم طلبات JSON (1MB): تخفيف عملي لثغرة zod 3 (استنزاف ذاكرة عند التحقق من مجموعات ضخمة)
+// ريثما تُرقّى zod إلى 4 مع shared/web معاً. الرفع (multipart للمرفقات) خارج هذا الحدّ عمداً.
+const jsonBodyLimit = bodyLimit({ maxSize: 1024 * 1024, onError: (c) => c.json({ error: 'payload_too_large' }, 413) });
+api.use('*', async (c, next) => {
+  if ((c.req.header('content-type') ?? '').includes('application/json')) return jsonBodyLimit(c, next);
+  return next();
+});
 api.use('*', requireSecretOutsideLocal());
 api.use('*', async (_c, next) => {
   await ensureMigrated();

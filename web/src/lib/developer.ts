@@ -1,7 +1,7 @@
 /** بيانات مطوّر النظام — تظهر في الصفحات العامة وأسفل القائمة، ولا تظهر في مطبوعات المستشفيات */
 export const DEVELOPER = {
-  nameEn: 'Qasim Mohammed',
-  nameAr: 'قاسم محمد',
+  nameEn: 'Q Products',
+  nameAr: 'Q Products',
   email: 'qasimmohamed14@gmail.com',
   /** للاتصال (tel:) وواتساب (wa.me) */
   phone: '+9647744777950',

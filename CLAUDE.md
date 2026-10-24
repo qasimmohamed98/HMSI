@@ -1,10 +1,14 @@
-# HMSI — تعليمات للوكلاء
+# Q VIREXA (الاسم البرمجي HMSI) — تعليمات للوكلاء
+
+> **قاعدة ثابتة لمنع خلط اللغتين (طلب المالك 2026-10-16):** أي مصطلح تقني إنكليزي وسط جملة عربية (ملف، أمر، متغيّر، حزمة) بين backticks دائماً ولا يُصرَّف مع العربية؛ أي عبارة إنكليزية كاملة بين علامتي اقتباس أو بسطر مستقل، لا مدمجة وسط الجملة العربية.
+
+> المجلد كان `HMSI` وصار `Q VIREXA` ضمن مساحة `E:\QASIM\QPRODUCTS`؛ حزم npm وأسماء المستودع (`@hmsi/api`, `/opt/hmsi`) تبقى كما هي. راجع `..\CLAUDE.md` للإطار العام والهوية.
 
 اقرأ أولاً: [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) — حالة المشروع، القرارات المعتمدة، وخارطة الطريق.
 حدّثه بعد كل مهمة (علّم البنود المنجزة وأضف سطراً في سجل التحديثات).
 
 - Monorepo: `web/` (React+Vite)، `server/` (Hono+libsql، الحزمة `@hmsi/api`)، `packages/shared/` (أنواع + Zod + RBAC).
-- النشر: خادم Hostinger (`deploy/`، التحديث: `ssh qvps "bash /opt/hmsi/app/deploy/deploy.sh"` بعد الدفع إلى main مع `[skip netlify]`). Netlify تحويل فقط.
+- النشر: خادم Hostinger (`deploy/`، التحديث: `ssh qvps "bash /opt/hmsi/app/deploy/deploy.sh"` بعد الدفع إلى HMSI/main مع `[skip netlify]`. المجلد الآن جزء من مستودع QPRODUCTS ولا يحوي `.git` خاصاً به، فالدفع إلى HMSI يتم بـ `bash ../tools/publish-virexa.sh` (عرض الفروقات) ثم `--push "رسالة"` بطلب المالك). Netlify تحويل فقط.
 - قبل التسليم: `npm run typecheck && npm test && npm run build` — كلها يجب أن تنجح.
 - كل استعلام في `server/src/repos` مقيّد بـ `hospitalId` (عزل المستشفيات)؛ السجلات الطبية عبر `getAdmissionScope`.
 - لا تشغّل seed على قاعدة الإنتاج (`server/.env` يشير إلى Turso حقيقي). `npm test` يستخدم قاعدة مؤقتة.

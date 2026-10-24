@@ -1401,5 +1401,13 @@ console.log('\n— حذف بيانات التجربة والمستشفيات (آ
   check('الحذف مسجّل في التدقيق', (await n(`SELECT COUNT(*) AS n FROM audit_logs WHERE action IN ('demo_purged','hospital_purged')`)) === 2);
 }
 
+{
+  // حدّ حجم JSON: طلب 2MB يُرفض 413 قبل التحقق، وطلب عادي صغير لا يُرفض بسبب الحجم
+  const big = await api.request(`${BASE}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'x'.repeat(2 * 1024 * 1024), password: 'y' }) });
+  check('طلب JSON أكبر من 1MB يُرفض بـ413', big.status === 413, big.status);
+  const small = await api.request(`${BASE}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'nobody', password: 'wrong' }) });
+  check('طلب JSON صغير لا يُرفض بسبب الحجم', small.status !== 413, small.status);
+}
+
 console.log(`\n${passed} passed, ${failures} failed`);
 process.exit(failures > 0 ? 1 : 0);

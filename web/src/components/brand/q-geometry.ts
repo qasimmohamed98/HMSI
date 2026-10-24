@@ -1,4 +1,7 @@
 /**
+ * ملف مولَّد النسخ — المصدر الوحيد: QPRODUCTS/brand/q-geometry.ts
+ * لا تعدّل هذا الملف داخل أي مشروع؛ عدّل المصدر ثم شغّل `node brand/sync.mjs` (والفحص: `node brand/sync.mjs --check`).
+ *
  * هندسة علامة Q — مصدر واحد لكل مكان يُرسم فيه الرمز (الواجهة، المطبوعات، توليد الأيقونات).
  * القصة: الحلقة = المعمل، الفتحة عند 45° = البوابة، الخط يبدأ داخل الحلقة ويخرج منها = خط الإنتاج،
  * وفي الشعار الكامل ينحني الخط ليصبح سطراً يحمل اسم المنتج.
@@ -80,7 +83,7 @@ export function qMarkSvg(opts: { colors?: QColors; small?: boolean; padding?: nu
 
 /**
  * الشعار الكامل: Q + خط إنتاج ينحني ليحمل اسم المنتج.
- * wordWidth: عرض الاسم بخط Syncopate بحجم WORDMARK.size (يُقاس في المتصفح؛ التقدير الافتراضي تقريبي).
+ * wordWidth: عرض الاسم بخط Syncopate بحجم WORDMARK.size (يُقاس في المتصفح؛ الافتراضي من WORD_WIDTHS ثم تقدير تقريبي).
  */
 export function qLockupSvg(name: string, opts: { colors?: QColors; wordWidth?: number } = {}): string {
   const g = Q_REGULAR;
@@ -91,12 +94,15 @@ export function qLockupSvg(name: string, opts: { colors?: QColors; wordWidth?: n
   const t1: [number, number] = [xc - 0.70711 * rb, LINE_Y - rb + 0.70711 * rb];
   const [sx, sy] = pt(g, 45, g.start);
   const wordX = xc + 14;
-  const w = opts.wordWidth ?? estimateWordWidth(name);
+  const w = opts.wordWidth ?? WORD_WIDTHS[name] ?? estimateWordWidth(name);
   const endX = wordX + w;
   const x0 = g.cx - g.r - 9;
   const y0 = g.cy - g.r - 9;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f(x0)} ${f(y0)} ${f(endX + 8 - x0)} ${f(LINE_Y + g.s / 2 + 2 - y0)}" role="img" aria-label="Q ${escXml(name)}"><defs>${gradientDef(id, g, c)}</defs><path d="${ringPath(g)}" fill="none" stroke="${c.a}" stroke-width="${g.s}" stroke-linecap="butt"/><path d="M${f(sx)} ${f(sy)} L${f(t1[0])} ${f(t1[1])} A${rb} ${rb} 0 0 0 ${f(xc)} ${LINE_Y} L${f(endX)} ${LINE_Y}" fill="none" stroke="url(#${id})" stroke-width="${g.s}" stroke-linecap="round" stroke-linejoin="round"/><text x="${f(wordX)}" y="${LINE_Y - 17}" font-family="${WORDMARK.family}, 'Segoe UI', sans-serif" font-weight="${WORDMARK.weight}" font-size="${WORDMARK.size}" letter-spacing="${f(WORDMARK.size * WORDMARK.tracking)}" fill="${c.b}">${escXml(name)}</text></svg>`;
 }
+
+/** عرض الأسماء المقاس فعلياً (Syncopate 700، 58px، تباعد 0.06). اسم منتج جديد = أضف قياسه هنا */
+export const WORD_WIDTHS: Record<string, number> = { VIREXA: 300, CLINIC: 275.8, DOSE: 226.6, NOTES: 277.8, MOMENT: 358.4, PRODUCTS: 452.1, NOTE: 225.3, ERP: 163, PLAYER: 324.4, FORMS: 294.9, SCHOOL: 346.4, DINE: 200.4, FLOW: 239.7, LAB: 161.2, CARE: 219.9 };
 
 /** تقدير عرض الاسم إن لم يتوفر القياس (متوسط عرض أحرف Syncopate العريضة) */
 export function estimateWordWidth(name: string): number {
@@ -105,12 +111,13 @@ export function estimateWordWidth(name: string): number {
   return em * WORDMARK.size + WORDMARK.size * WORDMARK.tracking * Math.max(0, name.length - 1);
 }
 
-/** قياس دقيق في المتصفح بعد تحميل الخط */
+/** قياس دقيق في المتصفح بعد تحميل الخط (على الخادم يرجع إلى الجدول/التقدير) */
 export function measureWordWidth(name: string): number {
-  if (typeof document === 'undefined') return estimateWordWidth(name);
+  const doc = (globalThis as { document?: { createElement(tag: string): { getContext(id: string): { font: string; measureText(s: string): { width: number } } | null } } }).document;
+  if (!doc) return WORD_WIDTHS[name] ?? estimateWordWidth(name);
   try {
-    const ctx = document.createElement('canvas').getContext('2d');
-    if (!ctx) return estimateWordWidth(name);
+    const ctx = doc.createElement('canvas').getContext('2d');
+    if (!ctx) return WORD_WIDTHS[name] ?? estimateWordWidth(name);
     ctx.font = `${WORDMARK.weight} ${WORDMARK.size}px ${WORDMARK.family}`;
     const w = ctx.measureText(name).width + WORDMARK.size * WORDMARK.tracking * Math.max(0, name.length - 1);
     return w > 0 ? w : estimateWordWidth(name);

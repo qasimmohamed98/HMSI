@@ -538,7 +538,7 @@ export const GUIDE_AR: GuideContent = {
     { q: 'لا أسمع صوت التنبيهات؟', a: 'انقر أي مكان في الصفحة بعد فتح النظام (المتصفح يمنع الصوت قبل ذلك)، وتأكد أن الصوت مفعّل في «الإعدادات» ← «التنبيهات» وفي الحاسوب نفسه. جرّب زر «تجربة: حرج».' },
     { q: 'فقدت هاتفي وعليه تطبيق التحقق بخطوتين؟', a: 'ادخل بأحد رموز الاسترداد بدل رمز التطبيق، أو اطلب من مدير المستشفى إعادة ضبط التحقق بخطوتين لحسابك.' },
     { q: 'كيف أغيّر لغة النظام؟', a: 'اضغط زر EN / ع في الشريط العلوي، أو من «الإعدادات» ← اللغة.' },
-    { q: 'كيف أتواصل مع الدعم الفني أو مطوّر النظام؟', a: 'تطوير: قاسم محمد — البريد qasimmohamed14@gmail.com — الهاتف وواتساب ‎+964 774 477 7950. لمشكلات الحسابات والصلاحيات راجع مدير مستشفاك أولاً.' },
+    { q: 'كيف أتواصل مع الدعم الفني أو مطوّر النظام؟', a: 'تطوير: Q Products — البريد qasimmohamed14@gmail.com — الهاتف وواتساب ‎+964 774 477 7950. لمشكلات الحسابات والصلاحيات راجع مدير مستشفاك أولاً.' },
   ],
 };
 
@@ -1018,6 +1018,6 @@ export const GUIDE_EN: GuideContent = {
     { q: 'I cannot hear the alert sounds?', a: 'Click anywhere on the page after opening the system (browsers block sound before that), and make sure sound is on in Settings → alerts and on the computer itself. Try the "Test: critical" button.' },
     { q: 'I lost the phone with my 2-step verification app?', a: 'Sign in with one of your recovery codes instead of the app code, or ask the hospital admin to reset 2-step verification for your account.' },
     { q: 'How do I change the language?', a: 'Press EN / ع in the top bar, or Settings → Language.' },
-    { q: 'How do I contact technical support or the developer?', a: 'Developed by Qasim Mohammed — email qasimmohamed14@gmail.com — phone & WhatsApp +964 774 477 7950. For account and permission issues, ask your hospital admin first.' },
+    { q: 'How do I contact technical support or the developer?', a: 'Developed by Q Products — email qasimmohamed14@gmail.com — phone & WhatsApp +964 774 477 7950. For account and permission issues, ask your hospital admin first.' },
   ],
 };

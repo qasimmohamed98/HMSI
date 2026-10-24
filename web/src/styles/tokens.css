@@ -3,24 +3,26 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Cairo", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans Arabic", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --color-brand-50: #effaf6;
-  --color-brand-100: #d7f2e8;
-  --color-brand-200: #b2e5d5;
-  --color-brand-300: #82d1bd;
-  --color-brand-400: #4fb6a0;
-  --color-brand-500: #2b9b86;
-  --color-brand-600: #1e7f6e;
-  --color-brand-700: #1c665a;
-  --color-brand-800: #1a5249;
-  --color-brand-900: #17443d;
-  --color-brand-950: #0a2823;
+  /* هوية Q Products الموحّدة: لون المنتج #0A9E88 (brand/tokens.json) */
+  --color-brand-50: #e8f8f5;
+  --color-brand-100: #c9efe8;
+  --color-brand-200: #9be0d4;
+  --color-brand-300: #62ccbc;
+  --color-brand-400: #2fb5a1;
+  --color-brand-500: #0a9e88;
+  --color-brand-600: #08826f;
+  --color-brand-700: #0a6859;
+  --color-brand-800: #0a5347;
+  --color-brand-900: #0a443b;
+  --color-brand-950: #042723;
 
-  --color-surface: #f6f8f7;
+  --color-surface: #f3f6f9;
   --color-surface-raised: #ffffff;
-  --color-surface-muted: #eef2f0;
-  --color-ink: #0f2420;
+  --color-surface-muted: #e9eef4;
+  --color-ink: #101b3d;
 
   --color-danger-50: #fff1f2;
   --color-danger-100: #ffe0e2;
@@ -76,9 +78,9 @@
   --radius-xl: 1.375rem;
   --radius-full: 9999px;
 
-  --shadow-card: 0 1px 2px rgb(15 36 32 / 0.04), 0 4px 16px rgb(15 36 32 / 0.06);
-  --shadow-float: 0 8px 30px rgb(15 36 32 / 0.14);
-  --shadow-pop: 0 12px 48px rgb(15 36 32 / 0.18);
+  --shadow-card: 0 1px 2px rgb(16 27 61 / 0.05), 0 4px 14px rgb(16 27 61 / 0.06);
+  --shadow-float: 0 8px 30px rgb(16 27 61 / 0.14);
+  --shadow-pop: 0 12px 48px rgb(16 27 61 / 0.18);
 
   --animate-skeleton: skeleton 1.4s ease-in-out infinite;
   --animate-fade-up: fade-up 0.35s ease both;
@@ -101,6 +103,94 @@
     from { transform: translateX(var(--slide-from, -100%)); }
     to { transform: translateX(0); }
   }
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex-arabic-arabic-400.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex-arabic-latin-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-arabic-arabic-500.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-arabic-latin-500.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/plex-arabic-arabic-600.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/plex-arabic-latin-600.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/plex-arabic-arabic-700.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/plex-arabic-latin-700.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-mono-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/plex-mono-600.woff2') format('woff2');
 }
 
 /* ——— هوية Q VIREXA: خط الشعار (مضمَّن ليعمل دون اتصال) وألوان الرمز */
@@ -131,10 +221,10 @@
 }
 
 .dark {
-  --color-surface: #0d1716;
-  --color-surface-raised: #14211f;
-  --color-surface-muted: #1b2a27;
-  --color-ink: #e6efec;
+  --color-surface: #0c1636;
+  --color-surface-raised: #142048;
+  --color-surface-muted: #1b2a57;
+  --color-ink: #eaf0fa;
 }
 
 @layer base {
